@@ -60,7 +60,7 @@ class OdomPublisherNode(Node):
         )
 
         # Publisher
-        self._odom_pub = self.create_publisher(Odometry, 'wheel_odom', 10)
+        self._odom_pub = self.create_publisher(Odometry, 'odom/wheel', 10)
 
         self.get_logger().info(
             f'OdomPublisher ready: wheel_r={self._wheel_radius}m, '

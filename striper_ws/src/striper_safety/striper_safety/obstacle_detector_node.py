@@ -175,7 +175,7 @@ class ObstacleDetectorNode(Node):
             # Publish Range message
             range_msg = Range()
             range_msg.header.stamp = self.get_clock().now().to_msg()
-            range_msg.header.frame_id = f'{sensor.name}_link'
+            range_msg.header.frame_id = f'{sensor.name}_ultrasonic'
             range_msg.radiation_type = Range.ULTRASOUND
             range_msg.field_of_view = 0.26  # ~15 degrees
             range_msg.min_range = 0.02

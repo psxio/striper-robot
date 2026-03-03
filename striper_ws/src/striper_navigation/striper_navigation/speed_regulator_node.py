@@ -28,7 +28,7 @@ class SpeedRegulatorNode(Node):
         self.declare_parameter('max_accel', 0.5)  # m/s^2 max acceleration
         self.declare_parameter('ramp_distance', 0.3)  # meters to ramp up/down
         self.declare_parameter('control_rate', 20.0)  # Hz
-        self.declare_parameter('max_speed', 1.5)  # m/s hard limit
+        self.declare_parameter('max_speed', 1.0)  # m/s hard limit (matches nav2 max_velocity)
         self.declare_parameter('min_speed', 0.05)  # m/s minimum to consider moving
 
         self._target_speed = self.get_parameter('target_speed').value

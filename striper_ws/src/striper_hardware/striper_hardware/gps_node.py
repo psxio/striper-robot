@@ -11,7 +11,7 @@ import rclpy
 from rclpy.node import Node
 
 from sensor_msgs.msg import NavSatFix, NavSatStatus
-from std_msgs.msg import Float32, String
+from std_msgs.msg import Float32, String, UInt8MultiArray
 
 try:
     import serial
@@ -105,9 +105,14 @@ class GPSNode(Node):
         self._hdop_pub = self.create_publisher(Float32, 'gps/hdop', 10)
         self._quality_pub = self.create_publisher(String, 'gps/fix_quality', 10)
 
-        # RTCM correction subscriber (for network-based corrections)
+        # RTCM correction subscribers (for network-based corrections)
+        # UInt8MultiArray from ntrip_client_node (preferred binary format)
+        self._rtcm_bin_sub = self.create_subscription(
+            UInt8MultiArray, 'rtcm_corrections', self._rtcm_bin_cb, 10
+        )
+        # Legacy String subscriber on a separate topic for backward compat
         self._rtcm_sub = self.create_subscription(
-            String, 'rtcm_corrections', self._rtcm_cb, 10
+            String, 'rtcm_corrections_legacy', self._rtcm_cb, 10
         )
 
         # Serial read thread
@@ -241,8 +246,16 @@ class GPSNode(Node):
         quality_msg.data = f'{quality_str} (sats: {fix["num_sats"]})'
         self._quality_pub.publish(quality_msg)
 
+    def _rtcm_bin_cb(self, msg: UInt8MultiArray):
+        """Forward binary RTCM corrections from ntrip_client to GPS receiver."""
+        if self._rtcm_ser is not None and self._rtcm_ser.is_open:
+            try:
+                self._rtcm_ser.write(bytes(msg.data))
+            except Exception as e:
+                self.get_logger().debug(f'RTCM write error: {e}')
+
     def _rtcm_cb(self, msg: String):
-        """Forward RTCM corrections to GPS receiver."""
+        """Forward legacy string-encoded RTCM corrections to GPS receiver."""
         if self._rtcm_ser is not None and self._rtcm_ser.is_open:
             try:
                 self._rtcm_ser.write(msg.data.encode('latin-1'))

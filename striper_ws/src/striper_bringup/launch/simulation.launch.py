@@ -174,8 +174,8 @@ def generate_launch_description():
     # ==================== Simulated Sensors ====================
     fake_gps_node = Node(
         package='striper_simulation',
-        executable='fake_gps_node',
-        name='fake_gps_node',
+        executable='fake_gps',
+        name='fake_gps',
         output='screen',
         parameters=[{
             'use_sim_time': use_sim_time,
@@ -183,40 +183,85 @@ def generate_launch_description():
             'datum_longitude': -73.9855,
             'datum_altitude': 10.0,
             'publish_rate': 5.0,
-            'noise_stddev': 0.5,
+            'noise_std_m': 0.5,
         }],
         arguments=['--ros-args', '--log-level', log_level],
     )
 
     paint_visualizer_node = Node(
         package='striper_simulation',
-        executable='paint_visualizer_node',
-        name='paint_visualizer_node',
+        executable='paint_visualizer',
+        name='paint_visualizer',
         output='screen',
         parameters=[{'use_sim_time': use_sim_time}],
         arguments=['--ros-args', '--log-level', log_level],
     )
 
     # ==================== Safety (relaxed for simulation) ====================
-    safety_monitor_node = Node(
+    safety_supervisor_node = Node(
         package='striper_safety',
-        executable='safety_monitor_node',
-        name='safety_monitor_node',
+        executable='safety_supervisor',
+        name='safety_supervisor',
+        output='screen',
+        parameters=[{'use_sim_time': use_sim_time}],
+        arguments=['--ros-args', '--log-level', log_level],
+    )
+
+    obstacle_detector_node = Node(
+        package='striper_safety',
+        executable='obstacle_detector',
+        name='obstacle_detector',
         output='screen',
         parameters=[{
             'use_sim_time': use_sim_time,
-            'obstacle_stop_distance': 0.3,
-            'obstacle_warning_distance': 1.0,
-            'geofence_radius': 500.0,
+            'stop_distance': 0.3,
+            'warning_distance': 1.0,
         }],
+        arguments=['--ros-args', '--log-level', log_level],
+    )
+
+    geofence_node = Node(
+        package='striper_safety',
+        executable='geofence',
+        name='geofence',
+        output='screen',
+        parameters=[{'use_sim_time': use_sim_time}],
+        arguments=['--ros-args', '--log-level', log_level],
+    )
+
+    watchdog_node = Node(
+        package='striper_safety',
+        executable='watchdog',
+        name='watchdog',
+        output='screen',
+        parameters=[{'use_sim_time': use_sim_time}],
+        arguments=['--ros-args', '--log-level', log_level],
+    )
+
+    # ==================== Localization (Custom) ====================
+    datum_setter_node = Node(
+        package='striper_localization',
+        executable='datum_setter',
+        name='datum_setter',
+        output='screen',
+        parameters=[{'use_sim_time': use_sim_time}],
         arguments=['--ros-args', '--log-level', log_level],
     )
 
     # ==================== Application Nodes ====================
     path_manager_node = Node(
         package='striper_navigation',
-        executable='path_manager_node',
-        name='path_manager_node',
+        executable='path_manager',
+        name='path_manager',
+        output='screen',
+        parameters=[{'use_sim_time': use_sim_time}],
+        arguments=['--ros-args', '--log-level', log_level],
+    )
+
+    speed_regulator_node = Node(
+        package='striper_navigation',
+        executable='speed_regulator',
+        name='speed_regulator',
         output='screen',
         parameters=[{'use_sim_time': use_sim_time}],
         arguments=['--ros-args', '--log-level', log_level],
@@ -224,8 +269,8 @@ def generate_launch_description():
 
     paint_controller_node = Node(
         package='striper_navigation',
-        executable='paint_controller_node',
-        name='paint_controller_node',
+        executable='paint_controller',
+        name='paint_controller',
         output='screen',
         parameters=[{'use_sim_time': use_sim_time}],
         arguments=['--ros-args', '--log-level', log_level],
@@ -253,8 +298,14 @@ def generate_launch_description():
         fake_gps_node,
         paint_visualizer_node,
         # Safety
-        safety_monitor_node,
+        safety_supervisor_node,
+        obstacle_detector_node,
+        geofence_node,
+        watchdog_node,
+        # Localization (Custom)
+        datum_setter_node,
         # Application
         path_manager_node,
+        speed_regulator_node,
         paint_controller_node,
     ])

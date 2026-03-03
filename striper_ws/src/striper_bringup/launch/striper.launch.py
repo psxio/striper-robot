@@ -137,8 +137,8 @@ def generate_launch_description():
     # ==================== Hardware Drivers ====================
     motor_driver_node = Node(
         package='striper_hardware',
-        executable='motor_driver_node',
-        name='motor_driver_node',
+        executable='motor_driver',
+        name='motor_driver',
         output='screen',
         parameters=[{'use_sim_time': use_sim_time}],
         arguments=['--ros-args', '--log-level', log_level],
@@ -146,8 +146,8 @@ def generate_launch_description():
 
     imu_driver_node = Node(
         package='striper_hardware',
-        executable='imu_driver_node',
-        name='imu_driver_node',
+        executable='imu_node',
+        name='imu_node',
         output='screen',
         parameters=[{'use_sim_time': use_sim_time}],
         arguments=['--ros-args', '--log-level', log_level],
@@ -155,8 +155,8 @@ def generate_launch_description():
 
     gps_driver_node = Node(
         package='striper_hardware',
-        executable='gps_driver_node',
-        name='gps_driver_node',
+        executable='gps_node',
+        name='gps_node',
         output='screen',
         parameters=[{'use_sim_time': use_sim_time}],
         arguments=['--ros-args', '--log-level', log_level],
@@ -164,8 +164,8 @@ def generate_launch_description():
 
     paint_valve_node = Node(
         package='striper_hardware',
-        executable='paint_valve_node',
-        name='paint_valve_node',
+        executable='paint_valve',
+        name='paint_valve',
         output='screen',
         parameters=[{'use_sim_time': use_sim_time}],
         arguments=['--ros-args', '--log-level', log_level],
@@ -177,25 +177,84 @@ def generate_launch_description():
         actions=[
             Node(
                 package='striper_safety',
-                executable='safety_monitor_node',
-                name='safety_monitor_node',
+                executable='safety_supervisor',
+                name='safety_supervisor',
+                output='screen',
+                parameters=[{'use_sim_time': use_sim_time}],
+                arguments=['--ros-args', '--log-level', log_level],
+            ),
+            Node(
+                package='striper_safety',
+                executable='obstacle_detector',
+                name='obstacle_detector',
                 output='screen',
                 parameters=[{
                     'use_sim_time': use_sim_time,
-                    'obstacle_stop_distance': 0.5,
-                    'obstacle_warning_distance': 1.5,
-                    'geofence_radius': 100.0,
+                    'stop_distance': 0.5,
+                    'warning_distance': 1.5,
                 }],
+                arguments=['--ros-args', '--log-level', log_level],
+            ),
+            Node(
+                package='striper_safety',
+                executable='geofence',
+                name='geofence',
+                output='screen',
+                parameters=[{'use_sim_time': use_sim_time}],
+                arguments=['--ros-args', '--log-level', log_level],
+            ),
+            Node(
+                package='striper_safety',
+                executable='watchdog',
+                name='watchdog',
+                output='screen',
+                parameters=[{'use_sim_time': use_sim_time}],
+                arguments=['--ros-args', '--log-level', log_level],
+            ),
+            Node(
+                package='striper_safety',
+                executable='operator_override',
+                name='operator_override',
+                output='screen',
+                parameters=[{'use_sim_time': use_sim_time}],
                 arguments=['--ros-args', '--log-level', log_level],
             ),
         ],
     )
 
+    # ==================== Localization (Custom) ====================
+    odom_publisher_node = Node(
+        package='striper_localization',
+        executable='odom_publisher',
+        name='odom_publisher',
+        output='screen',
+        parameters=[{'use_sim_time': use_sim_time}],
+        arguments=['--ros-args', '--log-level', log_level],
+    )
+
+    datum_setter_node = Node(
+        package='striper_localization',
+        executable='datum_setter',
+        name='datum_setter',
+        output='screen',
+        parameters=[{'use_sim_time': use_sim_time}],
+        arguments=['--ros-args', '--log-level', log_level],
+    )
+
     # ==================== Application Nodes ====================
     path_manager_node = Node(
         package='striper_navigation',
-        executable='path_manager_node',
-        name='path_manager_node',
+        executable='path_manager',
+        name='path_manager',
+        output='screen',
+        parameters=[{'use_sim_time': use_sim_time}],
+        arguments=['--ros-args', '--log-level', log_level],
+    )
+
+    speed_regulator_node = Node(
+        package='striper_navigation',
+        executable='speed_regulator',
+        name='speed_regulator',
         output='screen',
         parameters=[{'use_sim_time': use_sim_time}],
         arguments=['--ros-args', '--log-level', log_level],
@@ -203,8 +262,8 @@ def generate_launch_description():
 
     paint_controller_node = Node(
         package='striper_navigation',
-        executable='paint_controller_node',
-        name='paint_controller_node',
+        executable='paint_controller',
+        name='paint_controller',
         output='screen',
         parameters=[{'use_sim_time': use_sim_time}],
         arguments=['--ros-args', '--log-level', log_level],
@@ -231,7 +290,11 @@ def generate_launch_description():
         paint_valve_node,
         # Safety
         safety_group,
+        # Localization (Custom)
+        odom_publisher_node,
+        datum_setter_node,
         # Application
         path_manager_node,
+        speed_regulator_node,
         paint_controller_node,
     ])

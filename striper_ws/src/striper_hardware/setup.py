@@ -26,6 +26,7 @@ setup(
             'motor_driver = striper_hardware.motor_driver_node:main',
             'imu_node = striper_hardware.imu_node:main',
             'gps_node = striper_hardware.gps_node:main',
+            'ntrip_client = striper_hardware.ntrip_client_node:main',
         ],
     },
 )

@@ -10,7 +10,7 @@ import rclpy
 from rclpy.node import Node
 
 from geometry_msgs.msg import Twist
-from std_msgs.msg import Bool
+from std_msgs.msg import Bool, Float32
 
 from striper_msgs.msg import SafetyStatus
 
@@ -71,6 +71,9 @@ class SafetySupervisorNode(Node):
         self._watchdog_sub = self.create_subscription(
             Bool, 'safety/watchdog_timeout', self._watchdog_cb, 10
         )
+        self._obstacle_dist_sub = self.create_subscription(
+            Float32, 'safety/obstacle_distance', self._obstacle_dist_cb, 10
+        )
 
         # Cmd_vel input (from Nav2 or manual) and safety override output
         self._cmd_vel_sub = self.create_subscription(
@@ -99,6 +102,9 @@ class SafetySupervisorNode(Node):
 
     def _watchdog_cb(self, msg: Bool):
         self._watchdog_timeout = msg.data
+
+    def _obstacle_dist_cb(self, msg: Float32):
+        self._obstacle_distance = msg.data if msg.data >= 0.0 else float('inf')
 
     def _cmd_vel_cb(self, msg: Twist):
         self._last_cmd_vel = msg
@@ -154,7 +160,7 @@ class SafetySupervisorNode(Node):
         status.estop_active = self._estop_active
         status.obstacle_detected = self._obstacle_detected
         status.geofence_violation = self._geofence_violation
-        status.obstacle_distance = self._obstacle_distance
+        status.obstacle_distance = min(self._obstacle_distance, 999.0)
         status.safety_level = self._safety_level
         status.status_message = self._level_name(self._safety_level)
         self._status_pub.publish(status)
