@@ -1,0 +1,17 @@
+# Goal
+string job_id
+striper_msgs/PaintSegment[] segments
+---
+# Result
+bool success
+float32 total_distance_m
+float32 paint_used_ml
+uint32 segments_completed
+string message
+---
+# Feedback
+uint32 current_segment
+uint32 total_segments
+float32 progress_percent
+geometry_msgs/Point current_position
+float32 current_speed

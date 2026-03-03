@@ -1,0 +1,204 @@
+<?xml version="1.0" ?>
+<sdf version="1.8">
+  <world name="parking_lot">
+
+    <!-- Physics -->
+    <physics name="default_physics" type="ode">
+      <max_step_size>0.001</max_step_size>
+      <real_time_factor>1.0</real_time_factor>
+      <real_time_update_rate>1000</real_time_update_rate>
+    </physics>
+
+    <!-- Sun -->
+    <light type="directional" name="sun">
+      <cast_shadows>true</cast_shadows>
+      <pose>0 0 50 0 0 0</pose>
+      <diffuse>0.9 0.9 0.9 1</diffuse>
+      <specular>0.3 0.3 0.3 1</specular>
+      <attenuation>
+        <range>1000</range>
+        <constant>0.9</constant>
+        <linear>0.01</linear>
+        <quadratic>0.001</quadratic>
+      </attenuation>
+      <direction>-0.5 0.1 -0.9</direction>
+    </light>
+
+    <!-- Ground plane (100m x 100m asphalt) -->
+    <model name="ground_plane">
+      <static>true</static>
+      <link name="link">
+        <collision name="collision">
+          <geometry>
+            <plane>
+              <normal>0 0 1</normal>
+              <size>100 100</size>
+            </plane>
+          </geometry>
+          <surface>
+            <friction>
+              <ode>
+                <mu>0.8</mu>
+                <mu2>0.8</mu2>
+              </ode>
+            </friction>
+          </surface>
+        </collision>
+        <visual name="visual">
+          <geometry>
+            <plane>
+              <normal>0 0 1</normal>
+              <size>100 100</size>
+            </plane>
+          </geometry>
+          <material>
+            <ambient>0.3 0.3 0.3 1</ambient>
+            <diffuse>0.4 0.4 0.4 1</diffuse>
+            <specular>0.1 0.1 0.1 1</specular>
+          </material>
+        </visual>
+      </link>
+    </model>
+
+    <!-- Traffic cone 1 -->
+    <model name="cone_1">
+      <static>true</static>
+      <pose>10 5 0 0 0 0</pose>
+      <link name="link">
+        <collision name="collision">
+          <geometry>
+            <cone>
+              <radius>0.15</radius>
+              <length>0.45</length>
+            </cone>
+          </geometry>
+        </collision>
+        <visual name="visual">
+          <geometry>
+            <cone>
+              <radius>0.15</radius>
+              <length>0.45</length>
+            </cone>
+          </geometry>
+          <material>
+            <ambient>1.0 0.4 0.0 1</ambient>
+            <diffuse>1.0 0.5 0.0 1</diffuse>
+          </material>
+        </visual>
+      </link>
+    </model>
+
+    <!-- Traffic cone 2 -->
+    <model name="cone_2">
+      <static>true</static>
+      <pose>10 -5 0 0 0 0</pose>
+      <link name="link">
+        <collision name="collision">
+          <geometry>
+            <cone>
+              <radius>0.15</radius>
+              <length>0.45</length>
+            </cone>
+          </geometry>
+        </collision>
+        <visual name="visual">
+          <geometry>
+            <cone>
+              <radius>0.15</radius>
+              <length>0.45</length>
+            </cone>
+          </geometry>
+          <material>
+            <ambient>1.0 0.4 0.0 1</ambient>
+            <diffuse>1.0 0.5 0.0 1</diffuse>
+          </material>
+        </visual>
+      </link>
+    </model>
+
+    <!-- Bollard 1 -->
+    <model name="bollard_1">
+      <static>true</static>
+      <pose>20 0 0.5 0 0 0</pose>
+      <link name="link">
+        <collision name="collision">
+          <geometry>
+            <cylinder>
+              <radius>0.1</radius>
+              <length>1.0</length>
+            </cylinder>
+          </geometry>
+        </collision>
+        <visual name="visual">
+          <geometry>
+            <cylinder>
+              <radius>0.1</radius>
+              <length>1.0</length>
+            </cylinder>
+          </geometry>
+          <material>
+            <ambient>0.8 0.8 0.0 1</ambient>
+            <diffuse>0.9 0.9 0.0 1</diffuse>
+          </material>
+        </visual>
+      </link>
+    </model>
+
+    <!-- Bollard 2 -->
+    <model name="bollard_2">
+      <static>true</static>
+      <pose>-15 8 0.5 0 0 0</pose>
+      <link name="link">
+        <collision name="collision">
+          <geometry>
+            <cylinder>
+              <radius>0.1</radius>
+              <length>1.0</length>
+            </cylinder>
+          </geometry>
+        </collision>
+        <visual name="visual">
+          <geometry>
+            <cylinder>
+              <radius>0.1</radius>
+              <length>1.0</length>
+            </cylinder>
+          </geometry>
+          <material>
+            <ambient>0.8 0.8 0.0 1</ambient>
+            <diffuse>0.9 0.9 0.0 1</diffuse>
+          </material>
+        </visual>
+      </link>
+    </model>
+
+    <!-- Traffic cone 3 -->
+    <model name="cone_3">
+      <static>true</static>
+      <pose>-10 -10 0 0 0 0</pose>
+      <link name="link">
+        <collision name="collision">
+          <geometry>
+            <cone>
+              <radius>0.15</radius>
+              <length>0.45</length>
+            </cone>
+          </geometry>
+        </collision>
+        <visual name="visual">
+          <geometry>
+            <cone>
+              <radius>0.15</radius>
+              <length>0.45</length>
+            </cone>
+          </geometry>
+          <material>
+            <ambient>1.0 0.4 0.0 1</ambient>
+            <diffuse>1.0 0.5 0.0 1</diffuse>
+          </material>
+        </visual>
+      </link>
+    </model>
+
+  </world>
+</sdf>

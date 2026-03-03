@@ -1,0 +1,5 @@
+string job_id
+bool resume
+---
+bool success
+string message

@@ -1,0 +1,9 @@
+paint_solenoid: 17
+estop_input: 27
+status_led_green: 22
+status_led_red: 23
+status_led_blue: 24
+ultrasonic_front_left_trigger: 5
+ultrasonic_front_left_echo: 6
+ultrasonic_front_right_trigger: 13
+ultrasonic_front_right_echo: 19
