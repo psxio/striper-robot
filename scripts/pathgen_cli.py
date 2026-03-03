@@ -56,7 +56,7 @@ import sys
 # the pathgen package to sys.path.
 _SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))
 _PROJECT_ROOT = os.path.dirname(_SCRIPT_DIR)
-_PATHGEN_PKG = os.path.join(_PROJECT_ROOT, "striper_ws", "src", "striper_pathgen")
+_PATHGEN_PKG = os.path.join(_PROJECT_ROOT, "striper_pathgen")
 
 if _PATHGEN_PKG not in sys.path:
     sys.path.insert(0, _PATHGEN_PKG)
