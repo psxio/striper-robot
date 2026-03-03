@@ -626,6 +626,72 @@ def cmd_validate(args):
 
 
 # ---------------------------------------------------------------------------
+# Subcommand: layout
+# ---------------------------------------------------------------------------
+
+def cmd_layout(args):
+    """Generate a full mission from a lot layout JSON file."""
+    from striper_pathgen.lot_layout import LotLayout, generate_from_layout
+    from striper_pathgen.mission_planner import save_waypoints
+    from striper_pathgen.job_exporter import export_geojson
+    from striper_pathgen.waypoint_validator import validate_waypoints
+    from striper_pathgen.mission_planner import export_waypoints
+
+    layout = LotLayout.from_json(args.input)
+    print(f'Layout: "{layout.name}"')
+    print(f"  Datum: ({layout.datum.lat}, {layout.datum.lon}), heading {layout.heading} deg")
+    print(f"  Elements: {len(layout.elements)}")
+
+    job = generate_from_layout(layout, optimize=not args.no_optimize)
+    total_paint = sum(seg.path.length for seg in job.segments)
+    print(f"  Generated: {len(job.segments)} paint segments, {total_paint:.0f}m paint distance")
+
+    # Export waypoints
+    content = export_waypoints(
+        job=job,
+        datum_lat=layout.datum.lat,
+        datum_lon=layout.datum.lon,
+        datum_heading=layout.heading,
+        paint_speed=args.paint_speed,
+        transit_speed=args.transit_speed,
+    )
+    save_waypoints(
+        job=job,
+        filepath=args.output,
+        datum_lat=layout.datum.lat,
+        datum_lon=layout.datum.lon,
+        datum_heading=layout.heading,
+        paint_speed=args.paint_speed,
+        transit_speed=args.transit_speed,
+    )
+    print(f"  Wrote {args.output}")
+
+    # Validate
+    result = validate_waypoints(content)
+    if result.ok:
+        print(f"  Validation: PASS ({result.stats['total_commands']} commands)")
+    else:
+        print(f"  Validation: FAIL")
+        for e in result.errors:
+            print(f"    [!] {e}")
+
+    # Optional GeoJSON
+    if args.geojson:
+        geojson = export_geojson(job)
+        with open(args.geojson, "w") as f:
+            json.dump(geojson, f, indent=2)
+        print(f"  Wrote {args.geojson}")
+
+    # Job summary
+    paint_ft = total_paint * 3.281
+    gallons = paint_ft / 350
+    job_time_min = (total_paint / args.paint_speed) / 60
+    print(f"\n  Paint: {total_paint:.0f}m ({paint_ft:.0f}ft)")
+    print(f"  Est. paint: {gallons:.1f} gal (${gallons * 20:.0f})")
+    print(f"  Est. time: {job_time_min:.0f} min (+ transit)")
+
+
+# ---------------------------------------------------------------------------
 # Argument parser
 # ---------------------------------------------------------------------------
 
@@ -837,6 +903,33 @@ def build_parser() -> argparse.ArgumentParser:
     )
     p_validate.add_argument("--input", required=True, help="Path to .waypoints file")
     p_validate.set_defaults(func=cmd_validate)
+
+    # ── layout ────────────────────────────────────────────────────────────
+    p_layout = subparsers.add_parser(
+        "layout",
+        help="Generate a full mission from a lot layout JSON file",
+        description=(
+            "Read a parking lot layout JSON file and generate an ArduPilot\n"
+            ".waypoints mission file.  The layout file describes multiple rows,\n"
+            "arrows, crosswalks, etc. with positions and angles.\n\n"
+            "Example:\n"
+            "  pathgen_cli layout --input lot.json -o lot.waypoints --geojson lot.geojson"
+        ),
+        formatter_class=argparse.RawDescriptionHelpFormatter,
+    )
+    p_layout.add_argument("--input", required=True, help="Input lot layout JSON file")
+    p_layout.add_argument(
+        "--paint-speed", type=float, default=0.5,
+        help="Ground speed while painting in m/s (default: 0.5)",
+    )
+    p_layout.add_argument(
+        "--transit-speed", type=float, default=1.0,
+        help="Ground speed while transiting in m/s (default: 1.0)",
+    )
+    p_layout.add_argument("--no-optimize", action="store_true", help="Skip path optimization")
+    p_layout.add_argument("--geojson", type=str, default=None, help="Also export GeoJSON")
+    p_layout.add_argument("-o", "--output", required=True, help="Output .waypoints file path")
+    p_layout.set_defaults(func=cmd_layout)
 
     return parser
 

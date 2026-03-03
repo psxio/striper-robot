@@ -1,0 +1,40 @@
+{
+  "name": "Main Street Parking Lot",
+  "datum": {"lat": 30.2672, "lon": -97.7431},
+  "heading": 45.0,
+  "elements": [
+    {
+      "type": "parking_row",
+      "origin": [0.0, 0.0],
+      "angle": 0.0,
+      "count": 10,
+      "spacing": 2.7432,
+      "length": 5.4864,
+      "handicap": [0]
+    },
+    {
+      "type": "parking_row",
+      "origin": [0.0, 12.0],
+      "angle": 0.0,
+      "count": 10,
+      "spacing": 2.7432,
+      "length": 5.4864,
+      "handicap": [0, 9]
+    },
+    {
+      "type": "arrow",
+      "origin": [13.0, 6.0],
+      "angle": 90.0
+    },
+    {
+      "type": "arrow",
+      "origin": [13.0, 8.0],
+      "angle": 90.0
+    },
+    {
+      "type": "crosswalk",
+      "origin": [-2.0, 6.0],
+      "angle": 0.0
+    }
+  ]
+}
