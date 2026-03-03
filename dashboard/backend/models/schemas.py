@@ -51,6 +51,8 @@ class TemplateType(str, Enum):
     ANGLED_45 = "angled_45"
     HANDICAP = "handicap"
     COMPACT = "compact"
+    ARROW = "arrow"
+    CROSSWALK = "crosswalk"
 
 
 class TemplateRequest(BaseModel):
@@ -61,6 +63,11 @@ class TemplateRequest(BaseModel):
     spacing_ft: float = 9.0
     length_ft: float = 18.0
     include_end_lines: bool = True
+    # Arrow-specific
+    arrow_type: str = "straight"  # straight, left, right
+    # Crosswalk-specific
+    crosswalk_width_ft: float = 10.0
+    crosswalk_length_ft: float = 20.0
 
 
 class TemplateResponse(BaseModel):

@@ -1,6 +1,9 @@
 """Path management — upload, template generation, preview."""
 
 import math
+import os
+import sys
+import tempfile
 from typing import Any
 
 from fastapi import APIRouter, HTTPException, UploadFile
@@ -12,6 +15,13 @@ from ..models.schemas import (
     TemplateResponse,
     TemplateType,
 )
+
+# Add striper_pathgen to path so we can import it.
+_PATHGEN_DIR = os.path.normpath(
+    os.path.join(os.path.dirname(__file__), "..", "..", "..", "striper_ws", "src", "striper_pathgen")
+)
+if _PATHGEN_DIR not in sys.path:
+    sys.path.insert(0, _PATHGEN_DIR)
 
 router = APIRouter(prefix="/api/paths", tags=["paths"])
 
@@ -46,6 +56,17 @@ TEMPLATES = {
         "description": "Compact parking stalls, 8 ft wide x 16 ft deep",
         "default_spacing_ft": 8.0,
         "default_length_ft": 16.0,
+    },
+    TemplateType.ARROW: {
+        "name": "Directional Arrow",
+        "description": "Straight, left-turn, or right-turn arrow marking",
+        "arrow_types": ["straight", "left", "right"],
+    },
+    TemplateType.CROSSWALK: {
+        "name": "Crosswalk",
+        "description": "Parallel stripe crosswalk marking",
+        "default_width_ft": 10.0,
+        "default_length_ft": 20.0,
     },
 }
 
@@ -152,12 +173,78 @@ async def list_templates():
 
 @router.post("/template", response_model=TemplateResponse)
 async def generate_template(req: TemplateRequest):
+    # For arrow and crosswalk, use striper_pathgen's template generators.
+    if req.template_type in (TemplateType.ARROW, TemplateType.CROSSWALK):
+        try:
+            from striper_pathgen.models import Point2D as PGPoint2D
+            from striper_pathgen.template_generator import generate_arrow, generate_crosswalk
+        except ImportError:
+            raise HTTPException(
+                status_code=500,
+                detail="striper_pathgen not available for template generation",
+            )
+
+        origin = PGPoint2D(0.0, 0.0)
+        if req.template_type == TemplateType.ARROW:
+            paint_paths = generate_arrow(origin, req.angle, arrow_type=req.arrow_type)
+        else:
+            paint_paths = generate_crosswalk(
+                origin, req.angle,
+                width=req.crosswalk_width_ft * FT_TO_M,
+                length=req.crosswalk_length_ft * FT_TO_M,
+            )
+
+        features = _paint_paths_to_geojson(paint_paths, req.origin.lat, req.origin.lng)
+        return TemplateResponse(
+            template_type=req.template_type,
+            line_count=len(features),
+            geojson=PathPreview(features=features),
+        )
+
+    # Parking stall templates use the built-in geometric generator.
     features = _generate_lines(req)
     return TemplateResponse(
         template_type=req.template_type,
         line_count=len(features),
         geojson=PathPreview(features=features),
     )
+
+
+def _paint_paths_to_geojson(
+    paint_paths: list,
+    origin_lat: float = 30.2672,
+    origin_lng: float = -97.7431,
+) -> list[dict[str, Any]]:
+    """Convert striper_pathgen PaintPath objects to GeoJSON features.
+
+    PaintPaths use local meters, so we project them to lat/lng using the
+    CoordinateTransformer with a default datum (overridden per-job later).
+    """
+    from striper_pathgen.coordinate_transform import CoordinateTransformer
+
+    ct = CoordinateTransformer(origin_lat, origin_lng)
+    features: list[dict[str, Any]] = []
+
+    for idx, pp in enumerate(paint_paths):
+        coords = []
+        for wp in pp.waypoints:
+            geo = ct.local_to_geo(wp.x, wp.y)
+            coords.append([geo.lon, geo.lat])
+
+        features.append({
+            "type": "Feature",
+            "properties": {
+                "line_type": "paint_path",
+                "index": idx,
+                "color": getattr(pp, "color", "#FFFFFF"),
+                "line_width": getattr(pp, "line_width", 0.1),
+            },
+            "geometry": {
+                "type": "LineString",
+                "coordinates": coords,
+            },
+        })
+    return features
 
 
 @router.post("/upload", response_model=PathUploadResponse)
@@ -171,13 +258,55 @@ async def upload_path(file: UploadFile):
 
     content = await file.read()
 
-    # Placeholder: real implementation would parse DXF/SVG into GeoJSON.
-    # For now return a stub so the API contract is fulfilled.
+    # Write to a temp file so the importers can read it.
+    suffix = f".{ext}"
+    try:
+        with tempfile.NamedTemporaryFile(delete=False, suffix=suffix) as tmp:
+            tmp.write(content)
+            tmp_path = tmp.name
+
+        paint_paths: list = []
+        if ext == "dxf":
+            try:
+                from striper_pathgen.dxf_importer import import_dxf
+                paint_paths = import_dxf(tmp_path)
+            except ImportError:
+                raise HTTPException(
+                    status_code=422,
+                    detail="DXF support requires the 'ezdxf' package. Install with: pip install ezdxf",
+                )
+        elif ext == "svg":
+            try:
+                from striper_pathgen.svg_importer import import_svg
+                paint_paths = import_svg(tmp_path)
+            except ImportError:
+                raise HTTPException(
+                    status_code=422,
+                    detail="SVG support requires the 'svgpathtools' package. Install with: pip install svgpathtools",
+                )
+    finally:
+        os.unlink(tmp_path)
+
+    features = _paint_paths_to_geojson(paint_paths) if paint_paths else []
+
+    # Calculate bounds from all coordinates.
+    bounds = None
+    if features:
+        all_coords = [
+            c for f in features for c in f["geometry"]["coordinates"]
+        ]
+        lngs = [c[0] for c in all_coords]
+        lats = [c[1] for c in all_coords]
+        bounds = {
+            "south": min(lats), "north": max(lats),
+            "west": min(lngs), "east": max(lngs),
+        }
+
     return PathUploadResponse(
         filename=file.filename,
-        path_count=0,
-        bounds=None,
-        geojson=PathPreview(features=[]),
+        path_count=len(paint_paths),
+        bounds=bounds,
+        geojson=PathPreview(features=features),
     )
 
 
