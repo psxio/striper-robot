@@ -386,6 +386,79 @@ All competitors use the same approach we planned: **low-pressure diaphragm pump 
 
 ---
 
+## Market Opportunity: Parking Lot Striping Is Wide Open
+
+### Direct Competition (Parking Lots)
+
+| Competitor | Status | Funding | Target | Threat Level |
+|-----------|--------|---------|--------|-------------|
+| **10Lines** (Estonia) | Pre-commercial, full launch expected 2026 | EUR 2.2M total (EUR 700K seed 2021, EUR 1.5M 2024 led by Tera Ventures/Karista) | Parking lots, road markings | Medium — ESA-backed tech, software already used by 300+ companies, but hasn't shipped hardware yet |
+| **CivDot** (USA) | Commercial, expanding | $12.5M total ($7.5M Series A July 2025, Trimble + Converge) | Construction layout, some striping | Low-Medium — primarily construction, striping is secondary feature |
+| **Tyker/BauMotor** (Netherlands) | Commercial | Unknown | Road pre-marking, parking | Low — expensive, focused on roads/municipalities |
+
+**That's it.** Three companies, and only 10Lines is directly targeting parking lot striping — and they haven't shipped a robot yet.
+
+### The Sports Field Market Is Saturated (Don't Go Here)
+
+| Competitor | Price | Deployed | Funding/Backing |
+|-----------|-------|----------|----------------|
+| **Turf Tank** (Denmark) | ~$61,000 + $6-16K/yr subscription | 1,500+ robots, 5,000+ clients, 2 NFL stadiums | Tens of millions in revenue |
+| **TinyMobileRobots** (Denmark) | ~$30-40K est. + template fees | 2M+ fields marked, 35+ countries | $14.4M Series A + STIHL acquired 23.8% stake |
+| **SWOZI** (Switzerland) | $11K-$40K+ | Active globally | Unknown |
+| **FJD Dynamics** (China) | ~$160/wk rent-to-own | Growing | Large agtech parent company |
+| **Fleet Line Markers** (UK/NZ) | ~$19,000 + $1,600/yr | Launched 2024 | 70-year old line marking company |
+| **Traqnology** (Norway/US) | Quote-based | Active | NovAtel partnership |
+
+6+ well-funded competitors in sports fields. Red ocean.
+
+### Market Size
+
+- **Global line-marking robot market:** $322.92M (2025) → $454.42M by 2035 (3.5% CAGR)
+- **GPS line-marking robot market:** projected $1.2B by 2028 (14.3% CAGR)
+- **Architecture/construction marking segment:** ~40% of market (~$129M)
+- **Sports/stadium automation segment:** grown 32%
+
+### Why Parking Lots Are Underserved
+
+1. **GPS multipath near buildings** — satellite signals bounce off walls, reducing accuracy. Sports fields are open sky. Parking lots have buildings, light poles, trees nearby. RTK still works but needs better antennas/receivers (UM980's triple-band helps here).
+
+2. **More obstacles** — parked cars, curbs, speed bumps, pedestrians, light poles. Sports fields are flat open grass.
+
+3. **Surface differences** — asphalt/concrete vs grass. Paint adhesion, drying time, and durability requirements differ.
+
+4. **Fragmented customer base** — one sports complex might have 20 fields. Parking lots are one-off jobs at hundreds of different properties.
+
+5. **Sports field companies got funded first** — the use case is simpler, the customers (universities, cities) have bigger budgets, and the demo is more impressive (painting a football field in 30 minutes).
+
+### Our Competitive Advantages
+
+| Advantage | Detail |
+|-----------|--------|
+| **Price** | Sub-$1K robot vs $19K-61K commercial products |
+| **No subscription** | One-time build cost vs $6K-16K/year fees |
+| **Open architecture** | ArduPilot is open source, hackable, community-supported |
+| **Parking lot focus** | Purpose-built for asphalt, not retrofitted from sports |
+| **Network RTK** | No base station setup (competitors' #1 complaint) |
+| **First mover (US)** | 10Lines is in Estonia and hasn't shipped. CivDot is construction-first. |
+| **Path from DXF/SVG** | Import AutoCAD site plans directly (property managers already have these) |
+
+### What Customers Actually Care About (From Reviews/Forums)
+
+1. **Time savings** — #1 factor. Going from 3-4 days with a crew to an afternoon with one person.
+2. **Paint savings** — 50%+ reduction. Precise spray = less waste.
+3. **Consistency/repeatability** — same lot, same lines, every time. No human error.
+4. **One-person operation** — labor cost reduction is the real ROI driver.
+5. **No base station hassle** — biggest operational complaint across all competitors.
+
+### Revenue Model
+
+- **Per-job pricing:** $500-2K per parking lot (matching manual pricing but faster)
+- **Robot pays for itself in 2-3 jobs** at a $631 build cost
+- **RaaS potential:** $2K-5K/month recurring revenue per robot deployed
+- **Consumables:** ~$60-100 in paint per 50-space lot ($15-25/gallon, 4-5 gallons needed)
+
+---
+
 ## Sources
 
 ### Commercial Products
