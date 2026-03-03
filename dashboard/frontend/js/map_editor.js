@@ -171,6 +171,17 @@ const MapEditor = (() => {
         App.toast('Click on the map to place the template', 'info');
     }
 
+    function onTplTypeChange() {
+        const type = document.getElementById('tpl-type').value;
+        const isParking = ['standard','angled_60','angled_45','handicap','compact'].includes(type);
+        const isArrow = type === 'arrow';
+        const isCrosswalk = type === 'crosswalk';
+
+        document.querySelectorAll('.tpl-parking-param').forEach(el => el.style.display = isParking ? '' : 'none');
+        document.querySelectorAll('.tpl-arrow-param').forEach(el => el.style.display = isArrow ? '' : 'none');
+        document.querySelectorAll('.tpl-crosswalk-param').forEach(el => el.style.display = isCrosswalk ? '' : 'none');
+    }
+
     async function onMapClick(e) {
         if (!placementMode) return;
         placementMode = false;
@@ -179,15 +190,25 @@ const MapEditor = (() => {
         const count = parseInt(document.getElementById('tpl-count').value, 10) || 10;
         const angle = parseFloat(document.getElementById('tpl-angle').value) || 0;
 
+        const body = {
+            template_type: templateType,
+            origin: { lat: e.latlng.lat, lng: e.latlng.lng },
+            angle: angle,
+            count: count,
+        };
+
+        // Add type-specific params
+        if (templateType === 'arrow') {
+            body.arrow_type = document.getElementById('tpl-arrow-type').value;
+        } else if (templateType === 'crosswalk') {
+            body.crosswalk_width_ft = parseFloat(document.getElementById('tpl-crosswalk-width').value) || 10;
+            body.crosswalk_length_ft = parseFloat(document.getElementById('tpl-crosswalk-length').value) || 20;
+        }
+
         try {
             const data = await App.apiFetch('/api/paths/template', {
                 method: 'POST',
-                body: {
-                    template_type: templateType,
-                    origin: { lat: e.latlng.lat, lng: e.latlng.lng },
-                    angle: angle,
-                    count: count,
-                },
+                body: body,
             });
             displayGeoJSON(data.geojson);
             App.toast(`Placed ${data.line_count} lines`, 'success');
@@ -211,6 +232,7 @@ const MapEditor = (() => {
         placeTemplate,
         cancelPlacement,
         startPlacement,
+        onTplTypeChange,
         invalidateSize,
     };
 })();

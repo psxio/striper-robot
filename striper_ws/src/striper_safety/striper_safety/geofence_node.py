@@ -122,11 +122,11 @@ class GeofenceNode(Node):
         inside = False
         j = n - 1
         for i in range(n):
-            yi, xi = polygon[i]
-            yj, xj = polygon[j]
+            lat_i, lon_i = polygon[i]
+            lat_j, lon_j = polygon[j]
 
-            if ((yi > lon) != (yj > lon)) and \
-               (lat < (xj - xi) * (lon - yi) / (yj - yi) + xi):
+            if ((lat_i > lat) != (lat_j > lat)) and \
+               (lon < (lon_j - lon_i) * (lat - lat_i) / (lat_j - lat_i) + lon_i):
                 inside = not inside
             j = i
 

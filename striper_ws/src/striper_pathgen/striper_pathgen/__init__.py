@@ -20,6 +20,8 @@ from .template_generator import (
     load_template,
     save_template,
 )
+from .ros_converter import msg_to_paint_path, paint_job_to_msgs, paint_path_to_msg
+from .job_exporter import export_csv, export_geojson, export_kml
 
 __all__ = [
     # Models
@@ -43,4 +45,12 @@ __all__ = [
     "generate_from_template",
     "load_template",
     "save_template",
+    # ROS converter
+    "paint_path_to_msg",
+    "paint_job_to_msgs",
+    "msg_to_paint_path",
+    # Job exporters
+    "export_geojson",
+    "export_kml",
+    "export_csv",
 ]

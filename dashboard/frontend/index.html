@@ -133,18 +133,41 @@
             </div>
             <div class="form-group">
                 <label>Template</label>
-                <select id="input-job-template">
+                <select id="input-job-template" onchange="JobManager.onTemplateChange()">
                     <option value="">None (upload DXF/SVG)</option>
-                    <option value="standard">Standard (90&deg;)</option>
-                    <option value="angled_60">60&deg; Angled</option>
-                    <option value="angled_45">45&deg; Angled</option>
-                    <option value="handicap">Handicap</option>
-                    <option value="compact">Compact</option>
+                    <optgroup label="Parking">
+                        <option value="standard">Standard (90&deg;)</option>
+                        <option value="angled_60">60&deg; Angled</option>
+                        <option value="angled_45">45&deg; Angled</option>
+                        <option value="handicap">Handicap</option>
+                        <option value="compact">Compact</option>
+                    </optgroup>
+                    <optgroup label="Markings">
+                        <option value="arrow">Directional Arrow</option>
+                        <option value="crosswalk">Crosswalk</option>
+                    </optgroup>
                 </select>
             </div>
-            <div class="form-group" id="template-params" style="display:none;">
+            <div class="form-group parking-param" id="template-params" style="display:none;">
                 <label>Number of Stalls</label>
                 <input type="number" id="input-stall-count" value="10" min="1" max="100">
+            </div>
+            <div class="form-group arrow-param" style="display:none;">
+                <label>Arrow Type</label>
+                <select id="input-arrow-type">
+                    <option value="straight">Straight</option>
+                    <option value="left">Left Turn</option>
+                    <option value="right">Right Turn</option>
+                    <option value="u_turn">U-Turn</option>
+                </select>
+            </div>
+            <div class="form-group crosswalk-param" style="display:none;">
+                <label>Crosswalk Width (ft)</label>
+                <input type="number" id="input-crosswalk-width" value="10" min="4" max="30" step="0.5">
+            </div>
+            <div class="form-group crosswalk-param" style="display:none;">
+                <label>Crosswalk Length (ft)</label>
+                <input type="number" id="input-crosswalk-length" value="20" min="6" max="60" step="0.5">
             </div>
             <div class="form-group" id="file-upload-group">
                 <label>Upload Path File (DXF / SVG)</label>
@@ -160,20 +183,43 @@
     <!-- Template Placement Modal -->
     <div class="modal-overlay" id="modal-place-template">
         <div class="modal">
-            <h3>Place Parking Template</h3>
+            <h3>Place Template on Map</h3>
             <div class="form-group">
                 <label>Template Type</label>
-                <select id="tpl-type">
-                    <option value="standard">Standard (90&deg;)</option>
-                    <option value="angled_60">60&deg; Angled</option>
-                    <option value="angled_45">45&deg; Angled</option>
-                    <option value="handicap">Handicap</option>
-                    <option value="compact">Compact</option>
+                <select id="tpl-type" onchange="MapEditor.onTplTypeChange()">
+                    <optgroup label="Parking">
+                        <option value="standard">Standard (90&deg;)</option>
+                        <option value="angled_60">60&deg; Angled</option>
+                        <option value="angled_45">45&deg; Angled</option>
+                        <option value="handicap">Handicap</option>
+                        <option value="compact">Compact</option>
+                    </optgroup>
+                    <optgroup label="Markings">
+                        <option value="arrow">Directional Arrow</option>
+                        <option value="crosswalk">Crosswalk</option>
+                    </optgroup>
                 </select>
             </div>
-            <div class="form-group">
+            <div class="form-group tpl-parking-param">
                 <label>Number of Stalls</label>
                 <input type="number" id="tpl-count" value="10" min="1" max="100">
+            </div>
+            <div class="form-group tpl-arrow-param" style="display:none;">
+                <label>Arrow Type</label>
+                <select id="tpl-arrow-type">
+                    <option value="straight">Straight</option>
+                    <option value="left">Left Turn</option>
+                    <option value="right">Right Turn</option>
+                    <option value="u_turn">U-Turn</option>
+                </select>
+            </div>
+            <div class="form-group tpl-crosswalk-param" style="display:none;">
+                <label>Width (ft)</label>
+                <input type="number" id="tpl-crosswalk-width" value="10" min="4" max="30" step="0.5">
+            </div>
+            <div class="form-group tpl-crosswalk-param" style="display:none;">
+                <label>Length (ft)</label>
+                <input type="number" id="tpl-crosswalk-length" value="20" min="6" max="60" step="0.5">
             </div>
             <div class="form-group">
                 <label>Rotation (degrees)</label>

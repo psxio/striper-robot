@@ -1,0 +1,63 @@
+# ============================================================================
+# ci.yml — GitHub Actions CI for the Striper robot project
+#
+# Runs pathgen tests, dashboard tests, and an optional lint pass on every
+# push or pull request targeting the master branch.
+# ============================================================================
+
+name: CI
+
+on:
+  push:
+    branches: [master]
+  pull_request:
+    branches: [master]
+
+jobs:
+  test:
+    name: Test & Lint
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Python 3.11
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Cache pip packages
+        uses: actions/cache@v4
+        with:
+          path: ~/.cache/pip
+          key: ${{ runner.os }}-pip-${{ hashFiles('dashboard/requirements.txt', 'striper_ws/src/striper_pathgen/setup.py') }}
+          restore-keys: |
+            ${{ runner.os }}-pip-
+
+      - name: Install pathgen package
+        run: |
+          pip install --upgrade pip
+          pip install -e "striper_ws/src/striper_pathgen[all]"
+
+      - name: Install dashboard dependencies
+        run: |
+          pip install -r dashboard/requirements.txt
+
+      - name: Install test tooling
+        run: |
+          pip install pytest pytest-asyncio httpx
+
+      - name: Run pathgen tests
+        run: |
+          pytest striper_ws/src/striper_pathgen/tests/ -v --tb=short
+
+      - name: Run dashboard tests
+        run: |
+          pytest dashboard/tests/ -v --tb=short
+
+      - name: Lint with ruff (non-blocking)
+        continue-on-error: true
+        run: |
+          pip install ruff
+          ruff check . --output-format=github

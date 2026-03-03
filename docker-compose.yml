@@ -1,0 +1,35 @@
+# ============================================================================
+# docker-compose.yml — Striper Robot Services
+#
+# Usage:
+#   docker compose up              # start all services
+#   docker compose up -d           # start in background
+#   docker compose down            # stop and remove containers
+#   docker compose logs dashboard  # view dashboard logs
+# ============================================================================
+
+services:
+  dashboard:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: striper-dashboard
+    ports:
+      # Map to 8100 externally to avoid conflicts with existing services
+      - "8100:8000"
+    volumes:
+      # Persist SQLite database across container restarts
+      - dashboard-data:/app/data
+    environment:
+      - PYTHONUNBUFFERED=1
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8000/docs')"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 10s
+
+volumes:
+  dashboard-data:
+    driver: local

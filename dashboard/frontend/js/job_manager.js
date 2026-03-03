@@ -112,12 +112,24 @@ const JobManager = (() => {
     }
 
     // ------------------------------------------------------------------ Create modal
+    function onTemplateChange() {
+        const type = document.getElementById('input-job-template').value;
+        const isParking = ['standard','angled_60','angled_45','handicap','compact'].includes(type);
+        const isArrow = type === 'arrow';
+        const isCrosswalk = type === 'crosswalk';
+        const hasTemplate = type !== '';
+
+        document.getElementById('template-params').style.display = isParking ? '' : 'none';
+        document.querySelectorAll('.arrow-param').forEach(el => el.style.display = isArrow ? '' : 'none');
+        document.querySelectorAll('.crosswalk-param').forEach(el => el.style.display = isCrosswalk ? '' : 'none');
+        document.getElementById('file-upload-group').style.display = hasTemplate ? 'none' : 'block';
+    }
+
     function showCreateModal() {
         document.getElementById('modal-create-job').classList.add('active');
         document.getElementById('input-job-name').value = '';
         document.getElementById('input-job-template').value = '';
-        document.getElementById('template-params').style.display = 'none';
-        document.getElementById('file-upload-group').style.display = 'block';
+        onTemplateChange();
     }
 
     function closeModal() {
@@ -137,14 +149,21 @@ const JobManager = (() => {
         // If a template is selected, generate it server-side with a default origin
         if (templateType) {
             const count = parseInt(document.getElementById('input-stall-count').value, 10) || 10;
+            const body = {
+                template_type: templateType,
+                origin: { lat: 30.2672, lng: -97.7431 },
+                count: count,
+            };
+            if (templateType === 'arrow') {
+                body.arrow_type = document.getElementById('input-arrow-type').value;
+            } else if (templateType === 'crosswalk') {
+                body.crosswalk_width_ft = parseFloat(document.getElementById('input-crosswalk-width').value) || 10;
+                body.crosswalk_length_ft = parseFloat(document.getElementById('input-crosswalk-length').value) || 20;
+            }
             try {
                 const tpl = await App.apiFetch('/api/paths/template', {
                     method: 'POST',
-                    body: {
-                        template_type: templateType,
-                        origin: { lat: 30.2672, lng: -97.7431 },
-                        count: count,
-                    },
+                    body: body,
                 });
                 pathData = tpl.geojson;
             } catch (err) {
@@ -208,5 +227,6 @@ const JobManager = (() => {
         showCreateModal,
         closeModal,
         createJob,
+        onTemplateChange,
     };
 })();

@@ -1,0 +1,50 @@
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.egg-info/
+dist/
+build/
+*.egg
+.venv/
+venv/
+env/
+
+# ROS 2 build artifacts
+striper_ws/build/
+striper_ws/install/
+striper_ws/log/
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# OS
+.DS_Store
+Thumbs.db
+desktop.ini
+
+# Git
+.git/
+.gitignore
+
+# Docker
+Dockerfile
+docker-compose.yml
+.dockerignore
+
+# CI / Config
+.github/
+.claude/
+
+# Firmware (not needed in dashboard container)
+firmware/
+
+# Database files (mounted as volume instead)
+*.db
+*.sqlite3
+
+# Documentation
+*.md
