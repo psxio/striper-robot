@@ -22,6 +22,7 @@ from .template_generator import (
 )
 from .ros_converter import msg_to_paint_path, paint_job_to_msgs, paint_path_to_msg
 from .job_exporter import export_csv, export_geojson, export_kml
+from .mission_planner import export_waypoints, save_waypoints
 
 __all__ = [
     # Models
@@ -53,4 +54,7 @@ __all__ = [
     "export_geojson",
     "export_kml",
     "export_csv",
+    # Mission Planner / ArduPilot
+    "export_waypoints",
+    "save_waypoints",
 ]
