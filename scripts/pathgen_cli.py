@@ -37,6 +37,12 @@ Usage examples:
 
   # Preview paths from a job file
   python scripts/pathgen_cli.py preview --input job.json
+
+  # Export a Mission Planner / ArduPilot waypoints file
+  python scripts/pathgen_cli.py mission \\
+      --template standard_space --count 10 \\
+      --origin 30.2672,-97.7431 --heading 45 \\
+      --output parking_lot.waypoints
 """
 
 from __future__ import annotations
@@ -418,6 +424,110 @@ def _preview_ascii(job, min_x: float, max_x: float, min_y: float, max_y: float):
 
 
 # ---------------------------------------------------------------------------
+# Subcommand: mission
+# ---------------------------------------------------------------------------
+
+def cmd_mission(args):
+    """Generate a Mission Planner / ArduPilot .waypoints file from a template."""
+    pg = _import_pathgen()
+    from striper_pathgen.mission_planner import export_waypoints, save_waypoints
+
+    # Parse origin as "lat,lon"
+    try:
+        parts = args.origin.split(",")
+        origin_lat = float(parts[0].strip())
+        origin_lon = float(parts[1].strip())
+    except (ValueError, IndexError):
+        print(
+            "Error: --origin must be lat,lon (e.g. 30.2672,-97.7431)",
+            file=sys.stderr,
+        )
+        sys.exit(1)
+
+    heading = args.heading
+    template_type = args.template
+    origin = pg.Point2D(0.0, 0.0)
+    angle = args.angle
+
+    # Build paths from template (same logic as cmd_template)
+    row_types = {"standard_space", "handicap_space", "compact"}
+    single_types = {"arrow", "crosswalk"}
+
+    all_paths: list = []
+
+    if template_type in row_types:
+        gen_map = {
+            "standard_space": pg.generate_standard_space,
+            "handicap_space": pg.generate_handicap_space,
+        }
+        gen_func = gen_map.get(template_type)
+        if gen_func is None:
+            gen_func = pg.generate_standard_space
+
+        spacing = args.spacing if args.spacing else 2.7
+        if template_type == "handicap_space":
+            spacing = args.spacing if args.spacing else 3.6
+
+        for i in range(args.count):
+            space_origin = pg.Point2D(origin.x + i * spacing, origin.y)
+            paths = gen_func(origin=space_origin, angle=angle)
+            all_paths.extend(paths)
+
+    elif template_type in single_types:
+        if template_type == "arrow":
+            for i in range(args.count):
+                arr_origin = pg.Point2D(origin.x + i * 3.0, origin.y)
+                paths = pg.generate_arrow(origin=arr_origin, angle=angle)
+                all_paths.extend(paths)
+        elif template_type == "crosswalk":
+            for i in range(args.count):
+                cw_origin = pg.Point2D(origin.x + i * 8.0, origin.y)
+                paths = pg.generate_crosswalk(origin=cw_origin, angle=angle)
+                all_paths.extend(paths)
+    else:
+        try:
+            paths = pg.generate_from_template(template_type, origin, angle)
+            all_paths.extend(paths)
+        except (ValueError, FileNotFoundError) as exc:
+            print(f"Error: {exc}", file=sys.stderr)
+            print(
+                "Available template types: standard_space, handicap_space, "
+                "arrow, crosswalk",
+                file=sys.stderr,
+            )
+            sys.exit(1)
+
+    if not all_paths:
+        print("No paths generated.", file=sys.stderr)
+        sys.exit(1)
+
+    job = _build_paint_job(
+        all_paths,
+        datum_lat=origin_lat,
+        datum_lon=origin_lon,
+        metadata={
+            "source": "mission_planner",
+            "template_type": template_type,
+            "count": args.count,
+            "heading": heading,
+        },
+    )
+
+    save_waypoints(
+        job,
+        filepath=args.output,
+        datum_lat=origin_lat,
+        datum_lon=origin_lon,
+        datum_heading=heading,
+        paint_speed=args.paint_speed,
+        transit_speed=args.transit_speed,
+    )
+    print(
+        f"Wrote {len(job.segments)} segment(s) as ArduPilot waypoints to {args.output}"
+    )
+
+
+# ---------------------------------------------------------------------------
 # Argument parser
 # ---------------------------------------------------------------------------
 
@@ -433,6 +543,7 @@ def build_parser() -> argparse.ArgumentParser:
             "  %(prog)s optimize --input job.json -o job_opt.json\n"
             "  %(prog)s preview --input job.json\n"
             "  %(prog)s preview --input job.json --ascii\n"
+            "  %(prog)s mission --template standard_space --count 10 --origin 30.2672,-97.7431 --heading 45 -o lot.waypoints\n"
         ),
         formatter_class=argparse.RawDescriptionHelpFormatter,
     )
@@ -512,6 +623,55 @@ def build_parser() -> argparse.ArgumentParser:
     p_prev.add_argument("--ascii", action="store_true", help="Force ASCII output (skip matplotlib)")
     p_prev.add_argument("--output-image", default=None, help="Save preview to an image file (PNG, PDF, etc.)")
     p_prev.set_defaults(func=cmd_preview)
+
+    # ── mission ───────────────────────────────────────────────────────────
+    p_mission = subparsers.add_parser(
+        "mission",
+        help="Export a Mission Planner / ArduPilot .waypoints file",
+        description=(
+            "Generate paint paths from a template and export them as an\n"
+            "ArduPilot/Mission Planner .waypoints file.\n\n"
+            "Available templates: standard_space, handicap_space, arrow, crosswalk"
+        ),
+        formatter_class=argparse.RawDescriptionHelpFormatter,
+    )
+    p_mission.add_argument(
+        "--template", required=True,
+        help="Template type (standard_space, handicap_space, arrow, crosswalk)",
+    )
+    p_mission.add_argument(
+        "--origin", required=True,
+        help="GPS origin as lat,lon (e.g. 30.2672,-97.7431)",
+    )
+    p_mission.add_argument(
+        "--heading", type=float, default=0.0,
+        help="Lot heading in degrees clockwise from North (default: 0)",
+    )
+    p_mission.add_argument(
+        "--angle", type=float, default=0.0,
+        help="Template rotation angle in degrees (default: 0)",
+    )
+    p_mission.add_argument(
+        "--count", type=int, default=1,
+        help="Number of template instances to generate (default: 1)",
+    )
+    p_mission.add_argument(
+        "--spacing", type=float, default=None,
+        help="Spacing between instances in metres",
+    )
+    p_mission.add_argument(
+        "--paint-speed", type=float, default=0.5,
+        help="Ground speed while painting in m/s (default: 0.5)",
+    )
+    p_mission.add_argument(
+        "--transit-speed", type=float, default=1.0,
+        help="Ground speed while transiting in m/s (default: 1.0)",
+    )
+    p_mission.add_argument(
+        "-o", "--output", required=True,
+        help="Output .waypoints file path",
+    )
+    p_mission.set_defaults(func=cmd_mission)
 
     return parser
 

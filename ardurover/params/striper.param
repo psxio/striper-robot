@@ -1,0 +1,612 @@
+# =============================================================================
+# ArduRover Parameter File: Parking Lot Line Striper
+# =============================================================================
+# Robot: Differential-drive (hoverboard motors) with RTK GPS and paint sprayer
+# Controller: Pixhawk 6C running ArduRover 4.5+
+# GPS: Unicore UM980 triple-band RTK (8mm accuracy)
+# Motors: Hoverboard BLDC via FOC firmware over UART
+# Paint: 12V solenoid valve + 12V diaphragm pump via relay outputs
+# Battery: 36V hoverboard pack with DC-DC converters (12V, 5V)
+# RC: FlySky FS-i6X receiver (iBus or PPM)
+# Weight: ~50kg with full paint tank
+# Wheels: 6.5" (0.165m diameter) hoverboard wheels
+# =============================================================================
+
+# -----------------------------------------------------------------------------
+# FRAME AND DRIVE TYPE
+# -----------------------------------------------------------------------------
+# FRAME_TYPE 2 = skid-steer / differential drive
+# ArduRover maps ThrottleLeft and ThrottleRight automatically
+FRAME_TYPE,2
+
+# Wheel track width in meters (hoverboard wheel center-to-center, measure yours)
+WHL_TRACK,0.40
+
+# Wheel encoders: 0 = none (we rely on GPS for speed/position)
+WENC_TYPE,0
+
+# -----------------------------------------------------------------------------
+# BOARD CONFIGURATION (Pixhawk 6C)
+# -----------------------------------------------------------------------------
+# BRD_TYPE 0 = auto-detect (works for all Pixhawk variants)
+BRD_TYPE,0
+
+# Disable hardware safety switch (we use a physical E-stop button instead)
+# The E-stop cuts power to motor drivers and solenoid directly
+BRD_SAFETY_DEFLT,0
+BRD_SAFETY_MASK,0
+
+# Initial mode on boot: HOLD (mode 4) - robot will not move on power-up
+INITIAL_MODE,4
+
+# -----------------------------------------------------------------------------
+# SERIAL PORT CONFIGURATION
+# -----------------------------------------------------------------------------
+# Serial0 = USB (console/debug), always available, no config needed
+# Serial1 = Telemetry radio (MAVLink to GCS / Mission Planner)
+SERIAL1_PROTOCOL,2
+SERIAL1_BAUD,57
+
+# Serial2 = Hoverboard motor controller (UART to FOC firmware)
+# Protocol 28 = Scripting (Lua sends/receives raw bytes for motor commands)
+# FOC firmware default baud: 115200
+SERIAL2_PROTOCOL,28
+SERIAL2_BAUD,115
+
+# Serial3 = UM980 RTK GPS (UART)
+# Protocol 5 = GPS
+# UM980 default baud: 115200
+SERIAL3_PROTOCOL,5
+SERIAL3_BAUD,115
+
+# Serial4 = available for future use (RTK corrections input, second GPS, etc.)
+# Set to -1 (None) to disable
+SERIAL4_PROTOCOL,-1
+SERIAL4_BAUD,115
+
+# Serial5 = RC input if using iBus/SBUS over UART (FlySky FS-i6X)
+# If using PPM on the dedicated RC port, leave this disabled
+# Protocol 23 = RCIN
+# Uncomment the following two lines if RC is on Serial5 instead of the RC port:
+# SERIAL5_PROTOCOL,23
+# SERIAL5_BAUD,115
+
+# -----------------------------------------------------------------------------
+# GPS CONFIGURATION (Unicore UM980)
+# -----------------------------------------------------------------------------
+# GPS_TYPE 1 = AUTO (ArduPilot auto-detects NMEA/UBX/Unicore)
+# UM980 speaks NMEA or Unicore binary; AUTO handles both
+GPS_TYPE,1
+
+# No secondary GPS
+GPS_TYPE2,0
+
+# GNSS constellation mask: all constellations for best RTK convergence
+# Bit 0=GPS, 1=SBAS, 2=Galileo, 3=BeiDou, 4=IRST, 5=QZSS, 6=GLONASS
+# 127 = 0b1111111 = all enabled
+GPS_GNSS_MODE,127
+
+# GPS auto-switch: 0 = use primary only (we have one GPS)
+GPS_AUTO_SWITCH,0
+
+# Minimum satellites for a valid fix
+GPS_MIN_DGPS,6
+
+# Minimum fix type for arming: 5 = RTK Float minimum
+# Ensures we have at least RTK float before robot will arm
+# Set to 6 for RTK Fixed only if your base station is reliable
+GPS_MIN_ELEV,5
+
+# GPS update rate in milliseconds: 100ms = 10Hz
+GPS_RATE_MS,100
+
+# GPS antenna position offset from vehicle center of rotation (meters, body frame)
+# X = forward, Y = right, Z = down (NED convention)
+# Adjust these to match your actual antenna mounting position
+GPS_POS1_X,0.10
+GPS_POS1_Y,0.00
+GPS_POS1_Z,-0.15
+
+# GPS measurement delay (ms): accounts for GPS processing latency
+# UM980 is fast; 200ms is conservative
+GPS_DELAY_MS,200
+
+# GPS driver auto-config: 2 = auto-configure the GPS module
+GPS_AUTO_CONFIG,2
+
+# Moving baseline yaw: not used (single GPS setup)
+GPS_MB1_TYPE,0
+
+# -----------------------------------------------------------------------------
+# AHRS / EKF3 CONFIGURATION
+# -----------------------------------------------------------------------------
+# Use EKF3 as the primary attitude/heading/position estimator
+AHRS_EKF_TYPE,3
+EK3_ENABLE,1
+EK2_ENABLE,0
+
+# EKF3 source configuration
+# Source 1: GPS for horizontal position and velocity
+EK3_SRC1_POSXY,1
+EK3_SRC1_VELXY,1
+EK3_SRC1_POSZ,1
+EK3_SRC1_VELZ,0
+EK3_SRC1_YAW,1
+
+# EKF3 noise parameters tuned for RTK GPS
+# GPS velocity noise (m/s) - low values for high-quality RTK
+EK3_VELNE_M_NSE,0.10
+EK3_VELD_M_NSE,0.15
+
+# GPS position noise (m) - 0.05m is appropriate for RTK Fixed
+EK3_POSNE_M_NSE,0.05
+
+# GPS check mask: enable all GPS quality checks
+EK3_GPS_CHECK,31
+
+# Number of EKF cores: 1 is sufficient for rover
+EK3_IMU_MASK,3
+
+# Gyro noise (rad/s) - default is fine for Pixhawk 6C IMU
+EK3_GYRO_P_NSE,0.015
+
+# Accelerometer noise (m/s/s) - slightly elevated for ground vehicle vibration
+EK3_ACC_P_NSE,0.35
+
+# -----------------------------------------------------------------------------
+# COMPASS CONFIGURATION
+# -----------------------------------------------------------------------------
+# Use Pixhawk 6C internal compass (IST8310 or BMM150 depending on variant)
+COMPASS_TYPEMASK,0
+COMPASS_USE,1
+COMPASS_USE2,0
+COMPASS_USE3,0
+
+# Auto-declination from GPS position
+COMPASS_AUTODEC,1
+
+# Learn compass offsets while driving (recommended for ground vehicles)
+COMPASS_LEARN,1
+
+# Compass orientation: 0 = no rotation (Pixhawk mounted flat, forward)
+# Change if your Pixhawk is rotated
+COMPASS_ORIENT,0
+
+# Motor compensation type: 2 = throttle-based (helps with motor interference)
+COMPASS_MOT_TYPE,2
+
+# -----------------------------------------------------------------------------
+# SERVO OUTPUT CONFIGURATION (Differential Drive)
+# -----------------------------------------------------------------------------
+# For FRAME_TYPE=2, ArduRover uses:
+#   ThrottleLeft (function 73) and ThrottleRight (function 74)
+# These outputs go to the hoverboard FOC controller via Lua scripting on Serial2
+# The PWM values below are for passthrough reference; actual motor commands
+# are sent as UART serial data by the Lua motor driver script.
+
+# SERVO1 = Left motor (ThrottleLeft)
+SERVO1_FUNCTION,73
+SERVO1_MIN,1000
+SERVO1_MAX,2000
+SERVO1_TRIM,1500
+SERVO1_REVERSED,0
+
+# SERVO3 = Right motor (ThrottleRight)
+SERVO3_FUNCTION,74
+SERVO3_MIN,1000
+SERVO3_MAX,2000
+SERVO3_TRIM,1500
+SERVO3_REVERSED,0
+
+# SERVO2 and SERVO4 unused for differential drive
+SERVO2_FUNCTION,0
+SERVO4_FUNCTION,0
+
+# -----------------------------------------------------------------------------
+# SPRAYER (AC_Sprayer) CONFIGURATION
+# -----------------------------------------------------------------------------
+# Enable the built-in sprayer subsystem
+SPRAY_ENABLE,1
+
+# Pump rate: percentage output at full pump speed (0-100)
+SPRAY_PUMP_RATE,100
+
+# Minimum pump rate when spraying: 0 = fully off when not spraying
+SPRAY_PUMP_MIN,0
+
+# Minimum ground speed (m/s) before sprayer activates
+# Prevents paint pooling when stopped or moving very slowly
+SPRAY_SPEED_MIN,0.10
+
+# Spinner RPM when active (used as generic spray width control)
+# For our solenoid: 1000 = on
+SPRAY_SPINNER,1000
+
+# Sprayer pump output: SERVO9 (AUX1), function 22 = SprayerPump
+SERVO9_FUNCTION,22
+SERVO9_MIN,1000
+SERVO9_MAX,2000
+SERVO9_TRIM,1000
+
+# Sprayer spinner/solenoid output: SERVO10 (AUX2), function 23 = SprayerSpinner
+SERVO10_FUNCTION,23
+SERVO10_MIN,1000
+SERVO10_MAX,2000
+SERVO10_TRIM,1000
+
+# -----------------------------------------------------------------------------
+# RELAY OUTPUTS (Solenoid and Pump control via Lua / Mission commands)
+# -----------------------------------------------------------------------------
+# Relay 1 = Paint solenoid valve
+# Pixhawk 6C AUX5 = SERVO13 = FMU pin 54
+RELAY1_FUNCTION,1
+RELAY1_PIN,54
+RELAY1_DEFAULT,0
+
+# Relay 2 = Diaphragm pump
+# Pixhawk 6C AUX6 = SERVO14 = FMU pin 55
+# Set RELAY2_DEFAULT to 0; pump controlled by Lua script or mission commands
+# If pump runs continuously from a manual switch, set RELAY2_FUNCTION to 0
+RELAY2_FUNCTION,1
+RELAY2_PIN,55
+RELAY2_DEFAULT,0
+
+# -----------------------------------------------------------------------------
+# MOTOR CONTROL (MOT) - Skid Steer Tuning
+# -----------------------------------------------------------------------------
+# Throttle range
+MOT_THR_MIN,0
+MOT_THR_MAX,100
+
+# Motor slew rate (percent per second): limits acceleration for smooth operation
+# 50% per second = 0 to full speed in 2 seconds
+# A ~50kg robot with hoverboard motors needs gentle ramps
+MOT_SLEWRATE,50
+
+# Vectored thrust: not used for skid steer
+MOT_VEC_ANGLEMAX,0
+
+# Safe throttle: throttle level that is considered safe for arming
+MOT_SAFE_TURN_TH,25
+
+# -----------------------------------------------------------------------------
+# STEERING AND SPEED CONTROL
+# -----------------------------------------------------------------------------
+# Target cruise speed (m/s) for general transit between paint zones
+CRUISE_SPEED,1.00
+
+# Throttle percentage at cruise speed (calibrate on flat ground)
+# Start at 30% and adjust after initial driving tests
+CRUISE_THROTTLE,30
+
+# Waypoint navigation speed (m/s): slower for painting accuracy
+WP_SPEED,0.50
+
+# Waypoint acceptance radius (meters): 5cm for precise line striping
+# This defines how close the robot must get to a waypoint before advancing
+WP_RADIUS,0.05
+
+# Waypoint overshoot distance (meters): how far past a WP we can go
+WP_OVERSHOOT,0.10
+
+# Pivot turn rate (deg/s) for point turns in skid steer
+WP_PIVOT_RATE,60
+
+# Pivot turn angle threshold (degrees): if heading error exceeds this,
+# the robot will stop and pivot in place instead of making a sweeping turn
+WP_PIVOT_ANGLE,60
+
+# Speed at which pivot turns are attempted (m/s): 0 = stopped pivot
+WP_PIVOT_SPEED,0.0
+
+# -----------------------------------------------------------------------------
+# L1 NAVIGATION CONTROLLER
+# -----------------------------------------------------------------------------
+# L1 period (seconds): controls path-following tightness
+# Lower = tighter tracking but more oscillation risk
+# For precise striping on smooth surfaces, 4-6 is a good starting range
+NAVL1_PERIOD,5
+
+# L1 damping: 0.7-0.85 typical, higher = more damped
+NAVL1_DAMPING,0.75
+
+# L1 crosstrack threshold: distance (m) at which L1 starts correcting
+NAVL1_XTRACK_I,0.02
+
+# -----------------------------------------------------------------------------
+# ATTITUDE CONTROL (ATC) - Steering and Speed PIDs
+# -----------------------------------------------------------------------------
+# These are conservative starting values for a ~50kg differential-drive robot
+# with 6.5" hoverboard wheels on smooth pavement.
+# TUNE IN THE FIELD: Use Mission Planner's auto-tune or manual PID tuning.
+
+# === Steering rate PID (controls yaw rate response) ===
+# P: proportional gain - how aggressively steering corrects heading error
+ATC_STR_RAT_P,0.20
+# I: integral gain - corrects steady-state steering bias
+ATC_STR_RAT_I,0.20
+# D: derivative gain - damps oscillation (keep low to start)
+ATC_STR_RAT_D,0.005
+# IMAX: maximum integral accumulation
+ATC_STR_RAT_IMAX,1.00
+# FF: feedforward for desired turn rate (helps with responsive steering)
+ATC_STR_RAT_FF,0.15
+# FILT: input filter frequency (Hz), reduces noise sensitivity
+ATC_STR_RAT_FILT,10.0
+# FLTT: target filter frequency (Hz), 0 = no filter on target
+ATC_STR_RAT_FLTT,0.0
+
+# === Speed PID (controls forward/reverse throttle) ===
+# P: proportional gain for speed error
+ATC_SPEED_P,0.40
+# I: integral gain for speed error (eliminates steady-state speed error)
+ATC_SPEED_I,0.20
+# D: derivative gain (usually 0 for speed control)
+ATC_SPEED_D,0.00
+# IMAX: maximum integral accumulation for speed
+ATC_SPEED_IMAX,1.00
+# FF: feedforward from desired speed to throttle
+ATC_SPEED_FF,0.00
+# FILT: input filter frequency (Hz)
+ATC_SPEED_FILT,5.0
+# FLTT: target filter frequency
+ATC_SPEED_FLTT,0.0
+
+# === Turn and acceleration limits ===
+# Maximum lateral G-force in turns (limits turn sharpness)
+# Lower values make turns gentler, reducing paint line wander
+ATC_TURN_MAX_G,0.30
+
+# Maximum deceleration (m/s/s): how fast the robot can stop
+ATC_DECEL_MAX,1.00
+
+# Maximum acceleration (m/s/s): how fast the robot can speed up
+ATC_ACCEL_MAX,1.00
+
+# Braking percentage: throttle applied when braking
+ATC_BRAKE,0
+
+# Steering acceleration max (deg/s/s)
+ATC_STR_ACC_MAX,120
+
+# Steering speed max (deg/s)
+ATC_STR_SPD_MAX,90
+
+# -----------------------------------------------------------------------------
+# RC INPUT CONFIGURATION (FlySky FS-i6X)
+# -----------------------------------------------------------------------------
+# RC channel mapping
+# RC1 = Steering (roll/yaw), RC3 = Throttle
+RCMAP_ROLL,1
+RCMAP_THROTTLE,3
+
+# RC input range (standard PWM 1000-2000us)
+RC1_MIN,1000
+RC1_MAX,2000
+RC1_TRIM,1500
+RC1_DZ,30
+RC1_REVERSED,0
+
+RC3_MIN,1000
+RC3_MAX,2000
+RC3_TRIM,1500
+RC3_DZ,30
+RC3_REVERSED,0
+
+# Flight mode channel: channel 5 (3-position switch on FS-i6X SwC)
+# Position low = MANUAL (mode 0), mid = HOLD (mode 4), high = AUTO (mode 10)
+FLTMODE_CH,5
+FLTMODE1,0
+FLTMODE2,0
+FLTMODE3,4
+FLTMODE4,4
+FLTMODE5,10
+FLTMODE6,10
+
+# RC channel 6: E-stop / motor kill (SwD on FS-i6X)
+# Option 31 = Motor Emergency Stop
+RC6_OPTION,31
+
+# RC channel 7: manual paint solenoid toggle (SwA on FS-i6X)
+# Option 28 = Relay1 On/Off
+RC7_OPTION,28
+
+# RC channel 8: manual pump toggle (SwB on FS-i6X)
+# Option 29 = Relay2 On/Off
+RC8_OPTION,29
+
+# RC channel 9: RTL trigger (VrA knob, optional)
+# Option 11 = RTL
+RC9_OPTION,11
+
+# RC channel 10: fence enable/disable (optional)
+# Option 11 is already used; set to 0 if unused
+RC10_OPTION,0
+
+# -----------------------------------------------------------------------------
+# ARMING CONFIGURATION
+# -----------------------------------------------------------------------------
+# Arming checks bitmask:
+# Bit 0=All, 1=Baro, 2=Compass, 3=GPS, 4=INS, 5=Params, 6=RC, 7=Voltage
+# 124 = compass + GPS + INS + params + RC + voltage (skip barometer for ground robot)
+ARMING_CHECK,124
+
+# Require arming method: 1 = require rudder stick or GCS arm command
+ARMING_REQUIRE,1
+
+# Rudder arming: 1 = arm/disarm with throttle-down + right/left rudder
+ARMING_RUDDER,1
+
+# -----------------------------------------------------------------------------
+# FAILSAFE SETTINGS
+# -----------------------------------------------------------------------------
+# Throttle failsafe: triggered when RC signal is lost
+# 1 = RTL on RC loss
+FS_THR_ENABLE,1
+# PWM value below which throttle failsafe triggers
+FS_THR_VALUE,950
+
+# GCS failsafe: triggered when telemetry link to Mission Planner is lost
+# 1 = RTL on GCS loss
+FS_GCS_ENABLE,1
+
+# Failsafe timeout (seconds): how long to wait before declaring link lost
+FS_TIMEOUT,5
+
+# Crash check: detect if robot is stuck or flipped
+FS_CRASH_CHECK,1
+
+# Failsafe action: 1 = RTL, 2 = Hold, 3 = SmartRTL
+# RTL drives the robot back to the launch point
+FS_ACTION,1
+
+# Battery failsafe: handled by BATT_LOW_VOLT and BATT_CRT_VOLT below
+
+# -----------------------------------------------------------------------------
+# FENCE (GEOFENCE) CONFIGURATION
+# -----------------------------------------------------------------------------
+# Enable geofencing to keep the robot within the work area
+FENCE_ENABLE,1
+
+# Fence action: 2 = RTL when fence boundary is breached
+FENCE_ACTION,2
+
+# Fence type bitmask:
+# Bit 1=Circle, Bit 2=Polygon
+# 6 = polygon + circle (belt and suspenders)
+FENCE_TYPE,6
+
+# Circle fence radius (meters): backup safety boundary
+FENCE_RADIUS,50
+
+# Fence margin (meters): trigger action this far inside the boundary
+FENCE_MARGIN,1.0
+
+# Fence polygon total points: set automatically by Mission Planner
+FENCE_TOTAL,0
+
+# Return to fence: how to re-enter fence after breach
+FENCE_RET_RALLY,0
+
+# -----------------------------------------------------------------------------
+# BATTERY MONITORING
+# -----------------------------------------------------------------------------
+# Monitor type 4 = analog voltage and current (Pixhawk power module)
+BATT_MONITOR,4
+
+# Pixhawk 6C power module analog pins
+BATT_VOLT_PIN,14
+BATT_CURR_PIN,15
+
+# Voltage multiplier: calibrate with a multimeter
+# For 36V hoverboard battery through the power module's voltage divider
+# Adjust this so that the voltage reading in Mission Planner matches
+# the actual battery voltage measured with a multimeter
+BATT_VOLT_MULT,10.1
+
+# Amps per volt: calibrate with a current meter or known load
+BATT_AMP_PERVLT,17.0
+
+# Battery capacity in mAh (typical hoverboard battery is 4000-5000mAh at 36V)
+BATT_CAPACITY,5000
+
+# Low voltage warning (per cell: 3.5V * 10S = 35V... but hoverboard is 10S)
+# 36V nominal = 10S lithium, fully charged ~42V, empty ~30V
+# Low warning at 33V (3.3V/cell)
+BATT_LOW_VOLT,33.0
+
+# Critical voltage: land/hold immediately (3.0V/cell = 30V)
+BATT_CRT_VOLT,30.0
+
+# Minimum voltage for arming (3.5V/cell = 35V, ensures charged battery)
+BATT_ARM_VOLT,35.0
+
+# Low battery failsafe action: 2 = Hold (stop in place, don't try to RTL)
+BATT_FS_LOW_ACT,2
+
+# Critical battery failsafe action: 0 = Hold/disarm
+BATT_FS_CRT_ACT,1
+
+# -----------------------------------------------------------------------------
+# LOGGING CONFIGURATION
+# -----------------------------------------------------------------------------
+# LOG_BITMASK: comprehensive logging for debugging
+# Includes: attitudes, IMU, GPS, sensors, RC, current, compass, servo, steering
+# 176126 provides detailed logs without excessive raw IMU data
+LOG_BITMASK,176126
+
+# Log backend: 1 = SD card on Pixhawk
+LOG_BACKEND_TYPE,1
+
+# Log while disarmed: 1 = yes (useful for debugging GPS/sensor issues pre-arm)
+LOG_DISARMED,1
+
+# Log replay: 0 = disabled (saves SD card space)
+LOG_REPLAY,0
+
+# File size limit (KB): 0 = no limit
+LOG_FILE_MBSIZE,0
+
+# Log rate (Hz) for fast data
+LOG_FILE_RATEMAX,0
+
+# -----------------------------------------------------------------------------
+# TELEMETRY STREAM RATES (Serial1 = GCS radio)
+# -----------------------------------------------------------------------------
+# Stream rates to Mission Planner (Hz)
+SR1_ADSB,0
+SR1_EXTRA1,4
+SR1_EXTRA2,4
+SR1_EXTRA3,2
+SR1_EXT_STAT,2
+SR1_PARAMS,10
+SR1_POSITION,4
+SR1_RAW_CTRL,2
+SR1_RAW_SENS,2
+SR1_RC_CHAN,2
+
+# -----------------------------------------------------------------------------
+# LUA SCRIPTING ENGINE
+# -----------------------------------------------------------------------------
+# Enable Lua scripting (required for paint_control.lua and paint_speed_sync.lua)
+SCR_ENABLE,1
+
+# Heap size (bytes): 100KB for our scripts
+SCR_HEAP_SIZE,102400
+
+# VM instruction count per script tick: higher = more processing per cycle
+SCR_VM_I_COUNT,25000
+
+# Script debug level: 0 = errors only, 1 = + warnings, 2 = + info
+SCR_DEBUG_LVL,1
+
+# Number of Lua scripts allowed
+SCR_DIR_DISABLE,0
+
+# -----------------------------------------------------------------------------
+# SIMPLE MODE / AUXILIARY
+# -----------------------------------------------------------------------------
+# Simple mode: 0 = disabled (we use heading-based steering)
+SIMPLE,0
+
+# Object avoidance: 0 = disabled (no lidar/sonar installed)
+AVOID_ENABLE,0
+
+# Rally points: 0 = return to home, not rally
+RALLY_TOTAL,0
+
+# =============================================================================
+# END OF PARAMETER FILE
+# =============================================================================
+# POST-LOAD CHECKLIST:
+# 1. Calibrate accelerometers (level the robot on flat ground)
+# 2. Calibrate compass (rotate robot through all orientations)
+# 3. Calibrate RC transmitter (full stick deflections)
+# 4. Verify battery voltage reading matches multimeter
+# 5. Upload polygon geofence matching your parking lot boundary
+# 6. Test motor direction: both wheels should drive forward on throttle up
+# 7. Test steering: right stick right should turn robot right
+# 8. Test paint solenoid with water before loading paint
+# 9. Perform initial PID tuning on flat pavement
+# 10. Verify GPS achieves RTK Fixed before starting paint missions
+# =============================================================================

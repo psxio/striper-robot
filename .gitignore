@@ -23,17 +23,14 @@ env/
 Thumbs.db
 desktop.ini
 
-# ROS2 build artifacts
-striper_ws/build/
-striper_ws/install/
-striper_ws/log/
+# ArduPilot SITL
+eeprom.bin
+logs/
+terrain/
 
 # Database
 *.db
 *.sqlite3
-
-# Uploads
-dashboard/backend/uploads/
 
 # Claude Code
 .claude/

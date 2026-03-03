@@ -1,201 +1,180 @@
 # Striper Robot -- Bill of Materials (BOM)
 
-Detailed bill of materials for the autonomous parking-lot line-striping
-robot, grouped by subsystem. Prices are approximate USD as of early 2026
-and may vary by vendor.
+Bill of materials for the autonomous parking-lot line-striping robot,
+redesigned around **ArduRover on a Pixhawk flight controller** with
+**hoverboard drive motors** running open-source FOC firmware.
+
+Three tiers let you start cheap and upgrade as needed. Prices are
+approximate USD as of early 2026 and exclude shipping/tax.
 
 ---
 
-## 1. Compute
+## Tier 1: $409 "Proof of Concept"
 
-| # | Component | Specs | Qty | Unit Price | Subtotal | Source |
-|---|-----------|-------|-----|------------|----------|--------|
-| 1 | Raspberry Pi 5 (8 GB) | Quad Cortex-A76, 8 GB LPDDR4X | 1 | $80 | $80 | PiShop.us / SparkFun |
-| 2 | Raspberry Pi 5 active cooler | Official fan + heatsink | 1 | $5 | $5 | PiShop.us |
-| 3 | MicroSD card (64 GB) | SanDisk Extreme A2 U3 | 1 | $12 | $12 | Amazon |
-| 4 | ESP32-DevKitC-32E | ESP32-WROOM-32E, 4 MB flash | 1 | $10 | $10 | Amazon / DigiKey |
-| 5 | USB-A to USB-C cable (short) | 30 cm, for RPi power or peripherals | 1 | $6 | $6 | Amazon |
+Minimum viable robot. Uses the hoverboard's built-in battery, an ESP32
+instead of a Pixhawk, and the cheapest RTK GPS board available. Good
+enough to prove the concept in a parking lot.
 
-**Compute subtotal: ~$113**
+| # | Component | Specs / Notes | Qty | Cost | Source |
+|---|-----------|---------------|-----|------|--------|
+| 1 | Used hoverboard | Two 350W BLDC hub motors, 36V battery (2-4Ah), STM32 dual motor controller board. Flash with [hoverboard-firmware-hack-FOC](https://github.com/EFeru/hoverboard-firmware-hack-FOC). | 1 | $30 | eBay / FB Marketplace |
+| 2 | ST-Link V2 programmer | Needed to flash FOC firmware onto the hoverboard mainboard via SWD. | 1 | $6 | [Amazon](https://www.amazon.com/s?k=ST-Link+V2) |
+| 3 | 3/4" plywood platform + casters | ~24"x18" plywood base. Two front casters (swivel, 3"). Hoverboard wheels are the rear drive wheels. | 1 | $25 | Home Depot |
+| 4 | ESP32-S3 dev board | Runs custom firmware: reads GPS, sends UART speed commands to hoverboard, toggles solenoid relay. Substitute for Pixhawk in this tier. | 1 | $8 | [Amazon](https://www.amazon.com/s?k=ESP32-S3+dev+board) |
+| 5 | ArduSimple simpleRTK2B Budget (ZED-F9P) | u-blox ZED-F9P RTK receiver. L1/L2 multi-band. 1-2 cm RTK accuracy. Includes patch antenna. Part: simpleRTK2B Budget Starter Kit. | 1 | $252 | [ArduSimple](https://www.ardusimple.com/product/simplertk2b/) |
+| 6 | 12V diaphragm pump | Self-priming, 60-80 PSI, 1-2 GPM. Powers paint flow. | 1 | $30 | [Amazon](https://www.amazon.com/s?k=12V+diaphragm+pump) |
+| 7 | 12V solenoid valve (N.C.) | 1/2" NPT, brass, normally closed. On/off paint control. | 1 | $15 | [Amazon](https://www.amazon.com/s?k=12V+solenoid+valve+1%2F2+NPT) |
+| 8 | Flat fan spray nozzle + fittings | TeeJet 8004 or equivalent, 4" fan width. Include barb-to-NPT adapters and 3 ft of 1/2" vinyl tubing. | 1 | $15 | [Amazon](https://www.amazon.com/s?k=flat+fan+spray+nozzle) |
+| 9 | DC-DC converters (36V to 12V, 36V to 5V) | Buck converters. 36V to 12V (3A min) for pump/solenoid. 36V to 5V (2A min) for ESP32/GPS. | 2 | $10 | [Amazon](https://www.amazon.com/s?k=36V+to+12V+DC+DC+converter) |
+| 10 | E-stop button + relay | 22mm mushroom-head, twist-release, N.C. contacts. 30A relay to cut motor power. | 1 | $5 | [Amazon](https://www.amazon.com/s?k=emergency+stop+button+22mm) |
+| 11 | Wiring, connectors, fuses | 14 AWG silicone wire, XT60 connectors, 30A blade fuse + holder, zip ties, heat shrink, ring terminals. | 1 lot | $13 | Amazon |
 
----
+**Tier 1 Total: ~$409**
 
-## 2. Drive System
-
-| # | Component | Specs | Qty | Unit Price | Subtotal | Source |
-|---|-----------|-------|-----|------------|----------|--------|
-| 6 | Pololu 37D metal gearmotor 131:1 | 24V, 80 RPM, 18 kg-cm stall torque, integrated encoder (64 CPR) | 2 | $40 | $80 | Pololu (#4758) |
-| 7 | Pololu 37D motor bracket (L-shaped) | Mounting bracket for 37D motors | 2 | $8 | $16 | Pololu (#1084) |
-| 8 | BTS7960 43A motor driver module | Dual H-bridge, 5.5-27V, 43A peak | 2 | $12 | $24 | Amazon |
-| 9 | 150mm diameter rubber wheel | 6" pneumatic or solid rubber, 8mm bore hub adapter | 2 | $15 | $30 | Amazon / Pololu |
-| 10 | Caster wheel (front) | 75mm swivel caster, ball bearing | 1 | $10 | $10 | Amazon |
-| 11 | 8mm shaft coupler | Motor shaft to wheel hub | 2 | $4 | $8 | Amazon |
-
-**Drive subtotal: ~$168**
-
----
-
-## 3. Positioning (GPS + IMU)
-
-| # | Component | Specs | Qty | Unit Price | Subtotal | Source |
-|---|-----------|-------|-----|------------|----------|--------|
-| 12 | SparkFun GPS-RTK-SMA (ZED-F9P) | u-blox ZED-F9P, USB-C, SMA connectors | 1 | $275 | $275 | SparkFun (GPS-16481) |
-| 13 | GNSS multi-band antenna | u-blox ANN-MB-00 or SparkFun TOP106, L1/L2 | 1 | $65 | $65 | SparkFun / DigiKey |
-| 14 | SMA male to SMA male cable | 25 cm, RG316, for antenna connection | 1 | $7 | $7 | Amazon |
-| 15 | Antenna ground plane | 100mm aluminum disc, improves multipath rejection | 1 | $10 | $10 | Amazon / custom |
-| 16 | Adafruit BNO085 breakout | 9-DOF IMU, I2C/SPI/UART, STEMMA QT | 1 | $30 | $30 | Adafruit (#4754) |
-| 17 | STEMMA QT / Qwiic cable | 100mm, JST SH 4-pin, for I2C | 1 | $1 | $1 | Adafruit / SparkFun |
-
-**Positioning subtotal: ~$388**
+> **What you give up:** No Pixhawk (no ArduRover autopilot, no Mission
+> Planner, no RC override, no geofencing). You must write your own
+> waypoint-following firmware on the ESP32. Hoverboard battery gives
+> only 20-40 minutes of runtime.
 
 ---
 
-## 4. Paint System
+## Tier 2: $631 "Best Value" (RECOMMENDED)
 
-| # | Component | Specs | Qty | Unit Price | Subtotal | Source |
-|---|-----------|-------|-----|------------|----------|--------|
-| 18 | 12V DC solenoid valve (normally closed) | 1/2" NPT, brass, 0-80 PSI | 1 | $25 | $25 | Amazon |
-| 19 | IRLZ44N N-channel MOSFET | Logic-level gate, TO-220, 47A, 55V | 1 | $2 | $2 | DigiKey / Amazon |
-| 20 | 1N4007 rectifier diode | Flyback protection for solenoid | 1 | $0.10 | $0.10 | DigiKey |
-| 21 | 220 ohm resistor (1/4W) | Gate resistor for MOSFET | 1 | $0.10 | $0.10 | DigiKey |
-| 22 | 10k ohm resistor (1/4W) | Gate pull-down for MOSFET | 1 | $0.10 | $0.10 | DigiKey |
-| 23 | Paint reservoir tank | 1-gallon pressurized canister or gravity-fed tank | 1 | $30 | $30 | Amazon / hardware store |
-| 24 | 1/2" vinyl tubing | For paint supply line, 3 ft | 1 | $5 | $5 | Hardware store |
-| 25 | Hose barb fittings (1/2") | Barb to NPT adapters | 2 | $3 | $6 | Hardware store |
-| 26 | Spray nozzle tip | Flat fan pattern, 2-4 inch stripe width | 1 | $8 | $8 | Amazon |
+The sweet spot. A real Pixhawk running ArduRover gives you autopilot,
+Mission Planner, RC manual override, geofencing, and the built-in
+AC_Sprayer library. The UM980 GPS is cheaper and more accurate than the
+ZED-F9P. A separate e-bike battery gives 2-3 hours of runtime.
 
-**Paint subtotal: ~$76**
+| # | Component | Specs / Notes | Qty | Cost | Source |
+|---|-----------|---------------|-----|------|--------|
+| 1 | Used hoverboard | Same as Tier 1. Motors + mainboard only; the built-in battery becomes a backup/bench-test supply. | 1 | $30 | eBay / FB Marketplace |
+| 2 | ST-Link V2 programmer | Same as Tier 1. | 1 | $6 | [Amazon](https://www.amazon.com/s?k=ST-Link+V2) |
+| 3 | 2020 aluminum extrusion frame + plywood deck | 500mm lengths of 20x20mm V-slot extrusion, corner brackets, T-nuts, M5 screws. 3/4" plywood deck screwed on top. | 1 | $50 | [Amazon](https://www.amazon.com/s?k=2020+aluminum+extrusion+500mm) / Home Depot |
+| 4 | Pixhawk 6C Mini | Holybro Pixhawk 6C Mini. Runs ArduRover firmware. STM32H743, triple IMU, barometer, microSD. Part: Holybro 6C Mini Set. | 1 | $120 | [Holybro](https://holybro.com/products/pixhawk-6c-mini) |
+| 5 | Unicore UM980 breakout + multiband antenna | UM980 RTK GNSS module. L1/L2/L5 triple-band, 8mm RTK accuracy. ArduPilot native support. Multiband (L1/L2) patch or helical antenna. | 1 | $165 | [ArduSimple](https://www.ardusimple.com/) / [SparkFun](https://www.sparkfun.com/) |
+| 6 | 12V diaphragm pump | Same as Tier 1. | 1 | $30 | Amazon |
+| 7 | 12V solenoid valve (N.C.) | Same as Tier 1. | 1 | $15 | Amazon |
+| 8 | Flat fan spray nozzle + fittings | Same as Tier 1. Includes tubing, barb adapters, hose clamps. | 1 | $15 | Amazon |
+| 9 | Spray system mounting hardware | Nozzle bracket, paint reservoir holder, tube routing clips. | 1 | $20 | Amazon / hardware store |
+| 10 | 36V 10Ah e-bike battery | 36V lithium-ion, 10S or equivalent. 360Wh. Includes BMS. XT60 or Anderson connector. | 1 | $100 | [Amazon](https://www.amazon.com/s?k=36V+10Ah+ebike+battery) |
+| 11 | DC-DC converters (36V to 12V, 36V to 5V) | Same specs as Tier 1. The 5V BEC powers the Pixhawk and GPS. | 2 | $10 | Amazon |
+| 12 | E-stop button | Same as Tier 1. N.C. contacts cut motor power via relay. | 1 | $5 | Amazon |
+| 13 | HC-SR04 ultrasonic sensors | 2-400 cm range, 5V. Front-left and front-right obstacle detection. | 2 | $5 | Amazon |
+| 14 | RC transmitter + receiver (FlySky FS-i6X) | 6-channel, 2.4 GHz, IBUS/SBUS receiver. Manual override + mode switching. Part: FlySky FS-i6X with FS-iA6B receiver. | 1 | $30 | [Amazon](https://www.amazon.com/s?k=FlySky+FS-i6X) |
+| 15 | Wiring, connectors, fuses, mounting | 14/18/22 AWG wire, XT60 connectors, 30A fuse, JST-GH cables for Pixhawk, M3 standoffs, zip ties, heat shrink. | 1 lot | $30 | Amazon |
+| 16 | Relay module (2-channel, 5V) | For Pixhawk MAIN OUT to control solenoid and pump. Opto-isolated preferred. | 1 | $5 | Amazon |
 
----
-
-## 5. Obstacle Detection
-
-| # | Component | Specs | Qty | Unit Price | Subtotal | Source |
-|---|-----------|-------|-----|------------|----------|--------|
-| 27 | HC-SR04 ultrasonic sensor | 2-400 cm range, 5V, 15 deg beam | 2 | $3 | $6 | Amazon |
-| 28 | Bi-directional logic level converter | 4-channel, 3.3V <-> 5V (for echo pins) | 1 | $3 | $3 | SparkFun / Amazon |
-| 29 | Ultrasonic sensor mounting bracket | 3D-printed or L-bracket, adjustable angle | 2 | $2 | $4 | Amazon / custom |
-
-**Obstacle detection subtotal: ~$13**
-
----
-
-## 6. Safety
-
-| # | Component | Specs | Qty | Unit Price | Subtotal | Source |
-|---|-----------|-------|-----|------------|----------|--------|
-| 30 | Emergency stop button (mushroom head) | 22mm panel mount, 2x N.C. contacts, twist-release | 1 | $15 | $15 | Amazon / DigiKey (e.g., Schneider XB5AS8442) |
-| 31 | 30A automotive relay or contactor | 24V coil, 30A N.C. contacts (or use e-stop contacts directly if rated) | 1 | $12 | $12 | Amazon / DigiKey |
-| 32 | 30A blade fuse + inline holder | ATC/ATO style, for main battery line | 1 | $5 | $5 | Amazon / auto parts |
-| 33 | 3.3V zener diode (1N4728A) | Clamp protection for GPIO 27 | 1 | $0.20 | $0.20 | DigiKey |
-| 34 | 10k ohm resistor (voltage divider) | For e-stop signal path | 1 | $0.10 | $0.10 | DigiKey |
-| 35 | 5.6k ohm resistor (voltage divider) | For e-stop signal path | 1 | $0.10 | $0.10 | DigiKey |
-
-**Safety subtotal: ~$32**
+**Tier 2 Total: ~$631** (add ~$5 for a 2nd relay channel if controlling pump separately)
 
 ---
 
-## 7. Status Indicators
+## Tier 3: $905 "Production Prototype"
 
-| # | Component | Specs | Qty | Unit Price | Subtotal | Source |
-|---|-----------|-------|-----|------------|----------|--------|
-| 36 | RGB common-cathode LED (5mm) | or 3x individual LEDs (red, green, blue) | 1 | $1 | $1 | Amazon / DigiKey |
-| 37 | 220 ohm resistor (1/4W) | Current limiting, one per LED color | 3 | $0.10 | $0.30 | DigiKey |
-| 38 | LED panel mount holder (5mm) | Chrome bezel | 1 | $1 | $1 | Amazon |
+Built to run all day on real job sites. Better GPS antenna for multipath
+rejection near buildings, bigger battery, weatherproof enclosure,
+proper spray tip with filter, and a full-size Pixhawk for expansion.
 
-**Status indicator subtotal: ~$2**
+| # | Component | Specs / Notes | Qty | Cost | Source |
+|---|-----------|---------------|-----|------|--------|
+| 1 | Used hoverboard | Same as Tier 1/2. Motors + mainboard. | 1 | $30 | eBay / FB Marketplace |
+| 2 | ST-Link V2 programmer | Same. | 1 | $6 | Amazon |
+| 3 | Aluminum frame + proper casters + paint tray mount | Welded or bolted aluminum tube/extrusion frame. 4" swivel casters (locking). Integrated paint reservoir tray. | 1 | $80 | Amazon / local metal shop |
+| 4 | Pixhawk 6C (full size) | Holybro Pixhawk 6C. Full-size with all ports. More serial ports, CAN bus, dual redundant power. Part: Holybro Pixhawk 6C Standard Set. | 1 | $180 | [Holybro](https://holybro.com/products/pixhawk-6c) |
+| 5 | Unicore UM980 breakout | Same module as Tier 2. | 1 | $120 | ArduSimple / SparkFun |
+| 6 | Quality multiband GNSS antenna | Survey-grade L1/L2/L5 antenna with ground plane. Better multipath rejection for parking lots near buildings. (e.g., u-blox ANN-MB-00 or Beitian BT-800D). | 1 | $65 | [SparkFun](https://www.sparkfun.com/) / [DigiKey](https://www.digikey.com/) |
+| 7 | Graco-style spray tip + filter + fittings | Graco RAC 5 LL5319 reversible tip, inline filter (60-mesh), tip guard. Professional-grade line quality. | 1 | $100 | Amazon / [Graco](https://www.graco.com/) / paint supply |
+| 8 | 36V 15Ah e-bike battery + charger | 36V lithium-ion, 15Ah (540Wh). Includes BMS. Bundled 42V 2A charger. 4-6 hours runtime. | 1 | $140 | [Amazon](https://www.amazon.com/s?k=36V+15Ah+ebike+battery+charger) |
+| 9 | DC-DC converters + fuse panel | 36V to 12V (5A), 36V to 5V (3A). ATC fuse panel (4-way) for organized power distribution. | 1 | $20 | Amazon |
+| 10 | E-stop button | Same as Tier 1/2. | 1 | $5 | Amazon |
+| 11 | HC-SR04 ultrasonic sensors | Same as Tier 2. | 2 | $5 | Amazon |
+| 12 | FlySky FS-i6X (full 10-channel) | 10-channel transmitter. Extra channels for spray on/off toggle, speed dial, mode switch. Part: FlySky FS-i6X + FS-iA10B receiver. | 1 | $50 | [Amazon](https://www.amazon.com/s?k=FlySky+FS-i6X+10+channel) |
+| 13 | Weatherproof enclosure | IP65, ~300x200x120mm. Houses Pixhawk, DC-DC converters, relay module, fuse panel. | 1 | $20 | [Amazon](https://www.amazon.com/s?k=IP65+enclosure+300x200) |
+| 14 | 12V diaphragm pump | Same as Tier 1/2. Higher quality (Shurflo or equivalent) for consistent pressure. | 1 | $40 | Amazon |
+| 15 | 12V solenoid valve (N.C.) | Same as Tier 1/2. | 1 | $15 | Amazon |
+| 16 | Wiring, connectors, mounting hardware | Same categories as Tier 2, plus waterproof connectors (aviation plugs), cable glands for enclosure. | 1 lot | $30 | Amazon |
 
----
-
-## 8. Power
-
-| # | Component | Specs | Qty | Unit Price | Subtotal | Source |
-|---|-----------|-------|-----|------------|----------|--------|
-| 39 | LiFePO4 battery 24V 30Ah | 8S, built-in BMS, 720Wh | 1 | $250 | $250 | Amazon (e.g., Ampere Time / LiTime 25.6V 30Ah) |
-| 40 | Battery charger (29.2V LiFePO4) | 5A charge rate, CC/CV | 1 | $35 | $35 | Amazon (matched to battery) |
-| 41 | 24V to 5V DC-DC converter | DFRobot DFR0571 or Pololu D24V50F5 (5A, 5V out) | 1 | $15 | $15 | Pololu / Amazon |
-| 42 | 24V to 12V DC-DC converter | 3A step-down, isolated preferred | 1 | $12 | $12 | Amazon / Pololu (D24V22F12) |
-| 43 | Anderson Powerpole connectors (30A) | Battery quick-disconnect | 1 pair | $5 | $5 | Amazon / Powerwerx |
-| 44 | Power distribution bus bar / terminal block | 4-position, 30A rated | 1 | $8 | $8 | Amazon |
-| 45 | Toggle switch (main power) | 30A, panel mount, with LED indicator | 1 | $8 | $8 | Amazon |
-
-**Power subtotal: ~$333**
-
----
-
-## 9. Wiring, Connectors, and Consumables
-
-| # | Component | Specs | Qty | Unit Price | Subtotal | Source |
-|---|-----------|-------|-----|------------|----------|--------|
-| 46 | 10 AWG silicone wire (red + black) | Battery to fuse/e-stop, 3 ft each color | 1 set | $10 | $10 | Amazon |
-| 47 | 12 AWG silicone wire (red + black) | Motor power rail, 6 ft each color | 1 set | $8 | $8 | Amazon |
-| 48 | 14 AWG silicone wire (red + black) | Motor driver to motor, 3 ft each color | 1 set | $7 | $7 | Amazon |
-| 49 | 18 AWG hookup wire (assorted colors) | Solenoid, 5V rail, 10 ft total | 1 set | $6 | $6 | Amazon |
-| 50 | 22 AWG hookup wire (assorted colors) | Signal wires, GPIO, 25 ft total | 1 spool | $8 | $8 | Amazon |
-| 51 | Dupont jumper wire kit | M-M, M-F, F-F, 10cm and 20cm | 1 kit | $7 | $7 | Amazon |
-| 52 | JST-XH connector kit | 2/3/4/6 pin, for clean encoder & sensor connections | 1 kit | $12 | $12 | Amazon |
-| 53 | Ferrule crimps + crimping tool | For stranded wire terminations | 1 kit | $25 | $25 | Amazon |
-| 54 | Heat shrink tubing assortment | 2:1 ratio, various diameters | 1 kit | $8 | $8 | Amazon |
-| 55 | Zip ties (assorted) | Cable management | 1 bag | $5 | $5 | Amazon |
-| 56 | Adhesive cable clips | Stick-on, for wire routing on chassis | 1 pack | $5 | $5 | Amazon |
-| 57 | Breadboard (half-size) | For prototyping signal conditioning circuits | 1 | $5 | $5 | Amazon / SparkFun |
-| 58 | Perfboard (70x90mm) | For permanent signal conditioning (voltage dividers, MOSFET driver) | 1 | $3 | $3 | Amazon |
-| 59 | M3 standoffs, screws, nuts kit | For mounting PCBs to chassis | 1 kit | $8 | $8 | Amazon |
-| 60 | XT60 connectors (male + female) | Inline power connectors for battery and DC-DC modules | 2 pairs | $4 | $8 | Amazon |
-
-**Wiring/consumables subtotal: ~$125**
+**Tier 3 Total: ~$905**
 
 ---
 
-## 10. Chassis / Frame
+## Tier Comparison
 
-| # | Component | Specs | Qty | Unit Price | Subtotal | Source |
-|---|-----------|-------|-----|------------|----------|--------|
-| 61 | Aluminum extrusion (20x20mm, V-slot) | 500mm lengths for frame | 6 | $5 | $30 | Amazon / OpenBuilds |
-| 62 | V-slot corner brackets | 90-degree, 20-series | 12 | $1.50 | $18 | Amazon / OpenBuilds |
-| 63 | T-nuts (M5, 20-series) | Drop-in, for mounting components | 1 pack (50) | $8 | $8 | Amazon |
-| 64 | M5x8mm button head screws | For extrusion assembly | 1 pack (50) | $6 | $6 | Amazon |
-| 65 | Aluminum plate (3mm, 300x200mm) | Motor mount / electronics tray | 1 | $15 | $15 | Amazon / OnlineMetals |
-| 66 | 3D-printed mounts | Sensor, GPS antenna, nozzle holders (PLA/PETG) | misc | $10 | $10 | Self-printed |
-| 67 | Weatherproof electronics enclosure | IP65, ~250x200x120mm, for RPi + converters | 1 | $20 | $20 | Amazon |
-
-**Chassis subtotal: ~$107**
-
----
-
-## Cost Summary
-
-| Subsystem               | Subtotal |
-|--------------------------|----------|
-| Compute                  | $113     |
-| Drive system             | $168     |
-| Positioning (GPS + IMU)  | $388     |
-| Paint system             | $76      |
-| Obstacle detection       | $13      |
-| Safety                   | $32      |
-| Status indicators        | $2       |
-| Power                    | $333     |
-| Wiring & consumables     | $125     |
-| Chassis / frame          | $107     |
-| **TOTAL**                | **~$1,357** |
-
-> **Note:** Prices exclude shipping and tax. The largest single cost is the
-> ZED-F9P RTK GPS module ($275). If centimeter-level accuracy is not needed
-> initially, a standard u-blox NEO-M9N (~$50) can be substituted, reducing
-> the total to approximately $1,130. The LiFePO4 battery ($250) is the
-> second largest cost; a smaller 20Ah pack (~$170) would reduce cost but
-> limit runtime to roughly 4 hours of active use.
+| Feature | Tier 1 ($409) | Tier 2 ($631) | Tier 3 ($905) |
+|---------|---------------|---------------|---------------|
+| Autopilot | ESP32 (custom FW) | Pixhawk 6C Mini (ArduRover) | Pixhawk 6C Full (ArduRover) |
+| GPS module | ZED-F9P (1-2 cm) | UM980 (8 mm) | UM980 (8 mm) + quality antenna |
+| Runtime | 20-40 min (hoverboard battery) | 2-3 hrs (36V 10Ah) | 4-6 hrs (36V 15Ah) |
+| RC override | No | Yes (FlySky 6ch) | Yes (FlySky 10ch) |
+| Mission Planner | No | Yes | Yes |
+| Geofencing | No | Yes (ArduRover) | Yes (ArduRover) |
+| Spray quality | Basic nozzle | Basic nozzle | Graco reversible tip + filter |
+| Obstacle detection | No | 2x ultrasonic | 2x ultrasonic |
+| Weatherproofing | None | None | IP65 enclosure |
+| Frame | Plywood | Aluminum extrusion + plywood | Aluminum + proper casters |
 
 ---
 
-## Vendor Quick Links
+## What You Get from a Used Hoverboard
 
-| Vendor     | URL                              | Notes                           |
-|------------|----------------------------------|---------------------------------|
-| Pololu     | https://www.pololu.com           | Motors, motor drivers, DC-DC    |
-| SparkFun   | https://www.sparkfun.com         | GPS-RTK, IMU, breakouts         |
-| Adafruit   | https://www.adafruit.com         | BNO085, connectors, breakouts   |
-| DigiKey    | https://www.digikey.com          | Discrete components, connectors |
-| Amazon     | https://www.amazon.com           | General, batteries, wire, misc  |
-| OpenBuilds | https://openbuildspartstore.com  | Aluminum extrusion, V-slot      |
-| Powerwerx  | https://powerwerx.com            | Anderson Powerpole connectors   |
+A single used hoverboard ($20-50) provides all of the following:
+
+- **Two 350W BLDC hub motors** with built-in hall sensors (replace $80+ in motors)
+- **A 36V battery pack** (2-4Ah, fine for bench testing)
+- **An STM32-based dual motor controller board** (replace $25-80 in motor drivers + ESP32 PID controller)
+- **Wheels and tires** already attached to the motors
+
+Flash the mainboard with [hoverboard-firmware-hack-FOC](https://github.com/EFeru/hoverboard-firmware-hack-FOC) using an ST-Link V2 ($6). The FOC firmware accepts UART speed commands for each motor independently -- exactly what ArduRover (or an ESP32) sends for differential/skid steering.
+
+**Proven in:** HoverMower, ESP32-Hoverboard-Lawnmower, HoverBot, CHEAP-LAWNMOWER-ROBOT-FROM-HOVERBOARD, and dozens of other open-source robot projects.
+
+---
+
+## Where to Buy
+
+| Vendor | URL | What to Buy |
+|--------|-----|-------------|
+| ArduSimple | https://www.ardusimple.com | simpleRTK2B (ZED-F9P), UM980 boards, GNSS antennas, RTK kits |
+| Holybro | https://holybro.com | Pixhawk 6C / 6C Mini, PM02 power module, GPS modules |
+| SparkFun | https://www.sparkfun.com | GPS-RTK boards (ZED-F9P), UM980 breakout, GNSS antennas, breakouts |
+| Amazon | https://www.amazon.com | Hoverboard batteries, DC-DC converters, pumps, solenoids, wire, FlySky RC, extrusions, enclosures, everything else |
+| AliExpress | https://www.aliexpress.com | Budget alternative for UM980 boards, ST-Link clones, ESP32 boards, DC-DC converters, relay modules (longer shipping) |
+| eBay / FB Marketplace | https://www.ebay.com | Used hoverboards ($20-50) |
+| Home Depot | https://www.homedepot.com | Plywood, casters, tubing, fittings, spray paint (for demos) |
+| DigiKey | https://www.digikey.com | Discrete components, connectors, GNSS antennas (u-blox ANN-MB-00) |
+| OpenBuilds | https://openbuildspartstore.com | 2020 V-slot extrusion, corner brackets, T-nuts |
+| Graco | https://www.graco.com | Professional spray tips (RAC 5 series), filters, tip guards |
+
+---
+
+## Part Numbers Quick Reference
+
+| Part | Part Number / Search Term |
+|------|--------------------------|
+| Pixhawk 6C Mini | Holybro Pixhawk 6C Mini Set |
+| Pixhawk 6C (full) | Holybro Pixhawk 6C Standard Set |
+| simpleRTK2B Budget | ArduSimple simpleRTK2B Budget Starter Kit LR |
+| Unicore UM980 | UM980 (search ArduSimple or SparkFun for breakout boards) |
+| u-blox ZED-F9P | ZED-F9P (on simpleRTK2B board) |
+| GNSS antenna (budget) | u-blox ANN-MB-00 or patch antenna included with simpleRTK2B |
+| GNSS antenna (quality) | Beitian BT-800D / u-blox ANN-MB-00 |
+| FlySky RC (6ch) | FS-i6X + FS-iA6B receiver |
+| FlySky RC (10ch) | FS-i6X + FS-iA10B receiver |
+| Hoverboard FOC firmware | https://github.com/EFeru/hoverboard-firmware-hack-FOC |
+| Graco spray tip | RAC 5 LL5319 (4" line, 0.019" orifice) |
+| ST-Link V2 | ST-Link V2 (generic clone, SWD programmer) |
+
+---
+
+## Notes
+
+- **RTK corrections:** You need an RTK correction source for centimeter
+  accuracy. Options: own base station ($60-150 one-time with a second
+  UM980 or LC29H), RTK2Go (free community NTRIP), or Point One Polaris
+  ($50/month commercial). Budget for this separately.
+- **Paint:** Water-based latex traffic paint, ~$15-25/gallon,
+  ~350 linear feet per gallon. A 50-space lot needs 4-5 gallons.
+- **Charger:** Tier 1 uses the hoverboard's included charger. Tiers 2/3
+  need a 42V (10S) lithium-ion charger if not bundled with the battery.
+- **Tools needed:** Soldering iron, multimeter, hex keys, drill, wire
+  strippers, crimping tool. ST-Link V2 and a laptop with
+  STM32CubeProgrammer for flashing hoverboard firmware.

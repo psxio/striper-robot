@@ -1,12 +1,11 @@
 [project]
 name = "striper-robot"
-version = "0.1.0"
-description = "Autonomous parking lot line-painting (striping) robot"
+version = "0.2.0"
+description = "Autonomous parking lot line-painting (striping) robot — ArduRover + pathgen"
 requires-python = ">=3.10"
 
 [tool.pytest.ini_options]
-asyncio_mode = "auto"
-testpaths = ["tests"]
+testpaths = ["striper_pathgen/tests"]
 filterwarnings = [
     "ignore::DeprecationWarning",
 ]
