@@ -39,11 +39,10 @@
 ardurover/
   params/
     striper.param             # Complete ArduRover parameter file
-  scripts/
+  lua/
+    motor_bridge.lua          # CRITICAL: Hoverboard UART motor driver (PWM -> FOC protocol)
     paint_control.lua         # Paint solenoid control with lead/lag compensation
     paint_speed_sync.lua      # Speed-synchronized paint control (optional)
-  lua/
-    paint_control.lua         # Legacy location (same script)
     fence_check.lua           # Enhanced geofence safety (kills paint on breach)
   hoverboard/
     setup.md                  # Hoverboard motor integration guide
@@ -91,15 +90,29 @@ sky view. Keep it away from motors, the solenoid, and large metal surfaces.
 Use a ground plane under the antenna if possible.
 
 For RTK operation, the UM980 needs RTCM3 correction data from a base station.
-Options for feeding corrections:
 
-- **Via Mission Planner**: Setup > Optional Hardware > RTK/GPS Inject. Enter
-  your NTRIP caster URL, port, mountpoint, and credentials. Mission Planner
-  injects RTCM corrections over the telemetry link.
-- **Via dedicated radio**: Connect a second radio to the UM980's COM2 port
-  receiving base station corrections directly.
-- **Via companion computer**: Run an NTRIP client on a Raspberry Pi or similar,
-  forward corrections to the Pixhawk via MAVLink.
+**Quickest method: Mission Planner NTRIP (free via RTK2Go)**
+
+1. Open Mission Planner and connect to the Pixhawk via telemetry or USB
+2. Go to **Setup > Optional Hardware > RTK/GPS Inject**
+3. Enter the NTRIP caster settings:
+   - Host: `rtk2go.com`
+   - Port: `2101`
+   - Mount Point: find the nearest base station at http://monitor.use-snip.com
+     (pick one within 30km of your job site)
+   - Username: your email address (RTK2Go is free, email is the login)
+   - Password: `none` (leave blank or type "none")
+4. Click **Connect**
+5. The status should show "Connected" and bytes flowing
+6. In the HUD, watch the GPS fix type change:
+   - 3D Fix -> RTK Float (30-60 seconds) -> RTK Fixed (1-3 minutes)
+7. Once "RTK Fixed" shows, GPS accuracy is 1-2cm
+
+**Other options:**
+- **Own base station**: A second UM980 at a known location, transmitting
+  RTCM3 corrections via a telemetry radio.
+- **Commercial service** (PointPerfect, Polaris): $30-50/month subscription,
+  works anywhere with cellular coverage.
 
 ### UM980 Configuration
 
@@ -114,8 +127,8 @@ $command,config com1 115200
 $command,saveconfig
 ```
 
-ArduPilot's GPS driver (GPS_TYPE=1, AUTO) auto-detects NMEA and Unicore binary
-protocols.
+ArduPilot's GPS driver (GPS_TYPE=25, Unicore native) gives the best performance.
+Use GPS_TYPE=1 (AUTO) if you are unsure or using a different GPS module.
 
 ### Hoverboard Motor UART Wiring
 
@@ -325,7 +338,7 @@ support, Lua scripting improvements, and relay function parameters.
 
 7. Reconnect and verify critical parameters:
    - `FRAME_TYPE` = 2
-   - `GPS_TYPE` = 1
+   - `GPS_TYPE` = 25
    - `SCR_ENABLE` = 1
    - `SPRAY_ENABLE` = 1
    - `RELAY1_PIN` = 54
@@ -365,8 +378,9 @@ ArduRover runs Lua scripts from the SD card in the `/APM/scripts/` directory.
    ```
 
 3. Copy the following scripts to `/APM/scripts/`:
-   - `scripts/paint_control.lua` -- paint solenoid control with timing compensation
-   - `scripts/paint_speed_sync.lua` -- speed-based paint synchronization (optional)
+   - `lua/motor_bridge.lua` -- **REQUIRED** hoverboard UART motor driver
+   - `lua/paint_control.lua` -- paint solenoid control with timing compensation
+   - `lua/paint_speed_sync.lua` -- speed-based paint synchronization (optional)
    - `lua/fence_check.lua` -- geofence breach paint shutoff (optional)
 
 4. Reinsert the SD card into the Pixhawk
@@ -379,11 +393,10 @@ ArduRover runs Lua scripts from the SD card in the `/APM/scripts/` directory.
 
 7. Verify scripts loaded by checking the Messages tab in Mission Planner:
    ```
-   paint_control.lua loaded
-     Relay 0=solenoid, Relay 1=pump
-     Lead=25mm, Lag=15mm, MinSpeed=0.10 m/s
-   paint_speed_sync.lua loaded
-     Hysteresis=0.05 m/s, Avg samples=5, Rate=10Hz
+   motor_bridge.lua loaded - hoverboard FOC UART bridge
+     Rate=50Hz, Deadband=15, RampLimit=50
+   motor_bridge: Serial port found, 115200 baud
+   paint_control.lua loaded - relay 0 = solenoid
    fence_check.lua loaded - monitoring geofence
    ```
 
@@ -392,12 +405,22 @@ ArduRover runs Lua scripts from the SD card in the `/APM/scripts/` directory.
 In Mission Planner or MAVProxy:
 ```bash
 # MAVProxy:
-ftp put scripts/paint_control.lua scripts/paint_control.lua
-ftp put scripts/paint_speed_sync.lua scripts/paint_speed_sync.lua
+ftp put lua/motor_bridge.lua scripts/motor_bridge.lua
+ftp put lua/paint_control.lua scripts/paint_control.lua
+ftp put lua/paint_speed_sync.lua scripts/paint_speed_sync.lua
+ftp put lua/fence_check.lua scripts/fence_check.lua
 reboot
 ```
 
 ### Script Descriptions
+
+**motor_bridge.lua** (REQUIRED):
+Translates ArduRover SERVO1/SERVO3 PWM outputs (ThrottleLeft/ThrottleRight)
+into the hoverboard FOC firmware UART protocol (0xABCD start frame + int16
+steer + int16 speed + XOR checksum). Runs at 50Hz on Serial2
+(SERIAL2_PROTOCOL=28). Without this script, the wheels will not move.
+Includes PWM deadband, rate-limited acceleration ramp, and telemetry
+output (MSPD/MSTR named floats).
 
 **paint_control.lua** (required):
 Controls the paint solenoid relay during autonomous missions. Monitors
@@ -535,9 +558,21 @@ the first drive test.
 6. Mode switch verified: SwC low=Manual, mid=Hold, high=Auto
 7. Someone is standing by with the E-stop or a finger on SwC (Hold mode)
 
+### Bench Test (wheels off ground)
+
+Before driving on the ground, verify motors respond with the robot on blocks:
+
+1. Place the robot on blocks so both drive wheels spin freely
+2. Verify `motor_bridge.lua` loaded (check Messages tab for "motor_bridge: Serial port found")
+3. Arm in MANUAL mode (SwC low, throttle down + rudder right for 3 seconds)
+4. Gently push throttle forward -- both wheels should spin forward
+5. If wheels don't respond: check SERIAL2_PROTOCOL=28, hoverboard UART wiring, FOC firmware
+6. Test relay: flip SwA (CH7) -- you should hear the solenoid click
+7. Disarm (throttle down + rudder left)
+
 ### Manual Drive Test
 
-1. Arm in MANUAL mode (SwC low, throttle down + rudder right)
+1. Lower robot to the ground. Arm in MANUAL mode (SwC low, throttle down + rudder right)
 2. Slowly push throttle forward -- robot should drive straight
 3. Note the throttle percentage needed for ~0.5 m/s (from the HUD)
    - Use this to set CRUISE_THROTTLE
@@ -752,7 +787,7 @@ If you have line coordinates from a survey or CAD drawing:
 
 ### Paint Activates But Lines Are Offset
 
-- Adjust `LEAD_DISTANCE_M` and `LAG_DISTANCE_M` in paint_control.lua
+- Adjust `LEAD_TIME_MS` and `LAG_TIME_MS` in paint_control.lua (default 50ms/30ms)
 - Verify GPS antenna offset (`GPS_POS1_X`, `GPS_POS1_Y`) matches the actual
   antenna position relative to the paint nozzle
 - Check that `WP_RADIUS` is small enough (0.05m)
@@ -838,7 +873,7 @@ Before each striping session:
 | RELAY1_PIN | 54 | Paint solenoid on AUX5 |
 | RELAY2_PIN | 55 | Pump on AUX6 |
 | FENCE_ENABLE | 1 | Geofencing active |
-| GPS_TYPE | 1 | Auto-detect GPS protocol |
+| GPS_TYPE | 25 | Unicore UM980 native driver |
 | SCR_ENABLE | 1 | Lua scripting enabled |
 | BRD_SAFETY_DEFLT | 0 | Hardware safety switch disabled |
 | BATT_LOW_VOLT | 33.0 | Low battery warning (10S pack) |

@@ -52,9 +52,9 @@ A builder should be able to wire the entire robot from this document.
      |                                           |
      | SERIAL1/2 ──── Hoverboard UART (TX/RX/GND)|
      |                                           |
-     | MAIN OUT 1 ──→ Relay CH1 ──→ 12V Solenoid |
+     | AUX5 (pin 54) → Relay CH1 ──→ 12V Solenoid |
      |                                           |
-     | MAIN OUT 2 ──→ Relay CH2 ──→ 12V Pump     |
+     | AUX6 (pin 55) → Relay CH2 ──→ 12V Pump     |
      |                (optional,                 |
      |                 or wire pump always-on)    |
      |                                           |
@@ -172,14 +172,12 @@ SERIAL2_PROTOCOL = <motor driver protocol number>
 SERIAL2_BAUD = 115200
 ```
 
-> The exact protocol number depends on whether you use ArduRover's
-> built-in skid-steering output (which sends PWM to motor drivers) or a
-> custom Lua script that writes UART commands directly to the hoverboard.
-> The simplest approach: configure ArduRover for skid steering
-> (`FRAME_TYPE = 0`), route MAIN OUT 1/3 PWM signals through a small
-> Arduino/ESP32 translator that converts PWM to the hoverboard UART
-> protocol. Alternatively, use a Lua script on the Pixhawk to write
-> UART commands directly.
+> Set `SERIAL2_PROTOCOL = 28` (Scripting) and `SERIAL2_BAUD = 115200`.
+> The `motor_bridge.lua` Lua script on the Pixhawk reads ArduRover's
+> SERVO1/SERVO3 PWM outputs, converts them to the hoverboard FOC UART
+> protocol, and sends them over Serial2. This is handled automatically
+> when you load the Lua scripts -- no external Arduino is needed.
+> Set `FRAME_TYPE = 2` (differential drive / skid steering).
 
 ---
 
@@ -252,7 +250,7 @@ check yours).
 ```
 SOLENOID CIRCUIT:
 
-Pixhawk MAIN OUT 1 (signal wire) ──→ Relay CH1 IN
+Pixhawk AUX5 (signal wire, pin 54) ──→ Relay CH1 IN
 Pixhawk GND ──────────────────────→ Relay GND
 5V BEC ───────────────────────────→ Relay VCC
 
@@ -263,7 +261,7 @@ Solenoid valve terminal 2 ──→ 12V DC-DC output (−) / GND
 
 PUMP CIRCUIT (if using relay control):
 
-Pixhawk MAIN OUT 2 (signal wire) ──→ Relay CH2 IN
+Pixhawk AUX6 (signal wire, pin 55) ──→ Relay CH2 IN
 (GND and VCC already connected above)
 
 Relay CH2 COM ──→ 12V DC-DC output (+)
@@ -282,11 +280,16 @@ Pump terminal (−) ──→ 12V DC-DC output (−) / GND
 ### 5.3 ArduRover Configuration
 
 ```
-RELAY1_PIN = 50            (MAIN OUT 1 -- check your Pixhawk's pin mapping)
-RELAY2_PIN = 51            (MAIN OUT 2)
+RELAY1_PIN = 54            (AUX5 / SERVO13 on Pixhawk 6C)
+RELAY2_PIN = 55            (AUX6 / SERVO14 on Pixhawk 6C)
 RELAY1_DEFAULT = 0         (off at startup)
 RELAY2_DEFAULT = 0         (off at startup)
 ```
+
+> **Important:** The relay pins use AUX outputs (54/55), NOT MAIN outputs
+> (50/51). This keeps the relay signals separate from the motor servo
+> outputs on SERVO1/SERVO3. Wire the relay module signal inputs to the
+> Pixhawk AUX5 and AUX6 pins, not MAIN OUT 1/2.
 
 Paint on/off is triggered by `DO_SET_RELAY` mission commands or by the
 AC_Sprayer library. See the Lua script in `docs/research_report.md` for
@@ -448,7 +451,9 @@ Follow this order. Do not proceed until the current step is verified.
       commands from a USB-serial adapter on your laptop. Verify both
       motors spin and respond to speed/direction commands.
 - [ ] **5.** Mount the mainboard on the frame. Route motor phase wires and
-      hall sensor cables neatly.
+      hall sensor cables neatly. **Measure the wheel center-to-center
+      distance** (track width) with a tape measure and record it. Update
+      `WHL_TRACK` in the param file to match (default is 0.40m).
 
 ### Phase 2: Power System (Steps 6-8)
 
@@ -471,8 +476,8 @@ Follow this order. Do not proceed until the current step is verified.
        to the POWER port, or wire 5V/GND to the appropriate pins. Verify
        the Pixhawk boots (LED sequence).
 - [ ] **11.** Connect the Pixhawk to your laptop via USB-C. Open Mission
-       Planner. Flash ArduRover firmware. Set `FRAME_TYPE = 0`
-       (skid steering).
+       Planner. Flash ArduRover firmware. Set `FRAME_TYPE = 2`
+       (differential drive / skid steering).
 - [ ] **12.** Wire the UM980 GPS to Pixhawk SERIAL3 (GPS1 port). Connect
        the GNSS antenna. Take the robot outdoors. In Mission Planner,
        verify GPS fix (3D fix, then RTK float/fixed when corrections
@@ -503,7 +508,7 @@ Follow this order. Do not proceed until the current step is verified.
 
 - [ ] **17.** Install the 12V solenoid valve and diaphragm pump. Wire them
        through the relay module as described in Section 5. Connect the
-       relay module signal inputs to Pixhawk MAIN OUT 1 and MAIN OUT 2.
+       relay module signal inputs to Pixhawk AUX5 (pin 54) and AUX6 (pin 55).
        Add flyback diodes across both the solenoid and pump.
 - [ ] **18.** Test relay operation. In Mission Planner, manually toggle
        RELAY1. The solenoid should click open/closed. Toggle RELAY2 and
@@ -535,7 +540,7 @@ Follow this order. Do not proceed until the current step is verified.
 | GPS1 (SERIAL3) | JST-GH 6-pin | UM980 GPS UART |
 | GPS2 (SERIAL4) | JST-GH 6-pin | (spare / 2nd GPS) |
 | RC IN | JST-GH 3-pin | FlySky SBUS receiver |
-| MAIN OUT 1-8 | JST-GH (servo rail) | OUT 1: solenoid relay, OUT 2: pump relay |
+| MAIN OUT 1-8 | JST-GH (servo rail) | AUX5 (pin 54): solenoid relay, AUX6 (pin 55): pump relay |
 | USB-C | USB-C | Laptop (Mission Planner) |
 | SAFETY | JST-GH 3-pin | Safety switch (or e-stop signal) |
 | I2C | JST-GH 4-pin | (spare / compass / sensor) |

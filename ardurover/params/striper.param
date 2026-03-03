@@ -74,9 +74,10 @@ SERIAL4_BAUD,115
 # -----------------------------------------------------------------------------
 # GPS CONFIGURATION (Unicore UM980)
 # -----------------------------------------------------------------------------
-# GPS_TYPE 1 = AUTO (ArduPilot auto-detects NMEA/UBX/Unicore)
-# UM980 speaks NMEA or Unicore binary; AUTO handles both
-GPS_TYPE,1
+# GPS_TYPE 25 = Unicore UM980 native driver (ArduRover 4.5+)
+# Gives best performance with UM980 triple-band RTK receiver
+# Use GPS_TYPE=1 (AUTO) if you are unsure or using a different GPS module
+GPS_TYPE,25
 
 # No secondary GPS
 GPS_TYPE2,0
@@ -92,9 +93,10 @@ GPS_AUTO_SWITCH,0
 # Minimum satellites for a valid fix
 GPS_MIN_DGPS,6
 
-# Minimum fix type for arming: 5 = RTK Float minimum
-# Ensures we have at least RTK float before robot will arm
-# Set to 6 for RTK Fixed only if your base station is reliable
+# Minimum satellite elevation angle (degrees) to use in position solution
+# 5 degrees filters out low-elevation satellites (reduces multipath)
+# NOTE: This does NOT enforce RTK fix type for arming. RTK arming
+# requirements are controlled by ARMING_CHECK (GPS quality checks).
 GPS_MIN_ELEV,5
 
 # GPS update rate in milliseconds: 100ms = 10Hz

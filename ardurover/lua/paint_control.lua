@@ -77,7 +77,7 @@ function update()
             gcs:send_text(4, "PAINT: OFF (not in AUTO)")
         end
         -- Publish paint status: 0 = off
-        rc:set_aux_cached(300, 0)
+        gcs:send_named_float('PAINT', 0)
         return update, SCRIPT_INTERVAL
     end
 
@@ -90,7 +90,7 @@ function update()
             gcs:send_text(4, "PAINT: OFF (speed too low: " ..
                 string.format("%.2f", speed) .. " m/s)")
         end
-        rc:set_aux_cached(300, 0)
+        gcs:send_named_float('PAINT', 0)
         return update, SCRIPT_INTERVAL
     end
 
@@ -137,9 +137,9 @@ function update()
     -- Publish paint status as a named float for telemetry
     -- 1 = painting, 0 = not painting
     if paint_active then
-        rc:set_aux_cached(300, 1)
+        gcs:send_named_float('PAINT', 1)
     else
-        rc:set_aux_cached(300, 0)
+        gcs:send_named_float('PAINT', 0)
     end
 
     return update, SCRIPT_INTERVAL
