@@ -38,11 +38,11 @@ Usage examples:
   # Preview paths from a job file
   python scripts/pathgen_cli.py preview --input job.json
 
-  # Export a Mission Planner / ArduPilot waypoints file
+  # Export a Mission Planner / ArduPilot waypoints file (10-space row, 1 handicap)
   python scripts/pathgen_cli.py mission \\
-      --template standard_space --count 10 \\
+      --template parking_row --count 10 --handicap 0 \\
       --origin 30.2672,-97.7431 --heading 45 \\
-      --output parking_lot.waypoints
+      --output parking_lot.waypoints --geojson parking_lot.geojson
 """
 
 from __future__ import annotations
@@ -431,6 +431,7 @@ def cmd_mission(args):
     """Generate a Mission Planner / ArduPilot .waypoints file from a template."""
     pg = _import_pathgen()
     from striper_pathgen.mission_planner import export_waypoints, save_waypoints
+    from striper_pathgen.job_exporter import export_geojson
 
     # Parse origin as "lat,lon"
     try:
@@ -449,20 +450,35 @@ def cmd_mission(args):
     origin = pg.Point2D(0.0, 0.0)
     angle = args.angle
 
-    # Build paths from template (same logic as cmd_template)
-    row_types = {"standard_space", "handicap_space", "compact"}
-    single_types = {"arrow", "crosswalk"}
+    # Parse handicap indices (e.g. "0,9" -> [0, 9])
+    handicap_indices = []
+    if args.handicap:
+        try:
+            handicap_indices = [int(x.strip()) for x in args.handicap.split(",")]
+        except ValueError:
+            print("Error: --handicap must be comma-separated integers (e.g. 0,9)", file=sys.stderr)
+            sys.exit(1)
 
     all_paths: list = []
 
-    if template_type in row_types:
+    if template_type == "parking_row":
+        # Use the full parking row generator with handicap support
+        spacing = args.spacing if args.spacing else 2.7432  # 9 ft
+        length = args.length if args.length else 5.4864     # 18 ft
+        all_paths = pg.generate_parking_row(
+            origin=origin,
+            count=args.count,
+            spacing=spacing,
+            length=length,
+            angle=angle,
+            handicap_indices=handicap_indices,
+        )
+    elif template_type in {"standard_space", "handicap_space", "compact"}:
         gen_map = {
             "standard_space": pg.generate_standard_space,
             "handicap_space": pg.generate_handicap_space,
         }
-        gen_func = gen_map.get(template_type)
-        if gen_func is None:
-            gen_func = pg.generate_standard_space
+        gen_func = gen_map.get(template_type, pg.generate_standard_space)
 
         spacing = args.spacing if args.spacing else 2.7
         if template_type == "handicap_space":
@@ -472,47 +488,53 @@ def cmd_mission(args):
             space_origin = pg.Point2D(origin.x + i * spacing, origin.y)
             paths = gen_func(origin=space_origin, angle=angle)
             all_paths.extend(paths)
-
-    elif template_type in single_types:
-        if template_type == "arrow":
-            for i in range(args.count):
-                arr_origin = pg.Point2D(origin.x + i * 3.0, origin.y)
-                paths = pg.generate_arrow(origin=arr_origin, angle=angle)
-                all_paths.extend(paths)
-        elif template_type == "crosswalk":
-            for i in range(args.count):
-                cw_origin = pg.Point2D(origin.x + i * 8.0, origin.y)
-                paths = pg.generate_crosswalk(origin=cw_origin, angle=angle)
-                all_paths.extend(paths)
+    elif template_type == "arrow":
+        for i in range(args.count):
+            arr_origin = pg.Point2D(origin.x + i * 3.0, origin.y)
+            paths = pg.generate_arrow(origin=arr_origin, angle=angle)
+            all_paths.extend(paths)
+    elif template_type == "crosswalk":
+        for i in range(args.count):
+            cw_origin = pg.Point2D(origin.x + i * 8.0, origin.y)
+            paths = pg.generate_crosswalk(origin=cw_origin, angle=angle)
+            all_paths.extend(paths)
     else:
         try:
             paths = pg.generate_from_template(template_type, origin, angle)
             all_paths.extend(paths)
         except (ValueError, FileNotFoundError) as exc:
             print(f"Error: {exc}", file=sys.stderr)
-            print(
-                "Available template types: standard_space, handicap_space, "
-                "arrow, crosswalk",
-                file=sys.stderr,
-            )
             sys.exit(1)
 
     if not all_paths:
         print("No paths generated.", file=sys.stderr)
         sys.exit(1)
 
-    job = _build_paint_job(
-        all_paths,
-        datum_lat=origin_lat,
-        datum_lon=origin_lon,
+    # Optimize path ordering to minimize transit distance
+    if not args.no_optimize:
+        dist_before = pg.calculate_total_transit_distance(all_paths)
+        all_paths = pg.optimize_path_order(all_paths)
+        dist_after = pg.calculate_total_transit_distance(all_paths)
+        if dist_before > 0:
+            savings = (1.0 - dist_after / dist_before) * 100
+            print(f"Optimized path order: transit {dist_before:.1f}m -> {dist_after:.1f}m ({savings:.0f}% savings)")
+
+    # Build job
+    segments = [pg.PaintSegment(path=p, index=i) for i, p in enumerate(all_paths)]
+    datum = pg.GeoPoint(lat=origin_lat, lon=origin_lon)
+    job = pg.PaintJob(
+        job_id=f"{template_type}-{args.count}",
+        segments=segments,
+        datum=datum,
         metadata={
-            "source": "mission_planner",
+            "source": "mission_cli",
             "template_type": template_type,
             "count": args.count,
             "heading": heading,
         },
     )
 
+    # Export waypoints
     save_waypoints(
         job,
         filepath=args.output,
@@ -522,9 +544,50 @@ def cmd_mission(args):
         paint_speed=args.paint_speed,
         transit_speed=args.transit_speed,
     )
-    print(
-        f"Wrote {len(job.segments)} segment(s) as ArduPilot waypoints to {args.output}"
+
+    total_paint = sum(p.length for p in all_paths)
+    print(f"Mission: {len(job.segments)} segments, {total_paint:.0f}m paint distance")
+    print(f"Wrote {args.output}")
+
+    # Optionally export GeoJSON alongside
+    if args.geojson:
+        geojson = export_geojson(job)
+        with open(args.geojson, "w") as f:
+            json.dump(geojson, f, indent=2)
+        print(f"Wrote {args.geojson}")
+
+
+# ---------------------------------------------------------------------------
+# Subcommand: export
+# ---------------------------------------------------------------------------
+
+def cmd_export(args):
+    """Export an existing job JSON file to ArduPilot .waypoints format."""
+    from striper_pathgen.mission_planner import save_waypoints
+    from striper_pathgen.job_exporter import export_geojson
+
+    job = _load_job(args.input)
+    print(f"Loaded job {job.job_id} with {len(job.segments)} segment(s)")
+
+    save_waypoints(
+        job,
+        filepath=args.output,
+        datum_lat=job.datum.lat,
+        datum_lon=job.datum.lon,
+        datum_heading=args.heading,
+        paint_speed=args.paint_speed,
+        transit_speed=args.transit_speed,
     )
+
+    total_paint = sum(seg.path.length for seg in job.segments)
+    print(f"Mission: {len(job.segments)} segments, {total_paint:.0f}m paint distance")
+    print(f"Wrote {args.output}")
+
+    if args.geojson:
+        geojson = export_geojson(job)
+        with open(args.geojson, "w") as f:
+            json.dump(geojson, f, indent=2)
+        print(f"Wrote {args.geojson}")
 
 
 # ---------------------------------------------------------------------------
@@ -543,7 +606,8 @@ def build_parser() -> argparse.ArgumentParser:
             "  %(prog)s optimize --input job.json -o job_opt.json\n"
             "  %(prog)s preview --input job.json\n"
             "  %(prog)s preview --input job.json --ascii\n"
-            "  %(prog)s mission --template standard_space --count 10 --origin 30.2672,-97.7431 --heading 45 -o lot.waypoints\n"
+            "  %(prog)s mission --template parking_row --count 10 --handicap 0 --origin 30.2672,-97.7431 --heading 45 -o lot.waypoints\n"
+            "  %(prog)s export --input job.json --heading 45 -o lot.waypoints\n"
         ),
         formatter_class=argparse.RawDescriptionHelpFormatter,
     )
@@ -631,13 +695,22 @@ def build_parser() -> argparse.ArgumentParser:
         description=(
             "Generate paint paths from a template and export them as an\n"
             "ArduPilot/Mission Planner .waypoints file.\n\n"
-            "Available templates: standard_space, handicap_space, arrow, crosswalk"
+            "Available templates: parking_row, standard_space, handicap_space,\n"
+            "                     arrow, crosswalk\n\n"
+            "Examples:\n"
+            "  # 10-space parking row with first space handicap:\n"
+            "  pathgen_cli mission --template parking_row --count 10 \\\n"
+            "      --handicap 0 --origin 30.2672,-97.7431 --heading 45 \\\n"
+            "      -o lot.waypoints --geojson lot.geojson\n\n"
+            "  # 5 arrows:\n"
+            "  pathgen_cli mission --template arrow --count 5 \\\n"
+            "      --origin 30.2672,-97.7431 -o arrows.waypoints"
         ),
         formatter_class=argparse.RawDescriptionHelpFormatter,
     )
     p_mission.add_argument(
         "--template", required=True,
-        help="Template type (standard_space, handicap_space, arrow, crosswalk)",
+        help="Template type (parking_row, standard_space, handicap_space, arrow, crosswalk)",
     )
     p_mission.add_argument(
         "--origin", required=True,
@@ -653,11 +726,19 @@ def build_parser() -> argparse.ArgumentParser:
     )
     p_mission.add_argument(
         "--count", type=int, default=1,
-        help="Number of template instances to generate (default: 1)",
+        help="Number of spaces/instances to generate (default: 1)",
     )
     p_mission.add_argument(
         "--spacing", type=float, default=None,
-        help="Spacing between instances in metres",
+        help="Spacing between spaces in metres (default: 2.74m / 9ft for parking_row)",
+    )
+    p_mission.add_argument(
+        "--length", type=float, default=None,
+        help="Space depth in metres (default: 5.49m / 18ft for parking_row)",
+    )
+    p_mission.add_argument(
+        "--handicap", type=str, default=None,
+        help="Comma-separated 0-based indices of handicap spaces (e.g. 0,9)",
     )
     p_mission.add_argument(
         "--paint-speed", type=float, default=0.5,
@@ -668,10 +749,50 @@ def build_parser() -> argparse.ArgumentParser:
         help="Ground speed while transiting in m/s (default: 1.0)",
     )
     p_mission.add_argument(
+        "--no-optimize", action="store_true",
+        help="Skip path ordering optimization",
+    )
+    p_mission.add_argument(
+        "--geojson", type=str, default=None,
+        help="Also export a GeoJSON file for visualization",
+    )
+    p_mission.add_argument(
         "-o", "--output", required=True,
         help="Output .waypoints file path",
     )
     p_mission.set_defaults(func=cmd_mission)
+
+    # ── export ────────────────────────────────────────────────────────────
+    p_export = subparsers.add_parser(
+        "export",
+        help="Export an existing job JSON to ArduPilot .waypoints",
+        description=(
+            "Convert an existing job JSON file (from template, import-dxf, etc.)\n"
+            "into an ArduPilot/Mission Planner .waypoints file.\n\n"
+            "Example:\n"
+            "  pathgen_cli export --input job.json --heading 45 -o lot.waypoints"
+        ),
+        formatter_class=argparse.RawDescriptionHelpFormatter,
+    )
+    p_export.add_argument("--input", required=True, help="Input JSON job file")
+    p_export.add_argument(
+        "--heading", type=float, default=0.0,
+        help="Lot heading in degrees clockwise from North (default: 0)",
+    )
+    p_export.add_argument(
+        "--paint-speed", type=float, default=0.5,
+        help="Ground speed while painting in m/s (default: 0.5)",
+    )
+    p_export.add_argument(
+        "--transit-speed", type=float, default=1.0,
+        help="Ground speed while transiting in m/s (default: 1.0)",
+    )
+    p_export.add_argument(
+        "--geojson", type=str, default=None,
+        help="Also export a GeoJSON file for visualization",
+    )
+    p_export.add_argument("-o", "--output", required=True, help="Output .waypoints file path")
+    p_export.set_defaults(func=cmd_export)
 
     return parser
 
