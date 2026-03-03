@@ -591,6 +591,41 @@ def cmd_export(args):
 
 
 # ---------------------------------------------------------------------------
+# Subcommand: validate
+# ---------------------------------------------------------------------------
+
+def cmd_validate(args):
+    """Validate a .waypoints file for common errors."""
+    from striper_pathgen.waypoint_validator import validate_waypoints_file
+
+    result = validate_waypoints_file(args.input)
+
+    if result.errors:
+        print(f"ERRORS ({len(result.errors)}):")
+        for e in result.errors:
+            print(f"  [!] {e}")
+
+    if result.warnings:
+        print(f"WARNINGS ({len(result.warnings)}):")
+        for w in result.warnings:
+            print(f"  [?] {w}")
+
+    if result.stats:
+        print(f"\nMission stats:")
+        print(f"  Total commands:     {result.stats['total_commands']}")
+        print(f"  NAV waypoints:      {result.stats['nav_waypoints']}")
+        print(f"  Paint segments:     {result.stats['paint_segments']}")
+        print(f"  Total distance:     {result.stats['total_distance_m']:.0f} m")
+        print(f"  Max waypoint gap:   {result.stats['max_waypoint_gap_m']:.1f} m")
+
+    if result.ok:
+        print("\nResult: PASS")
+    else:
+        print("\nResult: FAIL")
+        sys.exit(1)
+
+
+# ---------------------------------------------------------------------------
 # Argument parser
 # ---------------------------------------------------------------------------
 
@@ -793,6 +828,15 @@ def build_parser() -> argparse.ArgumentParser:
     )
     p_export.add_argument("-o", "--output", required=True, help="Output .waypoints file path")
     p_export.set_defaults(func=cmd_export)
+
+    # ── validate ──────────────────────────────────────────────────────────
+    p_validate = subparsers.add_parser(
+        "validate",
+        help="Check a .waypoints file for errors before loading into Mission Planner",
+        description="Validate a QGC WPL 110 waypoint file for common issues.",
+    )
+    p_validate.add_argument("--input", required=True, help="Path to .waypoints file")
+    p_validate.set_defaults(func=cmd_validate)
 
     return parser
 
