@@ -303,6 +303,8 @@ def run_validation():
 # ---------------------------------------------------------------------------
 def _shade(color, factor):
     base = color.lstrip("#")
+    if len(base) == 3:
+        base = base[0]*2 + base[1]*2 + base[2]*2
     r, g, b = int(base[:2], 16), int(base[2:4], 16), int(base[4:6], 16)
     r = min(255, max(0, int(r * factor)))
     g = min(255, max(0, int(g * factor)))
