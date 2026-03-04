@@ -19,22 +19,23 @@ A builder should be able to wire the entire robot from this document.
                        |         |         |
                   [30A FUSE]     |         |
                        |         |         |
-                  [E-STOP N.C.]  |         |
+                  [DC CONTACTOR] |         |  ←── coil driven by E-STOP N.C.
                        |         |         |
-              +--------+    +---+----+ +---+--------+
-              |             | 36V→12V| | 36V→5V BEC |
-              |             | DC-DC  | | DC-DC      |
-              |             | (3A)   | | (2A)       |
-              |             +---+----+ +---+--------+
-              |                 |           |
-              |            12V RAIL      5V RAIL
-              |           (pump,       (Pixhawk,
-              |          solenoid)      GPS, RC rx)
+              +--------+    +---+----+ +---+---------+
+              |             | 36V→12V| | Holybro     |
+              |             | DC-DC  | | PM06 V2     |
+              |             | (5A)   | | (5V/3A +    |
+              |             +---+----+ |  batt mon.) |
+              |                 |      +---+---------+
+              |            12V RAIL        5V RAIL
+              |           (pump,         (Pixhawk,
+              |          solenoid)        GPS, RC rx)
               |
      +--------+--------+
      | HOVERBOARD       |
      | MAINBOARD         |
      | (FOC firmware)    |
+     | STM32F103RCT6     |
      |                   |
      | LEFT MOTOR ←──────|──── Left hub motor
      | RIGHT MOTOR ←─────|──── Right hub motor
@@ -48,7 +49,7 @@ A builder should be able to wire the entire robot from this document.
      +===========================================+
      |           PIXHAWK 6C MINI                 |
      |                                           |
-     | SERIAL3/4 ──── UM980 GPS (UART, 4 wires)  |
+     | SERIAL3 ────── UM980 GPS (UART, 4 wires)  |
      |                                           |
      | SERIAL1/2 ──── Hoverboard UART (TX/RX/GND)|
      |                                           |
@@ -62,7 +63,7 @@ A builder should be able to wire the entire robot from this document.
      |                                           |
      | SAFETY ←──────── E-stop button (signal)   |
      |                                           |
-     | POWER IN ←────── 5V BEC (36V→5V DC-DC)    |
+     | POWER IN ←────── Holybro PM06 V2 (5V+mon.)|
      |                                           |
      | USB-C ←───────── Laptop (config/telemetry)|
      +===========================================+
@@ -84,40 +85,59 @@ derived from it:
 
 | Rail | Source | Supplies | Wire Gauge |
 |------|--------|----------|------------|
-| 36V direct | Battery through fuse and e-stop | Hoverboard mainboard (motors) | 14 AWG min |
-| 12V | 36V to 12V DC-DC converter (3A) | Diaphragm pump, solenoid valve | 18 AWG |
-| 5V | 36V to 5V DC-DC BEC (2A) | Pixhawk, UM980 GPS, RC receiver | 22 AWG |
+| 36V direct | Battery through fuse, contactor, and e-stop | Hoverboard mainboard (motors) | **12 AWG** min |
+| 12V | 36V to 12V DC-DC converter (**5A min**) | Shurflo pump, solenoid valve | 18 AWG |
+| 5V | Holybro PM06 V2 (5V/3A + battery monitoring) | Pixhawk, UM980 GPS, RC receiver | 22 AWG |
 
 ### 2.2 Wiring
 
 ```
-Battery (+) ──[30A blade fuse]──[E-stop N.C. contacts]──┬── Hoverboard mainboard VCC
-                                                         ├── 36V→12V DC-DC IN+
-                                                         └── 36V→5V DC-DC IN+
+Battery (+) ──[30A blade fuse]──[DC CONTACTOR N.O.]──┬── Hoverboard mainboard VCC
+                                                       ├── 36V→12V DC-DC IN+
+                                                       └── PM06 V2 IN+
 
-Battery (−) ────────────────────────────────────────────┬── Hoverboard mainboard GND
-                                                         ├── 36V→12V DC-DC IN−
-                                                         ├── 36V→5V DC-DC IN−
-                                                         └── Common GND bus
+                                    DC CONTACTOR coil (+) ←── Battery + (after fuse)
+                                    DC CONTACTOR coil (−) ←── E-STOP N.C. ──→ GND
+
+Battery (−) ──────────────────────────────────────────┬── Hoverboard mainboard GND
+                                                       ├── 36V→12V DC-DC IN−
+                                                       ├── PM06 V2 IN−
+                                                       └── Common GND bus
 ```
 
 **Key points:**
 - The 30A blade fuse goes inline on the positive wire, directly at the
   battery. Use a waterproof inline fuse holder.
-- The e-stop N.C. contacts are wired in series AFTER the fuse. When
-  pressed, they break the 36V supply to the hoverboard (motors stop
-  immediately) AND to the DC-DC converters (everything powers down).
+- The **DC contactor** (40A rated) is controlled by the e-stop button.
+  The e-stop's N.C. contacts energize the contactor coil; pressing the
+  e-stop de-energizes the coil and the contactor opens, cutting all 36V
+  power. A bare 22mm e-stop button cannot reliably interrupt 40A DC —
+  the DC arc will weld the contacts. The contactor handles the high
+  current safely.
 - Use XT60 connectors for the battery connection (easy disconnect).
 - All grounds share a common bus (terminal block or solder joint). This
   is critical -- the Pixhawk, GPS, hoverboard, and relay module must
   share a common ground.
+- Use **12 AWG silicone wire** for the 36V main power run (not 14 AWG).
+  Peak motor current can reach 30A; 14 AWG is marginal.
 
 ### 2.3 DC-DC Converter Selection
 
 | Converter | Input Range | Output | Min Current Rating | Example Module |
 |-----------|-------------|--------|-------------------|----------------|
-| 36V to 12V | 8-60V in | 12V fixed | 3A (5A preferred) | LM2596-based buck, XL4015 |
-| 36V to 5V | 8-60V in | 5V fixed | 2A (3A preferred) | LM2596 5V fixed, MP1584 |
+| 36V to 12V | 8-60V in | 12V fixed | **5A (10A preferred)** | XL4015 5A buck module |
+| 36V to 5V | 7-42V in | 5.2V regulated | 3A | **Holybro PM06 V2** |
+
+> **Why 5A minimum for 12V:** The Shurflo 8000 pump has a startup inrush
+> of 15-24A for ~50ms. A 3A converter will brownout and may reset the
+> Pixhawk if sharing a ground bus. A 5A converter handles steady-state
+> (pump draws ~3A running); 10A handles inrush with margin.
+
+> **Why Holybro PM06 V2 for 5V:** Replaces the generic BEC. The PM06 V2
+> includes an INA226 current/voltage sensor that reports battery state to
+> the Pixhawk via its POWER port. This gives you battery % remaining,
+> voltage, and current draw in Mission Planner — critical for knowing
+> when to end a mission. Input range: 7-42V (works with 36V battery).
 
 Verify output voltage with a multimeter before connecting anything.
 
@@ -210,10 +230,22 @@ rejection.
 
 ```
 SERIAL3_PROTOCOL = 5       (GPS)
-SERIAL3_BAUD = 115200
-GPS_TYPE = 25              (Unicore UM980)
-GPS_RATE_MS = 100          (10 Hz update, or 50 for 20 Hz)
+SERIAL3_BAUD = 115         (115200 baud — ArduPilot uses shorthand)
+GPS_TYPE = 24              (UnicoreNMEA — single UM980)
+GPS_RATE_MS = 200          (5 Hz update, or 100 for 10 Hz)
+COMPASS_ENABLE = 0         (disable compass — hub motor magnets cause
+                            overwhelming interference; use GPS-based heading)
 ```
+
+> **GPS_TYPE values:** `24` = UnicoreNMEA (single UM980). `25` =
+> UnicoreMovingBaselineNMEA (dual-antenna UM982 for GPS-based heading).
+> Use 24 unless you upgrade to UM982.
+
+> **Compass-less operation:** ArduRover uses GSF (Gaussian Sum Filter) to
+> estimate heading from GPS velocity vectors. Works reliably at 0.5+ m/s
+> in open sky. After GPS lock, walk the robot in a small circle (~2m)
+> to initialize yaw. Wait for "EKF yaw alignment complete" in Mission
+> Planner before arming.
 
 > **Tier 1 (ZED-F9P):** Set `GPS_TYPE = 2` (u-blox). The simpleRTK2B
 > board can connect via USB to the ESP32 or via UART.
@@ -295,6 +327,29 @@ Paint on/off is triggered by `DO_SET_RELAY` mission commands or by the
 AC_Sprayer library. See the Lua script in `docs/research_report.md` for
 waypoint-based paint control.
 
+### 5.4 Paint Plumbing (Physical)
+
+```
+Paint Tank ──→ [60-mesh strainer] ──→ Shurflo Pump ──→ [T-valve] ──→ Solenoid ──→ Nozzle
+                                                          ↑
+                                                    Water Tank (500ml)
+                                                    (flush reservoir)
+```
+
+**Paint prep:** Thin water-based traffic latex 10-15% with water before
+filling the tank. Use **normal-dry** paint only — fast-dry formulations
+will clog the nozzle in under 2 minutes.
+
+**Flush system:** The 3-way T-valve switches between paint and water.
+Before any pause longer than 30 seconds, flush the system with water to
+prevent paint drying in the nozzle. The `paint_control.lua` script can
+trigger an automatic flush cycle.
+
+**Flyback diodes:** Install a **1N4007 diode** across each inductive load
+(solenoid and pump motor). Cathode to positive terminal, anode to
+negative terminal. This suppresses the voltage spike when the relay
+opens, protecting the relay contacts and nearby electronics.
+
 ---
 
 ## 6. RC Receiver Wiring
@@ -343,17 +398,29 @@ It does not rely on software.
 
 ### 7.1 Design
 
-The e-stop button has normally-closed (N.C.) contacts wired in series
-with the 36V battery positive line, between the fuse and the hoverboard
-mainboard. Pressing the button opens the contacts and immediately kills
-power to the motors.
+The e-stop button drives a **40A DC contactor** that switches the main
+36V power. The button's N.C. contacts carry only the contactor coil
+current (~0.5A), not the full motor current. Pressing the e-stop
+de-energizes the contactor coil, which opens the contactor and
+immediately kills power to everything.
 
 ```
-Battery (+) ──[30A Fuse]──[E-Stop N.C.]──→ Hoverboard VCC / DC-DC inputs
-                                ↑
-                          OPEN = motors stop
-                          CLOSED = motors run
+Battery (+) ──[30A Fuse]──[DC CONTACTOR N.O. contacts]──→ Hoverboard VCC / DC-DC inputs
+                 |
+                 └── Contactor coil (+)
+                            |
+                     [E-Stop N.C. contacts]
+                            |
+                           GND
+
+          E-STOP released (N.C. closed) → coil energized → contactor closed → power ON
+          E-STOP pressed (N.C. open) → coil de-energized → contactor open → power OFF
 ```
+
+> **Why a contactor?** A 22mm mushroom e-stop button is typically rated
+> for 5-10A AC. At 36V DC with motor loads up to 40A, the DC arc when
+> breaking the circuit will weld the button contacts shut. A DC contactor
+> (Hella 4RA, EV200 style, or automotive 40A relay) handles this safely.
 
 ### 7.2 Optional: Signal to Pixhawk
 
@@ -381,9 +448,8 @@ When contacts are open (e-stop pressed): pin reads LOW (pulled to GND).
   accidentally released.
 - Mount it where the operator can reach it instantly (top of the robot
   or on a tethered remote panel).
-- The e-stop must be rated for the full motor stall current (at least
-  20A at 36V). If the button's contacts are rated lower, use them to
-  drive a 40A relay/contactor coil instead.
+- The e-stop button drives a **DC contactor coil** (not the main power
+  directly). The contactor must be rated for at least 40A at 36V DC.
 - The 30A fuse protects against wiring faults. It does NOT replace the
   e-stop.
 
@@ -395,10 +461,11 @@ When contacts are open (e-stop pressed): pin reads LOW (pulled to GND).
 
 | Circuit | Recommended Gauge | Max Current |
 |---------|-------------------|-------------|
-| Battery to fuse / e-stop | 14 AWG (12 AWG for Tier 3) | 20-30A |
-| Hoverboard mainboard power | 14 AWG | 20A |
+| Battery to fuse / contactor | **12 AWG** | 30-40A |
+| Hoverboard mainboard power | **12 AWG** | 20-30A |
 | 12V pump / solenoid | 18 AWG | 5A |
-| 5V BEC rail | 22 AWG | 2A |
+| PM06 V2 input (36V side) | 18 AWG | 1A |
+| 5V rail (PM06 output) | 22 AWG | 3A |
 | Signal wires (UART, SBUS, GPIO) | 22-26 AWG | < 1A |
 | GPS antenna cable | RG316 coax (SMA) | N/A |
 

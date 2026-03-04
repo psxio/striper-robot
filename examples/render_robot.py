@@ -85,10 +85,10 @@ COMPONENTS = {
         "color": "#2d8a4e",
     },
     "gps": {
-        "desc": "Unicore UM980 + multiband antenna",
+        "desc": "Unicore UM980 (simpleRTK3B) + triband antenna",
         "dims": (0.050, 0.050, 0.030),  # board
         "weight": 0.2,
-        "price": 165,
+        "price": 180,
         "pos": (0, 0, 0.093),  # on deck, center
         "color": "#2d8a4e",
     },
@@ -125,23 +125,23 @@ COMPONENTS = {
         "color": "#336633",
     },
     "pump": {
-        "desc": "12V diaphragm pump (60-80 PSI, 1-2 GPM)",
-        "dims": (0.120, 0.070, 0.070),
-        "weight": 0.6,
-        "price": 30,
+        "desc": "Shurflo 8000 diaphragm pump (60 PSI, 1 GPM)",
+        "dims": (0.150, 0.100, 0.080),  # Shurflo 8000 is larger than generic
+        "weight": 1.2,  # Shurflo 8000 weighs ~1.2kg
+        "price": 90,
         "pos": (0.180, -0.100, 0.093),
         "color": "#444444",
     },
     "solenoid": {
-        "desc": "12V N.C. solenoid valve (1/2\" NPT)",
+        "desc": "12V N.C. solenoid valve (3/8\" direct-acting)",
         "dims": (0.060, 0.040, 0.050),
         "weight": 0.2,
-        "price": 15,
+        "price": 20,
         "pos": (0.220, 0, 0.093),
         "color": "#884444",
     },
     "nozzle": {
-        "desc": "TeeJet 8004 flat fan nozzle (4\" width)",
+        "desc": "TeeJet TP8004EVS even-fan nozzle (4\" width)",
         "dims": (0.050, 0.040, 0.035),
         "weight": 0.1,
         "price": 15,
@@ -157,18 +157,18 @@ COMPONENTS = {
         "color": "#cc3333",
     },
     "dcdc_12v": {
-        "desc": "36V→12V DC-DC converter (3A)",
+        "desc": "36V→12V DC-DC converter (5A, XL4015)",
         "dims": (0.070, 0.050, 0.025),
         "weight": 0.05,
-        "price": 5,
+        "price": 12,
         "pos": (-0.100, 0.150, 0.093),
         "color": "#448844",
     },
     "dcdc_5v": {
-        "desc": "36V→5V DC-DC BEC (2A)",
-        "dims": (0.070, 0.050, 0.025),
-        "weight": 0.05,
-        "price": 5,
+        "desc": "Holybro PM06 V2 (5V/3A + batt monitoring)",
+        "dims": (0.050, 0.050, 0.015),  # PM06 V2 is compact
+        "weight": 0.03,
+        "price": 25,
         "pos": (-0.100, 0.100, 0.093),
         "color": "#448844",
     },
@@ -189,10 +189,10 @@ COMPONENTS = {
         "color": "#aa8844",
     },
     "estop": {
-        "desc": "22mm mushroom E-stop (N.C., 30A)",
-        "dims": (0.040, 0.025),  # diameter, height
-        "weight": 0.05,
-        "price": 5,
+        "desc": "22mm E-stop + 40A DC contactor",
+        "dims": (0.040, 0.025),  # diameter, height (button only)
+        "weight": 0.3,  # button + contactor
+        "price": 25,
         "pos": (-0.200, 0.150, 0.093),
         "color": "#ff1111",
     },
@@ -247,7 +247,7 @@ def run_validation():
     total_cost += 30  # wiring/connectors/fuses
     total_cost += 30  # RC transmitter
     total_cost += 6   # ST-Link programmer
-    checks.append(("BOM cost (Tier 2)", f"${total_cost}", True, "Target: ~$631"))
+    checks.append(("BOM cost (Tier 2)", f"${total_cost}", True, "Target: ~$780"))
 
     # 3. Ground clearance
     checks.append(("Nozzle ground clearance", f"{NOZZLE_BOTTOM_Z*1000:.0f} mm",
@@ -588,7 +588,7 @@ def render_3d_view(output_path):
     # Pump
     _add_box(ax, 0.120, -0.135, tank_z,
              0.120, 0.070, 0.070, "#444", alpha=0.85,
-             label="12V Pump")
+             label="Shurflo 8000 Pump")
 
     # Solenoid
     _add_box(ax, 0.190, -0.020, tank_z,
@@ -598,7 +598,7 @@ def render_3d_view(output_path):
     # Nozzle
     _add_box(ax, 0.255, -0.020, 0.040,
              0.050, 0.040, 0.035, "#993333", alpha=0.9,
-             label="TeeJet 8004 Nozzle")
+             label="TP8004EVS Nozzle")
     _add_cylinder(ax, 0.280, 0, 0.032, 0.008, 0.008,
                   "#666", alpha=0.9, n=8)
 

@@ -34,7 +34,7 @@ REQUIRED_LUA_SCRIPTS = [
 # Key params that must exist (param_name, expected_value or None for any)
 REQUIRED_PARAMS = [
     ("FRAME_TYPE", "2"),          # skid steer
-    ("GPS_TYPE", "25"),           # UM980
+    ("GPS_TYPE", "24"),           # UnicoreNMEA (single UM980)
     ("SERVO1_FUNCTION", "73"),    # throttle left
     ("SERVO3_FUNCTION", "74"),    # throttle right
     ("SPRAY_ENABLE", "1"),        # AC_Sprayer

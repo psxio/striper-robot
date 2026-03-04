@@ -5,10 +5,10 @@
 # Controller: Pixhawk 6C running ArduRover 4.5+
 # GPS: Unicore UM980 triple-band RTK (8mm accuracy)
 # Motors: Hoverboard BLDC via FOC firmware over UART
-# Paint: 12V solenoid valve + 12V diaphragm pump via relay outputs
-# Battery: 36V hoverboard pack with DC-DC converters (12V, 5V)
+# Paint: Shurflo 8000 pump + 3/8" direct-acting solenoid + TP8004EVS nozzle
+# Battery: 36V 10Ah e-bike pack, Holybro PM06 V2 (5V), XL4015 (12V 5A)
 # RC: FlySky FS-i6X receiver (iBus or PPM)
-# Weight: ~50kg with full paint tank
+# Weight: ~29kg with full paint tank (20kg dry + 9kg paint)
 # Wheels: 6.5" (0.165m diameter) hoverboard wheels
 # =============================================================================
 
@@ -76,10 +76,11 @@ SERIAL4_BAUD,115
 # -----------------------------------------------------------------------------
 # GPS CONFIGURATION (Unicore UM980)
 # -----------------------------------------------------------------------------
-# GPS_TYPE 25 = Unicore UM980 native driver (ArduRover 4.5+)
+# GPS_TYPE 24 = UnicoreNMEA (single UM980, ArduRover 4.4+)
+# GPS_TYPE 25 = UnicoreMovingBaselineNMEA (dual-antenna UM982 heading only)
 # Gives best performance with UM980 triple-band RTK receiver
 # Use GPS_TYPE=1 (AUTO) if you are unsure or using a different GPS module
-GPS_TYPE,25
+GPS_TYPE,24
 
 # No secondary GPS
 GPS_TYPE2,0
@@ -160,24 +161,19 @@ EK3_ACC_P_NSE,0.35
 # -----------------------------------------------------------------------------
 # COMPASS CONFIGURATION
 # -----------------------------------------------------------------------------
-# Use Pixhawk 6C internal compass (IST8310 or BMM150 depending on variant)
-COMPASS_TYPEMASK,0
-COMPASS_USE,1
+# DISABLED: Hoverboard hub motors contain large permanent magnets that create
+# overwhelming magnetic interference. Even on a tall mast, compass readings
+# are unreliable (>60% interference in testing). ArduRover uses GSF
+# (Gaussian Sum Filter) for heading estimation from GPS velocity vectors.
+# This works reliably at paint speed (0.5 m/s) in open sky.
+#
+# Pre-arm procedure for compass-less: After GPS lock, walk the robot in a
+# small circle (~2m diameter). Wait for "EKF yaw alignment complete" in
+# Mission Planner before arming.
+COMPASS_ENABLE,0
+COMPASS_USE,0
 COMPASS_USE2,0
 COMPASS_USE3,0
-
-# Auto-declination from GPS position
-COMPASS_AUTODEC,1
-
-# Learn compass offsets while driving (recommended for ground vehicles)
-COMPASS_LEARN,1
-
-# Compass orientation: 0 = no rotation (Pixhawk mounted flat, forward)
-# Change if your Pixhawk is rotated
-COMPASS_ORIENT,0
-
-# Motor compensation type: 2 = throttle-based (helps with motor interference)
-COMPASS_MOT_TYPE,2
 
 # -----------------------------------------------------------------------------
 # SERVO OUTPUT CONFIGURATION (Differential Drive)
