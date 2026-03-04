@@ -59,9 +59,11 @@ SERIAL2_BAUD,115
 SERIAL3_PROTOCOL,5
 SERIAL3_BAUD,115
 
-# Serial4 = available for future use (RTK corrections input, second GPS, etc.)
-# Set to -1 (None) to disable
-SERIAL4_PROTOCOL,-1
+# Serial4 = Arduino Nano rangefinder bridge (HC-SR04 ultrasonic sensors)
+# Protocol 28 = Scripting (Lua reads distance bytes from Arduino Nano)
+# Arduino Nano sends distance data at 115200 baud
+# See obstacle_avoid.lua for the serial protocol specification
+SERIAL4_PROTOCOL,28
 SERIAL4_BAUD,115
 
 # Serial5 = RC input if using iBus/SBUS over UART (FlySky FS-i6X)
@@ -573,8 +575,8 @@ SR1_RC_CHAN,2
 # Enable Lua scripting (required for paint_control.lua and paint_speed_sync.lua)
 SCR_ENABLE,1
 
-# Heap size (bytes): 100KB for our scripts
-SCR_HEAP_SIZE,102400
+# Heap size (bytes): 120KB for all scripts (motor_bridge + paint + obstacle)
+SCR_HEAP_SIZE,122880
 
 # VM instruction count per script tick: higher = more processing per cycle
 SCR_VM_I_COUNT,25000
@@ -591,8 +593,47 @@ SCR_DIR_DISABLE,0
 # Simple mode: 0 = disabled (we use heading-based steering)
 SIMPLE,0
 
-# Object avoidance: 0 = disabled (no lidar/sonar installed)
-AVOID_ENABLE,0
+# -----------------------------------------------------------------------------
+# RANGEFINDER CONFIGURATION (HC-SR04 Ultrasonic via Arduino Nano Bridge)
+# -----------------------------------------------------------------------------
+# Two HC-SR04 sensors connected via Arduino Nano bridge on Serial4.
+# The Lua script obstacle_avoid.lua reads the rangefinder data and
+# implements stop/resume logic with hysteresis.
+
+# Rangefinder 1: Front-Left HC-SR04
+RNGFND1_TYPE,36
+RNGFND1_MIN_CM,2
+RNGFND1_MAX_CM,400
+RNGFND1_ORIENT,0
+RNGFND1_POS_X,0.30
+RNGFND1_POS_Y,0.08
+
+# Rangefinder 2: Front-Right HC-SR04
+RNGFND2_TYPE,36
+RNGFND2_MIN_CM,2
+RNGFND2_MAX_CM,400
+RNGFND2_ORIENT,0
+RNGFND2_POS_X,0.30
+RNGFND2_POS_Y,-0.08
+
+# -----------------------------------------------------------------------------
+# PROXIMITY SENSOR (aggregates rangefinders for avoidance)
+# -----------------------------------------------------------------------------
+# PRX_TYPE=4 = Rangefinder-based proximity
+PRX_TYPE,4
+PRX_IGN_GND,1
+
+# -----------------------------------------------------------------------------
+# OBJECT AVOIDANCE
+# -----------------------------------------------------------------------------
+# AVOID_ENABLE bitmask: 1=fence, 2=proximity, 4=bench_markers → 7=all
+AVOID_ENABLE,7
+# AVOID_BEHAVE: 1=stop (safest for paint robot)
+AVOID_BEHAVE,1
+# AVOID_MARGIN: 0.8m safety margin (stop before reaching obstacle)
+AVOID_MARGIN,0.80
+# AVOID_BACKUP_SPD: reverse at 0.3 m/s if needed
+AVOID_BACKUP_SPD,-0.30
 
 # Rally points: 0 = return to home, not rally
 RALLY_TOTAL,0
@@ -611,4 +652,8 @@ RALLY_TOTAL,0
 # 8. Test paint solenoid with water before loading paint
 # 9. Perform initial PID tuning on flat pavement
 # 10. Verify GPS achieves RTK Fixed before starting paint missions
+# 11. Verify ultrasonic sensors read reasonable distances (2cm-400cm)
+# 12. Test obstacle stop: place object at 1m, verify robot holds
+# 13. Test obstacle clear: remove object, verify robot resumes AUTO
+# 14. Verify Arduino Nano bridge sending data on Serial4
 # =============================================================================

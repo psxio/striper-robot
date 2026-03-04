@@ -1,0 +1,705 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Striper Telemetry</title>
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+<style>
+  :root {
+    --bg: #0d1117; --surface: #161b22; --border: #30363d;
+    --text: #e6edf3; --dim: #8b949e; --green: #3fb950;
+    --red: #f85149; --yellow: #d29922; --blue: #58a6ff;
+    --orange: #d18616;
+  }
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body { background: var(--bg); color: var(--text); font-family: 'Segoe UI', system-ui, sans-serif; height: 100vh; display: flex; flex-direction: column; overflow: hidden; }
+
+  /* Header */
+  header { display: flex; align-items: center; justify-content: space-between; padding: 8px 16px; background: var(--surface); border-bottom: 1px solid var(--border); }
+  header h1 { font-size: 16px; font-weight: 600; }
+  header h1 span { color: var(--green); }
+  .conn-status { display: flex; align-items: center; gap: 8px; font-size: 13px; }
+  .conn-dot { width: 8px; height: 8px; border-radius: 50%; }
+  .conn-dot.connected { background: var(--green); box-shadow: 0 0 6px var(--green); }
+  .conn-dot.disconnected { background: var(--red); }
+  .conn-dot.demo { background: var(--yellow); }
+  .btn { background: var(--surface); border: 1px solid var(--border); color: var(--text); padding: 4px 12px; border-radius: 6px; cursor: pointer; font-size: 12px; }
+  .btn:hover { border-color: var(--blue); }
+  .btn.active { background: var(--blue); color: #000; border-color: var(--blue); }
+
+  /* Main layout */
+  .main { flex: 1; display: grid; grid-template-columns: 280px 1fr 280px; grid-template-rows: 1fr; overflow: hidden; }
+
+  /* Left panel — gauges */
+  .panel { background: var(--surface); border-right: 1px solid var(--border); padding: 12px; overflow-y: auto; }
+  .panel:last-child { border-right: none; border-left: 1px solid var(--border); }
+  .card { background: var(--bg); border: 1px solid var(--border); border-radius: 8px; padding: 10px; margin-bottom: 8px; }
+  .card-title { font-size: 11px; color: var(--dim); text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 6px; }
+  .metric { display: flex; justify-content: space-between; align-items: baseline; margin-bottom: 4px; }
+  .metric-label { font-size: 12px; color: var(--dim); }
+  .metric-value { font-size: 18px; font-weight: 600; font-variant-numeric: tabular-nums; }
+  .metric-value.good { color: var(--green); }
+  .metric-value.warn { color: var(--yellow); }
+  .metric-value.bad { color: var(--red); }
+  .metric-unit { font-size: 11px; color: var(--dim); margin-left: 2px; }
+
+  /* Status indicators */
+  .status-row { display: flex; align-items: center; gap: 6px; margin-bottom: 4px; font-size: 13px; }
+  .status-led { width: 10px; height: 10px; border-radius: 50%; flex-shrink: 0; }
+  .status-led.on { background: var(--green); box-shadow: 0 0 6px var(--green); }
+  .status-led.off { background: #333; }
+  .status-led.warn { background: var(--yellow); box-shadow: 0 0 6px var(--yellow); }
+  .status-led.error { background: var(--red); box-shadow: 0 0 6px var(--red); }
+
+  /* Progress bar */
+  .progress-bar { height: 6px; background: #1c2128; border-radius: 3px; overflow: hidden; margin-top: 4px; }
+  .progress-fill { height: 100%; background: var(--green); border-radius: 3px; transition: width 0.3s; }
+
+  /* Map */
+  .map-container { position: relative; }
+  #map { width: 100%; height: 100%; }
+  .map-overlay { position: absolute; top: 8px; left: 50%; transform: translateX(-50%); z-index: 1000; background: rgba(13,17,23,0.85); padding: 4px 12px; border-radius: 6px; font-size: 12px; color: var(--dim); backdrop-filter: blur(4px); }
+
+  /* Right panel — log */
+  .log-entry { font-size: 11px; font-family: 'Cascadia Code', 'Consolas', monospace; padding: 2px 0; border-bottom: 1px solid #1c2128; }
+  .log-entry .ts { color: var(--dim); margin-right: 6px; }
+  .log-entry.info { color: var(--text); }
+  .log-entry.warn { color: var(--yellow); }
+  .log-entry.error { color: var(--red); }
+  .log-entry.paint { color: var(--blue); }
+
+  /* Bottom bar */
+  .bottom-bar { display: flex; align-items: center; justify-content: space-between; padding: 4px 16px; background: var(--surface); border-top: 1px solid var(--border); font-size: 11px; color: var(--dim); }
+
+  /* Connect dialog */
+  .dialog-overlay { position: fixed; inset: 0; background: rgba(0,0,0,0.6); z-index: 2000; display: none; align-items: center; justify-content: center; }
+  .dialog-overlay.show { display: flex; }
+  .dialog { background: var(--surface); border: 1px solid var(--border); border-radius: 12px; padding: 24px; width: 400px; }
+  .dialog h2 { font-size: 16px; margin-bottom: 12px; }
+  .dialog label { display: block; font-size: 12px; color: var(--dim); margin-bottom: 4px; margin-top: 10px; }
+  .dialog input { width: 100%; background: var(--bg); border: 1px solid var(--border); color: var(--text); padding: 6px 10px; border-radius: 6px; font-size: 13px; }
+  .dialog .actions { display: flex; gap: 8px; margin-top: 16px; justify-content: flex-end; }
+</style>
+</head>
+<body>
+
+<!-- Header -->
+<header>
+  <h1>Striper <span>Telemetry</span></h1>
+  <div style="display:flex;gap:8px;align-items:center;">
+    <div class="conn-status">
+      <div class="conn-dot demo" id="connDot"></div>
+      <span id="connLabel">Demo Mode</span>
+    </div>
+    <button class="btn" id="btnConnect" onclick="showConnectDialog()">Connect</button>
+    <button class="btn active" id="btnDemo" onclick="startDemo()">Demo</button>
+  </div>
+</header>
+
+<!-- Main -->
+<div class="main">
+
+  <!-- Left panel: Gauges -->
+  <div class="panel" id="gauges">
+    <!-- GPS -->
+    <div class="card">
+      <div class="card-title">GPS</div>
+      <div class="metric">
+        <span class="metric-label">Fix Type</span>
+        <span class="metric-value good" id="gpsFix">RTK Fixed</span>
+      </div>
+      <div class="metric">
+        <span class="metric-label">Satellites</span>
+        <span class="metric-value" id="gpsSats">18</span>
+      </div>
+      <div class="metric">
+        <span class="metric-label">HDOP</span>
+        <span class="metric-value" id="gpsHdop">0.8</span>
+      </div>
+      <div class="metric">
+        <span class="metric-label">Position</span>
+        <span class="metric-value" style="font-size:12px" id="gpsPos">30.26720, -97.74310</span>
+      </div>
+    </div>
+
+    <!-- Navigation -->
+    <div class="card">
+      <div class="card-title">Navigation</div>
+      <div class="metric">
+        <span class="metric-label">Speed</span>
+        <span class="metric-value" id="navSpeed">0.00<span class="metric-unit">m/s</span></span>
+      </div>
+      <div class="metric">
+        <span class="metric-label">Heading</span>
+        <span class="metric-value" id="navHeading">45<span class="metric-unit">deg</span></span>
+      </div>
+      <div class="metric">
+        <span class="metric-label">Mode</span>
+        <span class="metric-value good" id="navMode">AUTO</span>
+      </div>
+      <div class="metric">
+        <span class="metric-label">Waypoint</span>
+        <span class="metric-value" id="navWp">0 / 787</span>
+      </div>
+      <div class="card-title" style="margin-top:6px">Mission Progress</div>
+      <div class="progress-bar"><div class="progress-fill" id="missionProgress" style="width:0%"></div></div>
+      <div style="text-align:right;font-size:11px;color:var(--dim);margin-top:2px"><span id="missionPct">0</span>%</div>
+    </div>
+
+    <!-- Battery -->
+    <div class="card">
+      <div class="card-title">Battery</div>
+      <div class="metric">
+        <span class="metric-label">Voltage</span>
+        <span class="metric-value" id="batVolt">37.2<span class="metric-unit">V</span></span>
+      </div>
+      <div class="metric">
+        <span class="metric-label">Current</span>
+        <span class="metric-value" id="batCurr">2.1<span class="metric-unit">A</span></span>
+      </div>
+      <div class="metric">
+        <span class="metric-label">Remaining</span>
+        <span class="metric-value good" id="batPct">92<span class="metric-unit">%</span></span>
+      </div>
+      <div class="progress-bar"><div class="progress-fill" id="batBar" style="width:92%;background:var(--green)"></div></div>
+    </div>
+
+    <!-- Obstacle -->
+    <div class="card">
+      <div class="card-title">Obstacle Sensors</div>
+      <div class="metric">
+        <span class="metric-label">Front Left</span>
+        <span class="metric-value good" id="obstFL">4.00<span class="metric-unit">m</span></span>
+      </div>
+      <div class="metric">
+        <span class="metric-label">Front Right</span>
+        <span class="metric-value good" id="obstFR">4.00<span class="metric-unit">m</span></span>
+      </div>
+    </div>
+  </div>
+
+  <!-- Center: Map -->
+  <div class="map-container">
+    <div class="map-overlay" id="mapOverlay">Mission: sample_lot.waypoints</div>
+    <div id="map"></div>
+  </div>
+
+  <!-- Right panel: Paint + Log -->
+  <div class="panel">
+    <!-- Paint system -->
+    <div class="card">
+      <div class="card-title">Paint System</div>
+      <div class="status-row">
+        <div class="status-led off" id="ledPump"></div>
+        <span>Pump</span>
+        <span style="margin-left:auto;font-size:11px;color:var(--dim)" id="pumpLabel">OFF</span>
+      </div>
+      <div class="status-row">
+        <div class="status-led off" id="ledSolenoid"></div>
+        <span>Solenoid</span>
+        <span style="margin-left:auto;font-size:11px;color:var(--dim)" id="solLabel">OFF</span>
+      </div>
+      <div class="status-row">
+        <div class="status-led off" id="ledPainting"></div>
+        <span>Painting</span>
+        <span style="margin-left:auto;font-size:11px;color:var(--dim)" id="paintLabel">IDLE</span>
+      </div>
+      <div class="metric" style="margin-top:8px">
+        <span class="metric-label">Paint Used</span>
+        <span class="metric-value" id="paintUsed">0.0<span class="metric-unit">gal</span></span>
+      </div>
+      <div class="metric">
+        <span class="metric-label">Paint Distance</span>
+        <span class="metric-value" id="paintDist">0<span class="metric-unit">m</span></span>
+      </div>
+      <div class="metric">
+        <span class="metric-label">Segments Done</span>
+        <span class="metric-value" id="paintSegs">0 / 84</span>
+      </div>
+    </div>
+
+    <!-- Safety -->
+    <div class="card">
+      <div class="card-title">Safety</div>
+      <div class="status-row">
+        <div class="status-led on" id="ledArmed"></div>
+        <span>Armed</span>
+      </div>
+      <div class="status-row">
+        <div class="status-led on" id="ledGeofence"></div>
+        <span>Geofence OK</span>
+      </div>
+      <div class="status-row">
+        <div class="status-led off" id="ledEstop"></div>
+        <span>E-Stop</span>
+        <span style="margin-left:auto;font-size:11px;color:var(--dim)" id="estopLabel">CLEAR</span>
+      </div>
+    </div>
+
+    <!-- Event log -->
+    <div class="card" style="flex:1;max-height:300px;overflow-y:auto" id="logCard">
+      <div class="card-title">Event Log</div>
+      <div id="logContainer"></div>
+    </div>
+  </div>
+</div>
+
+<!-- Bottom bar -->
+<div class="bottom-bar">
+  <span>Striper Robot Telemetry v1.0</span>
+  <span id="clock"></span>
+  <span>Uptime: <span id="uptime">00:00</span></span>
+</div>
+
+<!-- Connect dialog -->
+<div class="dialog-overlay" id="connectDialog">
+  <div class="dialog">
+    <h2>Connect to Robot</h2>
+    <p style="font-size:12px;color:var(--dim);margin-bottom:8px">
+      Connect via MAVLink WebSocket bridge.<br>
+      Run: <code style="background:var(--bg);padding:2px 4px;border-radius:3px">mavproxy.py --master=COM3 --out=udpout:127.0.0.1:14550</code><br>
+      Then use <a href="https://github.com/ArduPilot/mavlink2rest" style="color:var(--blue)">mavlink2rest</a> for WebSocket.
+    </p>
+    <label>WebSocket URL</label>
+    <input id="wsUrl" value="ws://127.0.0.1:8088/ws" placeholder="ws://host:port/ws">
+    <label>Mission File (optional)</label>
+    <input id="missionFile" type="file" accept=".waypoints,.txt" style="padding:4px">
+    <div class="actions">
+      <button class="btn" onclick="hideConnectDialog()">Cancel</button>
+      <button class="btn active" onclick="connectWS()">Connect</button>
+    </div>
+  </div>
+</div>
+
+<script>
+// ─── State ───────────────────────────────────────────────────────────────────
+const state = {
+  connected: false, demo: true, startTime: Date.now(),
+  lat: 30.26720, lon: -97.74310, speed: 0, heading: 45,
+  gpsFix: 6, sats: 18, hdop: 0.8,
+  batVolt: 37.2, batCurr: 2.1, batPct: 92,
+  mode: 'AUTO', armed: true, wpCurrent: 0, wpTotal: 787,
+  painting: false, pump: false, solenoid: false,
+  paintDistM: 0, paintGal: 0, paintSegs: 0, paintSegsTotal: 84,
+  obstFL: 4.0, obstFR: 4.0,
+  geofenceOk: true, estop: false,
+  trail: [], paintTrail: []
+};
+
+// ─── Map ─────────────────────────────────────────────────────────────────────
+const map = L.map('map', { zoomControl: false }).setView([state.lat, state.lon], 19);
+L.control.zoom({ position: 'topright' }).addTo(map);
+
+const streetTiles = L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+  maxZoom: 22, attribution: '&copy; OSM'
+});
+const satTiles = L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}', {
+  maxZoom: 22, attribution: '&copy; Esri'
+});
+satTiles.addTo(map);
+L.control.layers({ 'Satellite': satTiles, 'Street': streetTiles }, {}, { position: 'topright' }).addTo(map);
+
+// Robot marker
+const robotIcon = L.divIcon({
+  className: '',
+  html: `<svg width="24" height="24" viewBox="-12 -12 24 24">
+    <polygon points="0,-10 8,8 -8,8" fill="#3fb950" stroke="#0d1117" stroke-width="2" opacity="0.9"/>
+  </svg>`,
+  iconSize: [24, 24], iconAnchor: [12, 12]
+});
+const robotMarker = L.marker([state.lat, state.lon], { icon: robotIcon, rotationAngle: 0 }).addTo(map);
+
+// Trail polylines
+const transitLine = L.polyline([], { color: '#8b949e', weight: 1, opacity: 0.4, dashArray: '4 4' }).addTo(map);
+const paintLine = L.polyline([], { color: '#58a6ff', weight: 4, opacity: 0.8 }).addTo(map);
+
+// ─── UI Update ───────────────────────────────────────────────────────────────
+function updateUI() {
+  // GPS
+  const fixNames = { 0: 'No GPS', 1: 'No Fix', 2: '2D Fix', 3: '3D Fix', 4: 'DGPS', 5: 'RTK Float', 6: 'RTK Fixed' };
+  const fixEl = document.getElementById('gpsFix');
+  fixEl.textContent = fixNames[state.gpsFix] || 'Unknown';
+  fixEl.className = 'metric-value ' + (state.gpsFix >= 6 ? 'good' : state.gpsFix >= 4 ? 'warn' : 'bad');
+  document.getElementById('gpsSats').textContent = state.sats;
+  document.getElementById('gpsHdop').textContent = state.hdop.toFixed(1);
+  document.getElementById('gpsPos').textContent = `${state.lat.toFixed(5)}, ${state.lon.toFixed(5)}`;
+
+  // Nav
+  document.getElementById('navSpeed').innerHTML = `${state.speed.toFixed(2)}<span class="metric-unit">m/s</span>`;
+  document.getElementById('navHeading').innerHTML = `${Math.round(state.heading)}<span class="metric-unit">deg</span>`;
+  const modeEl = document.getElementById('navMode');
+  modeEl.textContent = state.mode;
+  modeEl.className = 'metric-value ' + (state.mode === 'AUTO' ? 'good' : state.mode === 'HOLD' ? 'warn' : '');
+  document.getElementById('navWp').textContent = `${state.wpCurrent} / ${state.wpTotal}`;
+  const pct = state.wpTotal > 0 ? Math.round(state.wpCurrent / state.wpTotal * 100) : 0;
+  document.getElementById('missionProgress').style.width = pct + '%';
+  document.getElementById('missionPct').textContent = pct;
+
+  // Battery
+  document.getElementById('batVolt').innerHTML = `${state.batVolt.toFixed(1)}<span class="metric-unit">V</span>`;
+  document.getElementById('batCurr').innerHTML = `${state.batCurr.toFixed(1)}<span class="metric-unit">A</span>`;
+  const batEl = document.getElementById('batPct');
+  batEl.innerHTML = `${Math.round(state.batPct)}<span class="metric-unit">%</span>`;
+  batEl.className = 'metric-value ' + (state.batPct > 30 ? 'good' : state.batPct > 15 ? 'warn' : 'bad');
+  const batBar = document.getElementById('batBar');
+  batBar.style.width = state.batPct + '%';
+  batBar.style.background = state.batPct > 30 ? 'var(--green)' : state.batPct > 15 ? 'var(--yellow)' : 'var(--red)';
+
+  // Obstacles
+  const flEl = document.getElementById('obstFL');
+  flEl.innerHTML = `${state.obstFL.toFixed(2)}<span class="metric-unit">m</span>`;
+  flEl.className = 'metric-value ' + (state.obstFL > 1.0 ? 'good' : state.obstFL > 0.5 ? 'warn' : 'bad');
+  const frEl = document.getElementById('obstFR');
+  frEl.innerHTML = `${state.obstFR.toFixed(2)}<span class="metric-unit">m</span>`;
+  frEl.className = 'metric-value ' + (state.obstFR > 1.0 ? 'good' : state.obstFR > 0.5 ? 'warn' : 'bad');
+
+  // Paint
+  setLed('ledPump', state.pump ? 'on' : 'off');
+  document.getElementById('pumpLabel').textContent = state.pump ? 'ON' : 'OFF';
+  setLed('ledSolenoid', state.solenoid ? 'on' : 'off');
+  document.getElementById('solLabel').textContent = state.solenoid ? 'ON' : 'OFF';
+  setLed('ledPainting', state.painting ? 'on' : 'off');
+  document.getElementById('paintLabel').textContent = state.painting ? 'ACTIVE' : 'IDLE';
+  document.getElementById('paintUsed').innerHTML = `${state.paintGal.toFixed(2)}<span class="metric-unit">gal</span>`;
+  document.getElementById('paintDist').innerHTML = `${Math.round(state.paintDistM)}<span class="metric-unit">m</span>`;
+  document.getElementById('paintSegs').textContent = `${state.paintSegs} / ${state.paintSegsTotal}`;
+
+  // Safety
+  setLed('ledArmed', state.armed ? 'on' : 'off');
+  setLed('ledGeofence', state.geofenceOk ? 'on' : 'warn');
+  setLed('ledEstop', state.estop ? 'error' : 'off');
+  document.getElementById('estopLabel').textContent = state.estop ? 'TRIGGERED' : 'CLEAR';
+
+  // Map
+  robotMarker.setLatLng([state.lat, state.lon]);
+  // Rotate marker via CSS transform
+  const markerEl = robotMarker.getElement();
+  if (markerEl) markerEl.style.transform += ` rotate(${state.heading}deg)`;
+
+  // Clock
+  document.getElementById('clock').textContent = new Date().toLocaleTimeString();
+  const elapsed = Math.floor((Date.now() - state.startTime) / 1000);
+  const mm = String(Math.floor(elapsed / 60)).padStart(2, '0');
+  const ss = String(elapsed % 60).padStart(2, '0');
+  document.getElementById('uptime').textContent = `${mm}:${ss}`;
+}
+
+function setLed(id, cls) {
+  const el = document.getElementById(id);
+  el.className = 'status-led ' + cls;
+}
+
+function addLog(msg, level = 'info') {
+  const c = document.getElementById('logContainer');
+  const ts = new Date().toLocaleTimeString();
+  const div = document.createElement('div');
+  div.className = 'log-entry ' + level;
+  div.innerHTML = `<span class="ts">${ts}</span>${msg}`;
+  c.prepend(div);
+  // Keep last 200 entries
+  while (c.children.length > 200) c.removeChild(c.lastChild);
+}
+
+// ─── Demo Mode ───────────────────────────────────────────────────────────────
+let demoInterval = null;
+let demoWaypoints = [];
+let demoIdx = 0;
+let demoSubIdx = 0;
+let demoPainting = false;
+
+// Generate a simple demo mission (rectangle parking lot)
+function generateDemoWaypoints() {
+  const datum = { lat: 30.26720, lon: -97.74310 };
+  const mPerDegLat = 111320;
+  const mPerDegLon = 111320 * Math.cos(datum.lat * Math.PI / 180);
+  const wps = [];
+
+  // Create a small parking lot pattern: 5 vertical lines + 2 horizontal
+  const spacing = 2.74; // meters (9ft stall)
+  const length = 5.49;  // meters (18ft depth)
+  const heading = 45 * Math.PI / 180;
+
+  function addPoint(lx, ly, paint) {
+    const rx = lx * Math.cos(heading) - ly * Math.sin(heading);
+    const ry = lx * Math.sin(heading) + ly * Math.cos(heading);
+    wps.push({
+      lat: datum.lat + ry / mPerDegLat,
+      lon: datum.lon + rx / mPerDegLon,
+      paint: paint
+    });
+  }
+
+  // Vertical lines (stall dividers)
+  for (let i = 0; i <= 5; i++) {
+    const x = i * spacing;
+    addPoint(x, 0, false);   // transit to start
+    addPoint(x, 0, true);    // paint on
+    addPoint(x, length, true); // paint to end
+    addPoint(x, length, false); // paint off
+  }
+
+  // Top horizontal line
+  addPoint(0, length, false);
+  addPoint(0, length, true);
+  addPoint(5 * spacing, length, true);
+  addPoint(5 * spacing, length, false);
+
+  // Bottom horizontal line
+  addPoint(0, 0, false);
+  addPoint(0, 0, true);
+  addPoint(5 * spacing, 0, true);
+  addPoint(5 * spacing, 0, false);
+
+  return wps;
+}
+
+function startDemo() {
+  if (demoInterval) clearInterval(demoInterval);
+  state.demo = true;
+  state.connected = false;
+  document.getElementById('connDot').className = 'conn-dot demo';
+  document.getElementById('connLabel').textContent = 'Demo Mode';
+  document.getElementById('btnDemo').classList.add('active');
+  document.getElementById('btnConnect').classList.remove('active');
+
+  // Reset state
+  state.startTime = Date.now();
+  state.wpCurrent = 0;
+  state.paintDistM = 0;
+  state.paintGal = 0;
+  state.paintSegs = 0;
+  state.paintSegsTotal = 8;
+  state.wpTotal = 0;
+  state.trail = [];
+  state.paintTrail = [];
+  transitLine.setLatLngs([]);
+  paintLine.setLatLngs([]);
+  document.getElementById('logContainer').innerHTML = '';
+
+  demoWaypoints = generateDemoWaypoints();
+  state.wpTotal = demoWaypoints.length;
+  demoIdx = 0;
+  demoSubIdx = 0;
+
+  addLog('Demo mode started', 'info');
+  addLog('Mission loaded: 5-stall parking lot', 'info');
+  addLog('RTK Fixed — 18 satellites', 'info');
+  addLog('Armed in AUTO mode', 'info');
+
+  map.setView([state.lat, state.lon], 20);
+
+  const stepsPerSeg = 30; // interpolation steps between waypoints
+
+  demoInterval = setInterval(() => {
+    if (demoIdx >= demoWaypoints.length - 1) {
+      clearInterval(demoInterval);
+      state.speed = 0;
+      state.painting = false;
+      state.pump = false;
+      state.solenoid = false;
+      addLog('Mission complete!', 'info');
+      updateUI();
+      return;
+    }
+
+    const from = demoWaypoints[demoIdx];
+    const to = demoWaypoints[demoIdx + 1];
+    const t = demoSubIdx / stepsPerSeg;
+
+    state.lat = from.lat + (to.lat - from.lat) * t;
+    state.lon = from.lon + (to.lon - from.lon) * t;
+
+    // Heading
+    const dlat = to.lat - from.lat;
+    const dlon = to.lon - from.lon;
+    if (Math.abs(dlat) > 1e-9 || Math.abs(dlon) > 1e-9) {
+      state.heading = (Math.atan2(dlon, dlat) * 180 / Math.PI + 360) % 360;
+    }
+
+    // Paint state
+    const wasPainting = state.painting;
+    state.painting = to.paint;
+    state.pump = to.paint;
+    state.solenoid = to.paint;
+    state.speed = to.paint ? 0.5 : 1.0;
+
+    if (!wasPainting && state.painting) {
+      addLog(`Paint ON — segment ${state.paintSegs + 1}`, 'paint');
+    }
+    if (wasPainting && !state.painting) {
+      state.paintSegs++;
+      addLog(`Paint OFF — segment ${state.paintSegs} complete`, 'paint');
+    }
+
+    // Trail
+    const pos = [state.lat, state.lon];
+    if (state.painting) {
+      state.paintTrail.push(pos);
+      paintLine.addLatLng(pos);
+      // Accumulate paint distance
+      if (state.paintTrail.length > 1) {
+        const prev = state.paintTrail[state.paintTrail.length - 2];
+        const d = haversine(prev[0], prev[1], pos[0], pos[1]);
+        state.paintDistM += d;
+        state.paintGal = state.paintDistM * 0.00936; // ~1 gal per 107m at 4" width
+      }
+    } else {
+      state.trail.push(pos);
+      transitLine.addLatLng(pos);
+    }
+
+    // Simulate battery drain
+    state.batVolt = 37.2 - (1 - state.batPct / 100) * 5;
+    state.batPct = Math.max(0, state.batPct - 0.003);
+    state.batCurr = state.painting ? 8.5 + Math.random() * 2 : 2.1 + Math.random() * 0.5;
+
+    // Simulate obstacle sensors (random safe values)
+    state.obstFL = 3.5 + Math.random() * 1.0;
+    state.obstFR = 3.5 + Math.random() * 1.0;
+
+    // GPS jitter
+    state.sats = 17 + Math.floor(Math.random() * 3);
+    state.hdop = 0.7 + Math.random() * 0.3;
+
+    state.wpCurrent = demoIdx;
+
+    demoSubIdx++;
+    if (demoSubIdx >= stepsPerSeg) {
+      demoSubIdx = 0;
+      demoIdx++;
+    }
+
+    updateUI();
+    map.panTo([state.lat, state.lon], { animate: true, duration: 0.1 });
+  }, 80);
+}
+
+function haversine(lat1, lon1, lat2, lon2) {
+  const R = 6371000;
+  const dLat = (lat2 - lat1) * Math.PI / 180;
+  const dLon = (lon2 - lon1) * Math.PI / 180;
+  const a = Math.sin(dLat/2)**2 + Math.cos(lat1*Math.PI/180) * Math.cos(lat2*Math.PI/180) * Math.sin(dLon/2)**2;
+  return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a));
+}
+
+// ─── WebSocket Connection ────────────────────────────────────────────────────
+let ws = null;
+
+function showConnectDialog() { document.getElementById('connectDialog').classList.add('show'); }
+function hideConnectDialog() { document.getElementById('connectDialog').classList.remove('show'); }
+
+function connectWS() {
+  const url = document.getElementById('wsUrl').value;
+  hideConnectDialog();
+  if (demoInterval) { clearInterval(demoInterval); demoInterval = null; }
+
+  state.demo = false;
+  document.getElementById('btnDemo').classList.remove('active');
+  document.getElementById('btnConnect').classList.add('active');
+
+  addLog(`Connecting to ${url}...`, 'info');
+  document.getElementById('connDot').className = 'conn-dot disconnected';
+  document.getElementById('connLabel').textContent = 'Connecting...';
+
+  try {
+    ws = new WebSocket(url);
+    ws.onopen = () => {
+      state.connected = true;
+      document.getElementById('connDot').className = 'conn-dot connected';
+      document.getElementById('connLabel').textContent = 'Connected';
+      addLog('WebSocket connected', 'info');
+    };
+    ws.onmessage = (evt) => {
+      try {
+        const msg = JSON.parse(evt.data);
+        handleMAVLinkMessage(msg);
+      } catch(e) { /* binary or unknown format */ }
+    };
+    ws.onclose = () => {
+      state.connected = false;
+      document.getElementById('connDot').className = 'conn-dot disconnected';
+      document.getElementById('connLabel').textContent = 'Disconnected';
+      addLog('WebSocket disconnected', 'warn');
+    };
+    ws.onerror = () => {
+      addLog('WebSocket error', 'error');
+    };
+  } catch(e) {
+    addLog(`Connection failed: ${e.message}`, 'error');
+  }
+}
+
+// Handle mavlink2rest JSON messages
+function handleMAVLinkMessage(msg) {
+  // mavlink2rest format: { "header": {...}, "message": { "type": "GLOBAL_POSITION_INT", ... } }
+  const m = msg.message || msg;
+  switch (m.type) {
+    case 'GLOBAL_POSITION_INT':
+      state.lat = m.lat / 1e7;
+      state.lon = m.lon / 1e7;
+      state.heading = m.hdg / 100;
+      break;
+    case 'GPS_RAW_INT':
+      state.gpsFix = m.fix_type;
+      state.sats = m.satellites_visible;
+      state.hdop = m.eph / 100;
+      break;
+    case 'VFR_HUD':
+      state.speed = m.groundspeed;
+      state.heading = m.heading;
+      break;
+    case 'SYS_STATUS':
+      state.batVolt = m.voltage_battery / 1000;
+      state.batCurr = m.current_battery / 100;
+      state.batPct = m.battery_remaining;
+      break;
+    case 'MISSION_CURRENT':
+      state.wpCurrent = m.seq;
+      break;
+    case 'HEARTBEAT':
+      const modes = { 0:'MANUAL', 3:'AUTO', 4:'GUIDED', 5:'LOITER', 6:'RTL', 9:'HOLD' };
+      state.mode = modes[m.custom_mode] || `MODE_${m.custom_mode}`;
+      state.armed = (m.base_mode & 128) !== 0;
+      break;
+    case 'NAMED_VALUE_FLOAT':
+      if (m.name === 'PAINT') state.painting = m.value > 0;
+      if (m.name === 'MSPD') state.speed = m.value;
+      if (m.name === 'OBFL') state.obstFL = m.value / 100;
+      if (m.name === 'OBFR') state.obstFR = m.value / 100;
+      break;
+    case 'RANGEFINDER':
+      state.obstFL = m.distance;
+      break;
+  }
+
+  // Update trail
+  if (m.type === 'GLOBAL_POSITION_INT') {
+    const pos = [state.lat, state.lon];
+    if (state.painting) {
+      paintLine.addLatLng(pos);
+    } else {
+      transitLine.addLatLng(pos);
+    }
+    robotMarker.setLatLng(pos);
+  }
+
+  updateUI();
+}
+
+// ─── Init ────────────────────────────────────────────────────────────────────
+// Auto-update clock even when not in demo
+setInterval(() => {
+  document.getElementById('clock').textContent = new Date().toLocaleTimeString();
+  const elapsed = Math.floor((Date.now() - state.startTime) / 1000);
+  const mm = String(Math.floor(elapsed / 60)).padStart(2, '0');
+  const ss = String(elapsed % 60).padStart(2, '0');
+  document.getElementById('uptime').textContent = `${mm}:${ss}`;
+}, 1000);
+
+// Start in demo mode
+startDemo();
+</script>
+</body>
+</html>

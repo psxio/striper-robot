@@ -1,0 +1,492 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Striper Lot Planner</title>
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"/>
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+<style>
+:root{--bg:#0d1117;--surface:#161b22;--border:#30363d;--text:#e6edf3;--dim:#8b949e;--green:#3fb950;--blue:#58a6ff;--yellow:#d29922;--red:#f85149}
+*{margin:0;padding:0;box-sizing:border-box}
+body{background:var(--bg);color:var(--text);font-family:'Segoe UI',system-ui,sans-serif;height:100vh;display:flex;flex-direction:column;overflow:hidden}
+header{display:flex;align-items:center;justify-content:space-between;padding:8px 16px;background:var(--surface);border-bottom:1px solid var(--border)}
+header h1{font-size:16px;font-weight:600}
+header h1 span{color:var(--green)}
+.main{flex:1;display:flex;overflow:hidden}
+.sidebar{width:340px;background:var(--surface);border-right:1px solid var(--border);overflow-y:auto;padding:12px;flex-shrink:0}
+.map-wrap{flex:1;position:relative}
+#map{width:100%;height:100%}
+.section{margin-bottom:12px}
+.section-title{font-size:11px;text-transform:uppercase;letter-spacing:0.5px;color:var(--dim);margin-bottom:6px;display:flex;align-items:center;justify-content:space-between}
+.card{background:var(--bg);border:1px solid var(--border);border-radius:8px;padding:10px;margin-bottom:8px}
+label{display:block;font-size:12px;color:var(--dim);margin-bottom:3px;margin-top:6px}
+label:first-child{margin-top:0}
+input,select{width:100%;background:var(--bg);border:1px solid var(--border);color:var(--text);padding:5px 8px;border-radius:5px;font-size:13px}
+input:focus,select:focus{outline:none;border-color:var(--blue)}
+.row{display:flex;gap:8px}
+.row>*{flex:1}
+.btn{display:inline-flex;align-items:center;justify-content:center;padding:6px 14px;border-radius:6px;border:1px solid var(--border);background:var(--surface);color:var(--text);cursor:pointer;font-size:12px;gap:4px}
+.btn:hover{border-color:var(--blue)}
+.btn.primary{background:var(--green);color:#000;border-color:var(--green);font-weight:600}
+.btn.primary:hover{opacity:0.9}
+.btn.danger{color:var(--red);border-color:var(--red)}
+.btn.sm{padding:3px 8px;font-size:11px}
+.element-item{background:var(--bg);border:1px solid var(--border);border-radius:6px;padding:8px;margin-bottom:6px;font-size:12px}
+.element-item .el-header{display:flex;justify-content:space-between;align-items:center}
+.element-item .el-type{font-weight:600;text-transform:capitalize}
+.element-item .el-details{color:var(--dim);margin-top:4px}
+.unit-toggle{display:flex;border:1px solid var(--border);border-radius:5px;overflow:hidden}
+.unit-toggle button{background:transparent;border:none;color:var(--dim);padding:3px 10px;font-size:11px;cursor:pointer}
+.unit-toggle button.active{background:var(--blue);color:#000}
+.preset-row{display:flex;gap:6px;flex-wrap:wrap}
+.export-box{background:var(--bg);border:1px solid var(--border);border-radius:6px;padding:8px;margin-top:8px;font-family:'Cascadia Code','Consolas',monospace;font-size:11px;color:var(--dim);max-height:120px;overflow-y:auto;white-space:pre;word-break:break-all}
+footer{padding:6px 16px;background:var(--surface);border-top:1px solid var(--border);font-size:11px;color:var(--dim);text-align:center}
+.leaflet-container{background:var(--bg)!important}
+</style>
+</head>
+<body>
+
+<header>
+  <h1>Striper <span>Lot Planner</span></h1>
+  <div class="unit-toggle">
+    <button class="active" id="btnFeet" onclick="setUnit('ft')">Feet</button>
+    <button id="btnMeters" onclick="setUnit('m')">Meters</button>
+  </div>
+</header>
+
+<div class="main">
+  <div class="sidebar">
+    <!-- Location -->
+    <div class="section">
+      <div class="section-title">Location</div>
+      <div class="card">
+        <div class="row">
+          <div><label>Latitude</label><input type="number" id="datumLat" value="30.2672" step="0.0001"></div>
+          <div><label>Longitude</label><input type="number" id="datumLon" value="-97.7431" step="0.0001"></div>
+        </div>
+        <label>Lot Heading (deg)</label>
+        <div class="row">
+          <input type="range" id="headingSlider" min="0" max="359" value="45" style="flex:3">
+          <input type="number" id="headingInput" value="45" min="0" max="359" style="flex:1">
+        </div>
+        <div style="font-size:11px;color:var(--dim);margin-top:4px">Click the map to set datum location</div>
+      </div>
+    </div>
+
+    <!-- Presets -->
+    <div class="section">
+      <div class="section-title">Presets</div>
+      <div class="preset-row">
+        <button class="btn sm" onclick="loadPreset('small')">Small (1x10)</button>
+        <button class="btn sm" onclick="loadPreset('medium')">Medium (2x10)</button>
+        <button class="btn sm" onclick="loadPreset('large')">Large (4x10)</button>
+        <button class="btn sm danger" onclick="clearAll()">Clear</button>
+      </div>
+    </div>
+
+    <!-- Add Element -->
+    <div class="section">
+      <div class="section-title">Add Element</div>
+      <div class="card">
+        <label>Type</label>
+        <select id="addType">
+          <option value="parking_row">Parking Row</option>
+          <option value="arrow">Arrow</option>
+          <option value="crosswalk">Crosswalk</option>
+        </select>
+
+        <div id="parkingFields">
+          <div class="row">
+            <div><label>Spaces</label><input type="number" id="addCount" value="10" min="1" max="50"></div>
+            <div><label>Angle</label>
+              <select id="addAngle">
+                <option value="0">Perpendicular (90)</option>
+                <option value="45">Angled (45)</option>
+                <option value="60">Angled (60)</option>
+              </select>
+            </div>
+          </div>
+          <div class="row">
+            <div><label>Spacing <span class="unit-label">ft</span></label><input type="number" id="addSpacing" value="9" step="0.5"></div>
+            <div><label>Depth <span class="unit-label">ft</span></label><input type="number" id="addLength" value="18" step="0.5"></div>
+          </div>
+          <label>Handicap spaces (comma-separated indices, 0-based)</label>
+          <input type="text" id="addHandicap" placeholder="e.g. 0, 9">
+        </div>
+
+        <div id="arrowFields" style="display:none">
+          <label>Direction angle (deg)</label>
+          <input type="number" id="addArrowAngle" value="90" step="15">
+        </div>
+
+        <div id="crosswalkFields" style="display:none">
+          <label>Angle (deg)</label>
+          <input type="number" id="addCrosswalkAngle" value="0" step="15">
+        </div>
+
+        <div class="row" style="margin-top:8px">
+          <div><label>Origin X <span class="unit-label">ft</span></label><input type="number" id="addOriginX" value="0" step="1"></div>
+          <div><label>Origin Y <span class="unit-label">ft</span></label><input type="number" id="addOriginY" value="0" step="1"></div>
+        </div>
+
+        <button class="btn primary" style="width:100%;margin-top:8px" onclick="addElement()">Add Element</button>
+      </div>
+    </div>
+
+    <!-- Elements List -->
+    <div class="section">
+      <div class="section-title">Elements <span id="elCount">0</span></div>
+      <div id="elementsList"></div>
+    </div>
+
+    <!-- Export -->
+    <div class="section">
+      <div class="section-title">Export</div>
+      <div class="card">
+        <label>Lot Name</label>
+        <input type="text" id="lotName" value="My Parking Lot">
+        <div class="row" style="margin-top:8px">
+          <button class="btn primary" onclick="downloadJSON()">Download JSON</button>
+          <button class="btn" onclick="copyJSON()">Copy JSON</button>
+        </div>
+        <div style="font-size:11px;color:var(--dim);margin-top:8px">
+          Then run:<br>
+          <code style="color:var(--green)">python scripts/pathgen_cli.py layout lot.json --output mission.waypoints</code>
+        </div>
+        <div class="export-box" id="jsonPreview">{}</div>
+      </div>
+    </div>
+  </div>
+
+  <div class="map-wrap">
+    <div id="map"></div>
+  </div>
+</div>
+
+<footer>Export JSON &rarr; Run CLI &rarr; Load waypoints in Mission Planner &rarr; Paint lot</footer>
+
+<script>
+// ─── State ───────────────────────────────────────────────────────
+let unit = 'ft';  // 'ft' or 'm'
+const FT_TO_M = 0.3048;
+let elements = [];
+let mapLayers = [];
+let datumMarker = null;
+
+// ─── Unit conversion ─────────────────────────────────────────────
+function toMeters(val) { return unit === 'ft' ? val * FT_TO_M : val; }
+function fromMeters(val) { return unit === 'ft' ? val / FT_TO_M : val; }
+
+function setUnit(u) {
+  unit = u;
+  document.getElementById('btnFeet').className = u === 'ft' ? 'active' : '';
+  document.getElementById('btnMeters').className = u === 'm' ? 'active' : '';
+  document.querySelectorAll('.unit-label').forEach(el => el.textContent = u);
+  // Update input labels
+  if (u === 'ft') {
+    document.getElementById('addSpacing').value = '9';
+    document.getElementById('addLength').value = '18';
+  } else {
+    document.getElementById('addSpacing').value = '2.74';
+    document.getElementById('addLength').value = '5.49';
+  }
+}
+
+// ─── Map ─────────────────────────────────────────────────────────
+const map = L.map('map', { zoomControl: true }).setView([30.2672, -97.7431], 19);
+
+const satTiles = L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}', {
+  maxZoom: 22, attribution: '&copy; Esri'
+});
+const streetTiles = L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+  maxZoom: 22, attribution: '&copy; OSM'
+});
+satTiles.addTo(map);
+L.control.layers({ 'Satellite': satTiles, 'Street': streetTiles }).addTo(map);
+
+// Click to set datum
+map.on('click', function(e) {
+  document.getElementById('datumLat').value = e.latlng.lat.toFixed(6);
+  document.getElementById('datumLon').value = e.latlng.lng.toFixed(6);
+  updateDatum();
+  renderAll();
+});
+
+function updateDatum() {
+  const lat = parseFloat(document.getElementById('datumLat').value);
+  const lon = parseFloat(document.getElementById('datumLon').value);
+  if (datumMarker) map.removeLayer(datumMarker);
+  datumMarker = L.circleMarker([lat, lon], {
+    radius: 6, color: '#3fb950', fillColor: '#3fb950', fillOpacity: 1
+  }).addTo(map).bindTooltip('Datum', { permanent: false });
+  map.setView([lat, lon]);
+}
+
+// Heading sync
+document.getElementById('headingSlider').addEventListener('input', function() {
+  document.getElementById('headingInput').value = this.value;
+  renderAll();
+});
+document.getElementById('headingInput').addEventListener('input', function() {
+  document.getElementById('headingSlider').value = this.value;
+  renderAll();
+});
+document.getElementById('datumLat').addEventListener('change', () => { updateDatum(); renderAll(); });
+document.getElementById('datumLon').addEventListener('change', () => { updateDatum(); renderAll(); });
+
+// Show/hide element type fields
+document.getElementById('addType').addEventListener('change', function() {
+  document.getElementById('parkingFields').style.display = this.value === 'parking_row' ? '' : 'none';
+  document.getElementById('arrowFields').style.display = this.value === 'arrow' ? '' : 'none';
+  document.getElementById('crosswalkFields').style.display = this.value === 'crosswalk' ? '' : 'none';
+});
+
+// ─── Elements ────────────────────────────────────────────────────
+function addElement() {
+  const type = document.getElementById('addType').value;
+  const ox = parseFloat(document.getElementById('addOriginX').value) || 0;
+  const oy = parseFloat(document.getElementById('addOriginY').value) || 0;
+  const el = {
+    type: type,
+    origin: [toMeters(ox), toMeters(oy)],
+  };
+
+  if (type === 'parking_row') {
+    el.count = parseInt(document.getElementById('addCount').value) || 10;
+    el.spacing = toMeters(parseFloat(document.getElementById('addSpacing').value) || 9);
+    el.length = toMeters(parseFloat(document.getElementById('addLength').value) || 18);
+    el.angle = parseFloat(document.getElementById('addAngle').value) || 0;
+    const hText = document.getElementById('addHandicap').value.trim();
+    if (hText) {
+      el.handicap = hText.split(',').map(s => parseInt(s.trim())).filter(n => !isNaN(n));
+    }
+  } else if (type === 'arrow') {
+    el.angle = parseFloat(document.getElementById('addArrowAngle').value) || 90;
+  } else if (type === 'crosswalk') {
+    el.angle = parseFloat(document.getElementById('addCrosswalkAngle').value) || 0;
+  }
+
+  elements.push(el);
+  renderAll();
+  updateElementsList();
+  updateJSONPreview();
+}
+
+function removeElement(idx) {
+  elements.splice(idx, 1);
+  renderAll();
+  updateElementsList();
+  updateJSONPreview();
+}
+
+function updateElementsList() {
+  const container = document.getElementById('elementsList');
+  document.getElementById('elCount').textContent = elements.length;
+  container.innerHTML = '';
+  elements.forEach((el, i) => {
+    const div = document.createElement('div');
+    div.className = 'element-item';
+    let details = '';
+    if (el.type === 'parking_row') {
+      details = `${el.count} spaces, ${fromMeters(el.spacing).toFixed(1)}${unit} spacing, ${fromMeters(el.length).toFixed(1)}${unit} deep`;
+      if (el.handicap && el.handicap.length) details += ` | HC: [${el.handicap.join(',')}]`;
+    } else if (el.type === 'arrow') {
+      details = `angle: ${el.angle}\u00B0`;
+    } else if (el.type === 'crosswalk') {
+      details = `angle: ${el.angle}\u00B0`;
+    }
+    div.innerHTML = `<div class="el-header"><span class="el-type">${el.type.replace('_',' ')}</span><button class="btn sm danger" onclick="removeElement(${i})">Remove</button></div><div class="el-details">${details} | origin: (${fromMeters(el.origin[0]).toFixed(1)}, ${fromMeters(el.origin[1]).toFixed(1)})</div>`;
+    container.appendChild(div);
+  });
+}
+
+// ─── Rendering on map ────────────────────────────────────────────
+function localToGeo(lx, ly) {
+  const lat = parseFloat(document.getElementById('datumLat').value);
+  const lon = parseFloat(document.getElementById('datumLon').value);
+  const heading = parseFloat(document.getElementById('headingInput').value) * Math.PI / 180;
+  const mPerDegLat = 111320;
+  const mPerDegLon = 111320 * Math.cos(lat * Math.PI / 180);
+
+  // Rotate by heading
+  const rx = lx * Math.cos(heading) - ly * Math.sin(heading);
+  const ry = lx * Math.sin(heading) + ly * Math.cos(heading);
+
+  return [lat + ry / mPerDegLat, lon + rx / mPerDegLon];
+}
+
+function renderAll() {
+  // Clear old layers
+  mapLayers.forEach(l => map.removeLayer(l));
+  mapLayers = [];
+
+  elements.forEach(el => {
+    if (el.type === 'parking_row') renderParkingRow(el);
+    else if (el.type === 'arrow') renderArrow(el);
+    else if (el.type === 'crosswalk') renderCrosswalk(el);
+  });
+}
+
+function renderParkingRow(el) {
+  const ox = el.origin[0], oy = el.origin[1];
+  const count = el.count;
+  const sp = el.spacing;
+  const len = el.length;
+
+  // Vertical stall divider lines
+  for (let i = 0; i <= count; i++) {
+    const x = ox + i * sp;
+    const p1 = localToGeo(x, oy);
+    const p2 = localToGeo(x, oy + len);
+    const isHC = el.handicap && (el.handicap.includes(i) || el.handicap.includes(i - 1));
+    const color = isHC ? '#58a6ff' : '#ffffff';
+    const line = L.polyline([p1, p2], { color: color, weight: 3, opacity: 0.9 }).addTo(map);
+    mapLayers.push(line);
+  }
+
+  // Top horizontal line
+  const tl = localToGeo(ox, oy + len);
+  const tr = localToGeo(ox + count * sp, oy + len);
+  const topLine = L.polyline([tl, tr], { color: '#ffffff', weight: 3, opacity: 0.9 }).addTo(map);
+  mapLayers.push(topLine);
+
+  // Bottom horizontal line
+  const bl = localToGeo(ox, oy);
+  const br = localToGeo(ox + count * sp, oy);
+  const botLine = L.polyline([bl, br], { color: '#ffffff', weight: 3, opacity: 0.9 }).addTo(map);
+  mapLayers.push(botLine);
+}
+
+function renderArrow(el) {
+  const ox = el.origin[0], oy = el.origin[1];
+  const a = (el.angle || 90) * Math.PI / 180;
+  const len = 3.0;
+  const headLen = 0.8;
+
+  // Shaft
+  const p1 = localToGeo(ox, oy);
+  const p2 = localToGeo(ox + Math.cos(a) * len, oy + Math.sin(a) * len);
+  const shaft = L.polyline([p1, p2], { color: '#d29922', weight: 3, opacity: 0.9 }).addTo(map);
+  mapLayers.push(shaft);
+
+  // Arrowhead
+  const tipX = ox + Math.cos(a) * len;
+  const tipY = oy + Math.sin(a) * len;
+  const la = a + 2.6; // ~150 degrees
+  const ra = a - 2.6;
+  const pl = localToGeo(tipX + Math.cos(la) * headLen, tipY + Math.sin(la) * headLen);
+  const pr = localToGeo(tipX + Math.cos(ra) * headLen, tipY + Math.sin(ra) * headLen);
+  const head = L.polyline([pl, p2, pr], { color: '#d29922', weight: 3, opacity: 0.9 }).addTo(map);
+  mapLayers.push(head);
+}
+
+function renderCrosswalk(el) {
+  const ox = el.origin[0], oy = el.origin[1];
+  const a = (el.angle || 0) * Math.PI / 180;
+  const width = 3.0, length = 1.8;
+  const barW = 0.15, barSp = 0.3;
+
+  const perpX = -Math.sin(a), perpY = Math.cos(a);
+  const parX = Math.cos(a), parY = Math.sin(a);
+
+  for (let d = 0; d <= width; d += barSp) {
+    const sx = ox + perpX * d;
+    const sy = oy + perpY * d;
+    const ex = sx + parX * length;
+    const ey = sy + parY * length;
+    const p1 = localToGeo(sx, sy);
+    const p2 = localToGeo(ex, ey);
+    const bar = L.polyline([p1, p2], { color: '#ffffff', weight: 2, opacity: 0.8 }).addTo(map);
+    mapLayers.push(bar);
+  }
+}
+
+// ─── Presets ─────────────────────────────────────────────────────
+function loadPreset(size) {
+  elements = [];
+  const sp = 2.7432, len = 5.4864;
+
+  if (size === 'small') {
+    elements.push({ type: 'parking_row', origin: [0, 0], count: 10, spacing: sp, length: len, angle: 0, handicap: [0] });
+  } else if (size === 'medium') {
+    elements.push({ type: 'parking_row', origin: [0, 0], count: 10, spacing: sp, length: len, angle: 0, handicap: [0] });
+    elements.push({ type: 'parking_row', origin: [0, 12], count: 10, spacing: sp, length: len, angle: 0, handicap: [0, 9] });
+    elements.push({ type: 'arrow', origin: [13, 6], angle: 90 });
+    elements.push({ type: 'arrow', origin: [13, 8], angle: 90 });
+    elements.push({ type: 'crosswalk', origin: [-2, 6], angle: 0 });
+  } else if (size === 'large') {
+    for (let r = 0; r < 4; r++) {
+      const hc = r === 0 ? [0] : (r === 3 ? [0, 9] : undefined);
+      const row = { type: 'parking_row', origin: [0, r * 14], count: 10, spacing: sp, length: len, angle: 0 };
+      if (hc) row.handicap = hc;
+      elements.push(row);
+    }
+    elements.push({ type: 'arrow', origin: [13, 7], angle: 90 });
+    elements.push({ type: 'arrow', origin: [13, 21], angle: 90 });
+    elements.push({ type: 'crosswalk', origin: [-2, 7], angle: 0 });
+  }
+
+  renderAll();
+  updateElementsList();
+  updateJSONPreview();
+}
+
+function clearAll() {
+  elements = [];
+  renderAll();
+  updateElementsList();
+  updateJSONPreview();
+}
+
+// ─── Export ──────────────────────────────────────────────────────
+function buildJSON() {
+  return {
+    name: document.getElementById('lotName').value || 'Parking Lot',
+    datum: {
+      lat: parseFloat(document.getElementById('datumLat').value),
+      lon: parseFloat(document.getElementById('datumLon').value)
+    },
+    heading: parseFloat(document.getElementById('headingInput').value),
+    elements: elements.map(el => {
+      const out = { type: el.type, origin: [+el.origin[0].toFixed(4), +el.origin[1].toFixed(4)] };
+      if (el.angle !== undefined) out.angle = el.angle;
+      if (el.count !== undefined) out.count = el.count;
+      if (el.spacing !== undefined) out.spacing = +el.spacing.toFixed(4);
+      if (el.length !== undefined) out.length = +el.length.toFixed(4);
+      if (el.handicap && el.handicap.length) out.handicap = el.handicap;
+      return out;
+    })
+  };
+}
+
+function updateJSONPreview() {
+  document.getElementById('jsonPreview').textContent = JSON.stringify(buildJSON(), null, 2);
+}
+
+function downloadJSON() {
+  const data = JSON.stringify(buildJSON(), null, 2);
+  const blob = new Blob([data], { type: 'application/json' });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = (document.getElementById('lotName').value || 'lot').replace(/\s+/g, '_').toLowerCase() + '.json';
+  a.click();
+  URL.revokeObjectURL(url);
+}
+
+function copyJSON() {
+  const data = JSON.stringify(buildJSON(), null, 2);
+  navigator.clipboard.writeText(data).then(() => {
+    const btn = event.target;
+    btn.textContent = 'Copied!';
+    setTimeout(() => btn.textContent = 'Copy JSON', 1500);
+  });
+}
+
+// ─── Init ────────────────────────────────────────────────────────
+updateDatum();
+loadPreset('medium');
+</script>
+</body>
+</html>
