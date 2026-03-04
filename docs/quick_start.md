@@ -1,7 +1,7 @@
 # Striper Robot -- Quick Start Guide
 
 Step-by-step guide from a box of parts to a robot painting its first parking
-lot. This guide assumes the Tier 2 "Best Value" build ($631).
+lot. This guide assumes the Tier 2 "Best Value" build (~$780).
 
 Total estimated time: 2 weekends (20-25 hours of hands-on work).
 
@@ -30,13 +30,13 @@ out on a workbench and check off:
 | 4 | 3/4" plywood (24"x18" or sized to match frame) | [ ] |
 | 5 | Pixhawk 6C Mini | [ ] |
 | 6 | Unicore UM980 breakout + multiband GNSS antenna (L1/L2 minimum) | [ ] |
-| 7 | 12V diaphragm pump (60-80 PSI, 1-2 GPM) | [ ] |
-| 8 | 12V solenoid valve (N.C., 1/2" NPT, brass) | [ ] |
-| 9 | TeeJet 8004 flat fan nozzle + barb-to-NPT adapters + 3 ft 1/2" vinyl tubing | [ ] |
+| 7 | Shurflo 8000 diaphragm pump (12V, 60 PSI, 1 GPM) | [ ] |
+| 8 | 12V solenoid valve (N.C., 3/8" NPT, brass, direct-acting) | [ ] |
+| 9 | TeeJet TP8004EVS even-fan nozzle + 60-mesh strainer + adapters + 3 ft 3/8" tubing | [ ] |
 | 10 | 36V 10Ah e-bike battery with charger | [ ] |
-| 11 | DC-DC converter 36V to 12V (3A+) | [ ] |
-| 12 | DC-DC converter 36V to 5V BEC (2A+) | [ ] |
-| 13 | E-stop button (22mm mushroom, twist-release, N.C.) | [ ] |
+| 11 | DC-DC converter 36V to 12V (5A minimum, XL4015) | [ ] |
+| 12 | Holybro PM06 V2 power module (5V/3A + battery monitoring) | [ ] |
+| 13 | E-stop button (22mm mushroom, twist-release, N.C.) + 40A DC contactor | [ ] |
 | 14 | 2x HC-SR04 ultrasonic sensors | [ ] |
 | 15 | FlySky FS-i6X transmitter + FS-iA6B receiver | [ ] |
 | 16 | 2-channel 5V relay module (opto-isolated) | [ ] |
@@ -153,12 +153,14 @@ Wire the power distribution system. Refer to `docs/wiring_guide.md` Section
 1. Mount the 36V e-bike battery to the frame (use velcro straps or a
    battery tray). Position for best center of gravity
 2. Wire the battery positive through the 30A inline fuse holder
-3. Wire the fuse output through the E-stop N.C. contacts
-4. From the E-stop output, create a power distribution point (terminal
+3. Wire the fuse output through the DC contactor N.O. contacts. Wire the
+   contactor coil: positive to fused battery, negative through the E-stop
+   N.C. contacts to GND
+4. From the contactor output, create a power distribution point (terminal
    block or solder junction):
-   - Run 14 AWG to the hoverboard mainboard VCC input
+   - Run 12 AWG to the hoverboard mainboard VCC input
    - Run 18 AWG to the 36V-to-12V DC-DC converter input
-   - Run 22 AWG to the 36V-to-5V BEC input
+   - Run 18 AWG to the Holybro PM06 V2 input
 5. Connect all grounds to a common ground bus (terminal block or solder
    junction)
 6. **Before connecting anything to the outputs**: power on and verify
@@ -215,7 +217,7 @@ Wire the power distribution system. Refer to `docs/wiring_guide.md` Section
 6. Reconnect and verify key parameters loaded:
    - `FRAME_TYPE` = 2 (skid steer)
    - `SERIAL2_PROTOCOL` = 28 (Scripting)
-   - `GPS_TYPE` = 25 (UM980)
+   - `GPS_TYPE` = 24 (UnicoreNMEA / UM980)
    - `SCR_ENABLE` = 1
 7. Update `WHL_TRACK` to match your measured track width (default 0.40m)
 
@@ -446,7 +448,7 @@ Now add paint commands to the mission (still using water).
    - Clean start and stop of spray at waypoints
    - paint_control.lua lead/lag compensation produces clean line ends
 5. Measure the water line on the ground:
-   - Width should be approximately 4" (from TeeJet 8004)
+   - Width should be approximately 4" (from TeeJet TP8004EVS)
    - Line should be straight (no S-curves or wobble)
    - Start and end points should be clean (no pooling or drips)
 

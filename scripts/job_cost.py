@@ -38,7 +38,7 @@ CREW_SIZE = 2
 DEFAULT_PAINT_COST = 30.0   # $/gallon (traffic latex)
 
 # Robot costs
-ROBOT_BOM_COST = 631.0      # Tier 2 BOM
+ROBOT_BOM_COST = 780.0      # Tier 2 BOM (revised after deep research)
 ELECTRICITY_KWH = 0.12      # $/kWh
 BATTERY_WH = 360             # 36V * 10Ah
 WEAR_PER_JOB = 2.0          # nozzle, seals, etc.

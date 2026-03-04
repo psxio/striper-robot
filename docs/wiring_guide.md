@@ -525,9 +525,10 @@ Follow this order. Do not proceed until the current step is verified.
 ### Phase 2: Power System (Steps 6-8)
 
 - [ ] **6.** Install the 36V e-bike battery on the frame. Wire the battery
-      positive through the 30A inline fuse, then through the e-stop
-      button N.C. contacts, then to a power distribution point (terminal
-      block or bus bar).
+      positive through the 30A inline fuse, then through the DC contactor
+      N.O. contacts, then to a power distribution point (terminal block
+      or bus bar). Wire the contactor coil: positive to fused battery,
+      negative through the e-stop N.C. contacts to GND.
 - [ ] **7.** Install the two DC-DC converters. Wire their inputs to the
       36V bus (after the fuse/e-stop). Verify outputs with a multimeter:
       12V and 5V.

@@ -217,6 +217,10 @@ return update, 1000
 
 ### Tier 2: $631 "Best Value" (Recommended)
 
+> **NOTE:** This was the original estimate. After deep hardware research,
+> the Tier 2 BOM has been revised to **~$780**. See `docs/bom.md` for
+> the corrected BOM with Shurflo pump, PM06 V2, DC contactor, etc.
+
 | Component | Source | Cost |
 |-----------|--------|------|
 | Used hoverboard (motors + battery + controller) | eBay/FB Marketplace | $30 |
@@ -297,7 +301,7 @@ return update, 1000
 All competitors use the same approach we planned: **low-pressure diaphragm pump + solenoid valve + flat fan nozzle.** This is correct.
 
 - **Paint type:** Water-based latex traffic paint (~$15-25/gallon, ~350 linear feet/gallon)
-- **Nozzle:** TeeJet 8004 or Graco RAC 5 LL5319 for 4" line width ($5-10)
+- **Nozzle:** TeeJet TP8004EVS (even spray) or Graco RAC 5 LL5319 for 4" line width ($5-15)
 - **A 50-space lot needs ~4-5 gallons of paint ($60-100) and takes 30-60 minutes**
 - **Spray paint can + servo** works for demos ($15) but is 10-20x more expensive per foot for production
 - **Thermoplastic marking** (3-5 year lifespan vs 6-12 months for paint) is a V2 opportunity but requires heated applicator

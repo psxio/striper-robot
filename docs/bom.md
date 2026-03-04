@@ -88,7 +88,7 @@ ZED-F9P. A separate e-bike battery gives 45-70 minutes of runtime
 
 ---
 
-## Tier 3: $905 "Production Prototype"
+## Tier 3: $1,050 "Production Prototype"
 
 Built to run all day on real job sites. Better GPS antenna for multipath
 rejection near buildings, bigger battery, weatherproof enclosure,
@@ -103,7 +103,7 @@ proper spray tip with filter, and a full-size Pixhawk for expansion.
 | 5 | Unicore UM980 breakout | Same module as Tier 2. | 1 | $120 | ArduSimple / SparkFun |
 | 6 | Quality multiband GNSS antenna | Survey-grade L1/L2/L5 antenna with ground plane. Better multipath rejection for parking lots near buildings. (e.g., u-blox ANN-MB-00 or Beitian BT-800D). | 1 | $65 | [SparkFun](https://www.sparkfun.com/) / [DigiKey](https://www.digikey.com/) |
 | 7 | Graco-style spray tip + filter + fittings | Graco RAC 5 LL5319 reversible tip, inline filter (60-mesh), tip guard. Professional-grade line quality. | 1 | $100 | Amazon / [Graco](https://www.graco.com/) / paint supply |
-| 8 | 36V 15Ah e-bike battery + charger | 36V lithium-ion, 15Ah (540Wh). Includes BMS. Bundled 42V 2A charger. 4-6 hours runtime. | 1 | $140 | [Amazon](https://www.amazon.com/s?k=36V+15Ah+ebike+battery+charger) |
+| 8 | 36V 15Ah e-bike battery + charger | 36V lithium-ion, 15Ah (540Wh). Includes BMS. Bundled 42V 2A charger. **Realistic runtime: 90-120 min** (1.5x Tier 2). | 1 | $140 | [Amazon](https://www.amazon.com/s?k=36V+15Ah+ebike+battery+charger) |
 | 9 | DC-DC converter (36V→12V, 10A) + Holybro PM06 V2 | 36V to 12V (10A, XL4015) for pump/solenoid. Holybro PM06 V2 for 5V with battery monitoring. ATC fuse panel (4-way). | 1 | $45 | Amazon / Holybro |
 | 10 | E-stop button + DC contactor | Same as Tier 2. 22mm button drives 40A DC contactor coil. | 1 | $25 | Amazon |
 | 11 | HC-SR04 ultrasonic sensors | Same as Tier 2. | 2 | $5 | Amazon |

@@ -6,7 +6,7 @@ life of all components.
 
 Hardware reference: Pixhawk 6C Mini, Unicore UM980 GPS, hoverboard hub motors
 (350W x2) with FOC firmware, 36V 10Ah e-bike battery, 12V diaphragm pump +
-solenoid valve + TeeJet 8004 nozzle, FlySky FS-i6X RC.
+solenoid valve + TeeJet TP8004EVS nozzle, FlySky FS-i6X RC.
 
 ---
 
@@ -59,7 +59,7 @@ minutes.
 - [ ] Solenoid clicks when toggled via RC (CH7) -- listen for relay click
 - [ ] Spray pattern tested with short burst: clean 4" fan, no drips, no
       deflection
-- [ ] Nozzle height set correctly (TeeJet 8004 at 6-8 inches from ground)
+- [ ] Nozzle height set correctly (TeeJet TP8004EVS at 6-8 inches from ground)
 - [ ] All tubing connections tight (no leaks at barb fittings)
 - [ ] Flyback diodes installed across solenoid and pump (visual check)
 
@@ -411,8 +411,8 @@ Time: 15-20 minutes.
 
 | Nozzle Type | Replacement Interval | Sign of Wear |
 |-------------|---------------------|--------------|
-| TeeJet 8004 (plastic) | Every 50-100 gallons or 3 months | Fan width increases >10%, uneven pattern |
-| TeeJet 8004 (stainless) | Every 200-400 gallons or 12 months | Same as above, but slower wear |
+| TeeJet TP8004EVS (plastic) | Every 50-100 gallons or 3 months | Fan width increases >10%, uneven pattern |
+| TeeJet TP8004EVS (stainless) | Every 200-400 gallons or 12 months | Same as above, but slower wear |
 | Graco RAC 5 LL5319 (Tier 3) | Every 100-200 gallons or 6 months | Tailing on pattern edges |
 
 - Carry 2-3 spare nozzle tips at all times
@@ -626,7 +626,7 @@ Keep these in your vehicle for field repairs:
 
 | Part | Qty | Approx Cost |
 |------|-----|-------------|
-| TeeJet 8004 nozzle tips | 3 | $10 |
+| TeeJet TP8004EVS nozzle tips | 3 | $10 |
 | Relay module (2-channel, 5V) | 1 | $5 |
 | DC-DC converter 36V to 12V | 1 | $5 |
 | DC-DC converter 36V to 5V (BEC) | 1 | $5 |
@@ -634,7 +634,7 @@ Keep these in your vehicle for field repairs:
 | 5A blade fuses | 5 | $2 |
 | JST-GH 6-pin cables (Pixhawk) | 2 | $5 |
 | XT60 connectors (pair) | 2 | $3 |
-| 14 AWG silicone wire (3 ft red, 3 ft black) | 1 lot | $5 |
+| 12 AWG silicone wire (3 ft red, 3 ft black) | 1 lot | $5 |
 | Zip ties (assorted) | 1 bag | $3 |
 | Heat shrink tubing (assorted) | 1 kit | $5 |
 | Vinyl tubing 1/2" (3 ft) | 1 | $3 |

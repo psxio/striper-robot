@@ -6,7 +6,7 @@ automatically, and what the operator should do.
 
 Hardware reference: Pixhawk 6C Mini, Unicore UM980 GPS, hoverboard hub motors
 (350W x2) with FOC firmware, 36V 10Ah e-bike battery, 12V diaphragm pump +
-solenoid valve + TeeJet 8004 nozzle, FlySky FS-i6X RC, 2x HC-SR04 ultrasonics.
+solenoid valve + TeeJet TP8004EVS nozzle, FlySky FS-i6X RC, 2x HC-SR04 ultrasonics.
 
 ---
 
@@ -104,10 +104,10 @@ solenoid valve + TeeJet 8004 nozzle, FlySky FS-i6X RC, 2x HC-SR04 ultrasonics.
 
 | Item | Detail |
 |------|--------|
-| **Cause** | Dried paint in the TeeJet 8004 nozzle orifice, paint debris or aggregate, or inadequate straining of paint |
+| **Cause** | Dried paint in the TeeJet TP8004EVS nozzle orifice, paint debris or aggregate, or inadequate straining of paint |
 | **What operator sees** | Paint line becomes thin, spotty, or stops entirely despite pump running and solenoid open. Spray pattern changes from a clean fan to a deflected stream or drip |
 | **Automatic action** | None. The system has no flow sensor to detect clogs |
-| **Operator action** | 1. Pause mission (HOLD mode). 2. Turn off paint via RC toggle (CH7). 3. Remove the nozzle tip. 4. For TeeJet 8004: the tip is reversible -- flip it 180 degrees and run the pump briefly to back-flush. 5. Soak the tip in warm water or paint thinner for 5 minutes. 6. Clear the orifice with the cleaning pin (included with TeeJet tips) or a thin wire. 7. Reinstall and test with a short burst before resuming mission |
+| **Operator action** | 1. Pause mission (HOLD mode). 2. Turn off paint via RC toggle (CH7). 3. Remove the nozzle tip. 4. For TeeJet TP8004EVS: the tip is reversible -- flip it 180 degrees and run the pump briefly to back-flush. 5. Soak the tip in warm water or paint thinner for 5 minutes. 6. Clear the orifice with the cleaning pin (included with TeeJet tips) or a thin wire. 7. Reinstall and test with a short burst before resuming mission |
 | **Prevention** | Strain all paint through a 60-mesh filter before pouring into the reservoir. Flush the entire system with warm water after every use. Carry 2-3 spare nozzle tips. With Tier 3 Graco tips, use the inline filter |
 
 ### 3.2 Pump Failure
@@ -157,7 +157,7 @@ solenoid valve + TeeJet 8004 nozzle, FlySky FS-i6X RC, 2x HC-SR04 ultrasonics.
 | **Cause** | Wrong nozzle tip installed, pump pressure incorrect, nozzle height wrong, or robot speed not matching spray rate |
 | **What operator sees** | Lines are consistently wider or narrower than the target 4" width |
 | **Automatic action** | None |
-| **Operator action** | 1. For lines too wide: raise the nozzle, reduce pump pressure (if adjustable), or use a smaller orifice tip (e.g., TeeJet 8002 for 2" width). 2. For lines too narrow: lower the nozzle, increase pump pressure, or use a larger orifice tip (e.g., TeeJet 8006). 3. Check nozzle-to-ground distance: TeeJet 8004 produces a 4" fan at approximately 6-8 inches from the surface. 4. Check robot speed: slower speed = thicker paint application (good for coverage, but can cause drips) |
+| **Operator action** | 1. For lines too wide: raise the nozzle, reduce pump pressure (if adjustable), or use a smaller orifice tip (e.g., TeeJet 8002 for 2" width). 2. For lines too narrow: lower the nozzle, increase pump pressure, or use a larger orifice tip (e.g., TeeJet 8006). 3. Check nozzle-to-ground distance: TeeJet TP8004EVS produces a 4" fan at approximately 6-8 inches from the surface. 4. Check robot speed: slower speed = thicker paint application (good for coverage, but can cause drips) |
 | **Prevention** | Bench test spray pattern with water before every job. Mark the correct nozzle height on the mounting bracket. Calibrate `WP_SPEED` to match the paint flow rate |
 
 ---
@@ -172,7 +172,7 @@ solenoid valve + TeeJet 8004 nozzle, FlySky FS-i6X RC, 2x HC-SR04 ultrasonics.
 | **What operator sees** | Mission Planner shows low voltage warning (below 33V). Robot behavior becomes sluggish. Eventually the battery failsafe triggers |
 | **Automatic action** | At `BATT_LOW_VOLT` (33V / 3.3V per cell): `BATT_FS_LOW_ACT=2` triggers Hold mode -- robot stops in place. At `BATT_CRT_VOLT` (30V / 3.0V per cell): `BATT_FS_CRT_ACT=1` triggers RTL. ArduRover will not arm below `BATT_ARM_VOLT` (35V) |
 | **Operator action** | 1. When low voltage warning appears, note the current waypoint number. 2. Switch to HOLD or MANUAL. 3. Drive the robot back to the staging area manually (to save remaining battery for safe return). 4. Swap batteries or charge. The 36V 10Ah battery takes 3-5 hours on a standard 42V 2A charger. 5. Resume mission from the noted waypoint |
-| **Prevention** | Fully charge before every job (42V at the charger). Monitor voltage in Mission Planner throughout the job. For large lots (100+ spaces), bring a second battery. The Tier 2 battery provides 2-3 hours; plan jobs accordingly |
+| **Prevention** | Fully charge before every job (42V at the charger). Monitor voltage in Mission Planner throughout the job. For large lots (100+ spaces), bring a second battery. The Tier 2 battery provides 45-70 minutes of runtime; plan jobs accordingly. For large lots, bring a spare battery |
 
 ### 4.2 DC-DC Converter Failure (36V to 12V)
 

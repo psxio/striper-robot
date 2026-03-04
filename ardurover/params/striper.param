@@ -639,7 +639,8 @@ RALLY_TOTAL,0
 # =============================================================================
 # POST-LOAD CHECKLIST:
 # 1. Calibrate accelerometers (level the robot on flat ground)
-# 2. Calibrate compass (rotate robot through all orientations)
+# 2. Compass disabled (COMPASS_ENABLE=0) — skip compass calibration
+#    Instead: after GPS lock, walk robot in a 2m circle for GSF heading init
 # 3. Calibrate RC transmitter (full stick deflections)
 # 4. Verify battery voltage reading matches multimeter
 # 5. Upload polygon geofence matching your parking lot boundary

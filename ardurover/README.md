@@ -127,7 +127,7 @@ $command,config com1 115200
 $command,saveconfig
 ```
 
-ArduPilot's GPS driver (GPS_TYPE=25, Unicore native) gives the best performance.
+ArduPilot's GPS driver (GPS_TYPE=24, UnicoreNMEA) gives the best performance.
 Use GPS_TYPE=1 (AUTO) if you are unsure or using a different GPS module.
 
 ### Hoverboard Motor UART Wiring
@@ -338,7 +338,7 @@ support, Lua scripting improvements, and relay function parameters.
 
 7. Reconnect and verify critical parameters:
    - `FRAME_TYPE` = 2
-   - `GPS_TYPE` = 25
+   - `GPS_TYPE` = 24
    - `SCR_ENABLE` = 1
    - `SPRAY_ENABLE` = 1
    - `RELAY1_PIN` = 54
@@ -873,7 +873,7 @@ Before each striping session:
 | RELAY1_PIN | 54 | Paint solenoid on AUX5 |
 | RELAY2_PIN | 55 | Pump on AUX6 |
 | FENCE_ENABLE | 1 | Geofencing active |
-| GPS_TYPE | 25 | Unicore UM980 native driver |
+| GPS_TYPE | 24 | Unicore UM980 (UnicoreNMEA) |
 | SCR_ENABLE | 1 | Lua scripting enabled |
 | BRD_SAFETY_DEFLT | 0 | Hardware safety switch disabled |
 | BATT_LOW_VOLT | 33.0 | Low battery warning (10S pack) |

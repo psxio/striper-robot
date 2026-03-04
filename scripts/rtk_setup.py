@@ -184,7 +184,7 @@ def print_ardurover_params():
     print()
     print("  These params are already set in striper.param:")
     print()
-    print("  GPS_TYPE       = 25    (UM980)")
+    print("  GPS_TYPE       = 24    (UnicoreNMEA, single UM980)")
     print("  GPS_GNSS_MODE  = 0     (auto - all constellations)")
     print("  SERIAL3_PROTOCOL = 5   (GPS)")
     print("  SERIAL3_BAUD    = 115  (115200)")

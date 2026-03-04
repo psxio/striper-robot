@@ -29,7 +29,7 @@ is wrong.
 | # | PreArm Message | Cause | Fix |
 |---|----------------|-------|-----|
 | 1 | "PreArm: Compass not calibrated" | Compass calibration not done or failed | Perform compass calibration: Setup > Mandatory Hardware > Compass > Start. Rotate robot through all axes outdoors, away from metal |
-| 2 | "PreArm: GPS hdop too high" or "PreArm: Need 3D Fix" | GPS does not have a good enough fix. Satellite count too low or accuracy too poor | Move outdoors with clear sky view. Wait 30-60 seconds for fix. Check antenna SMA connector. Check `SERIAL3_PROTOCOL=5`, `GPS_TYPE=25` |
+| 2 | "PreArm: GPS hdop too high" or "PreArm: Need 3D Fix" | GPS does not have a good enough fix. Satellite count too low or accuracy too poor | Move outdoors with clear sky view. Wait 30-60 seconds for fix. Check antenna SMA connector. Check `SERIAL3_PROTOCOL=5`, `GPS_TYPE=24` |
 | 3 | "PreArm: Battery below minimum" or "PreArm: Battery voltage X below minimum Y" | Battery voltage below `BATT_ARM_VOLT` (35V) | Charge the battery. Minimum arming voltage is 35V (3.5V/cell). If battery is charged but reading is wrong, recalibrate `BATT_VOLT_MULT` with a multimeter |
 | 4 | "PreArm: RC not calibrated" | RC transmitter has not been calibrated in Mission Planner | Go to Setup > Mandatory Hardware > Radio Calibration. Move all sticks to full extents and click Calibrate |
 | 5 | "PreArm: Throttle not zero" or "PreArm: Throttle too high" | Throttle stick is not at the bottom position | Pull throttle stick (CH3) fully down. Check `RC3_TRIM` matches the actual minimum PWM value |
@@ -173,7 +173,7 @@ paint and looks bad. Too thin leaves gaps in coverage.
 2. Test the nozzle spray pattern statically: hold the nozzle at the
    mounting height (6-8 inches) and trigger the solenoid manually. Measure
    the fan width
-3. Check which nozzle tip is installed (TeeJet 8004 = 4 inch fan at the
+3. Check which nozzle tip is installed (TeeJet TP8004EVS = 4 inch fan at the
    rated height)
 4. Check pump pressure: if you have a pressure gauge, it should read
    60-80 PSI
@@ -185,7 +185,7 @@ paint and looks bad. Too thin leaves gaps in coverage.
 | Problem | Cause | Fix |
 |---------|-------|-----|
 | Lines too wide (>5") | Nozzle too close to ground | Raise nozzle to 8 inches. Measure and mark the bracket |
-| Lines too wide (>5") | Wrong nozzle tip | Verify TeeJet 8004 is installed (the "04" means 4 inches). Swap if wrong |
+| Lines too wide (>5") | Wrong nozzle tip | Verify TeeJet TP8004EVS is installed (the "04" means 4 inches). Swap if wrong |
 | Lines too wide (>5") | Pump pressure too high | If pump has adjustable pressure, reduce it. Or partially restrict the pump output |
 | Lines too thin (<3") | Nozzle too far from ground | Lower nozzle to 6 inches |
 | Lines too thin (<3") | Pump pressure too low | Check 12V rail voltage (should be 12.0V). Check pump for wear. Verify pump is getting 12V, not 10V from a sagging converter |
@@ -279,7 +279,7 @@ navigate or arm.
    If nothing is detected:
    - Check SERIAL3 wiring (TX/RX crossover, GND, 5V)
    - Check `SERIAL3_PROTOCOL=5` and `SERIAL3_BAUD=115`
-   - Check `GPS_TYPE=25` (UM980)
+   - Check `GPS_TYPE=24` (UnicoreNMEA / UM980)
 2. **Is the antenna connected?** Check the SMA connector at the UM980
    breakout. It must be hand-tight. A disconnected antenna = 0 satellites
 3. **Is there sky view?** The antenna needs an unobstructed view of the sky.
@@ -299,7 +299,7 @@ navigate or arm.
 | Cause | Fix |
 |-------|-----|
 | SERIAL3 wiring wrong | Verify TX-to-RX crossover: Pixhawk TX (pin 2) to UM980 RX, Pixhawk RX (pin 3) to UM980 TX. Verify GND connected |
-| `GPS_TYPE` wrong | Set `GPS_TYPE=25` for UM980. Use `GPS_TYPE=1` (Auto) if unsure |
+| `GPS_TYPE` wrong | Set `GPS_TYPE=24` for UM980. Use `GPS_TYPE=1` (Auto) if unsure |
 | Antenna disconnected | Hand-tighten SMA connector |
 | No sky view | Move outdoors. The antenna needs 360-degree sky view |
 | Antenna cable damaged | Replace the SMA cable. Check for kinks or cuts |
@@ -624,11 +624,10 @@ during troubleshooting. All values reference the default `striper.param` file.
 | `SERIAL2_PROTOCOL` | 28 | Motor UART scripting | Motors do not respond |
 | `SERIAL2_BAUD` | 115 | Motor UART baud rate | Motors do not respond |
 | `SERIAL3_PROTOCOL` | 5 | GPS UART | GPS not detected |
-| `GPS_TYPE` | 25 | UM980 driver | GPS not detected |
+| `GPS_TYPE` | 24 | UM980 (UnicoreNMEA) | GPS not detected |
 | `SCR_ENABLE` | 1 | Lua scripting on/off | Scripts not loading |
 | `SCR_HEAP_SIZE` | 102400 | Lua memory (bytes) | Out of memory errors |
-| `COMPASS_ORIENT` | 0 | Pixhawk mounting direction | Heading wrong |
-| `COMPASS_USE` | 1 | Enable/disable compass | Compass interference |
+| `COMPASS_ENABLE` | 0 | Compass disabled (hub motor interference) | Heading wrong |
 | `WP_RADIUS` | 0.05 | Waypoint acceptance radius (m) | Circling at waypoints |
 | `WP_SPEED` | 0.50 | Navigation speed (m/s) | Lines wavy or overshooting |
 | `WP_OVERSHOOT` | 0.10 | Max overshoot distance (m) | Overshooting waypoints |
