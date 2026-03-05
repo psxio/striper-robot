@@ -7,6 +7,11 @@ redesigned around **ArduRover on a Pixhawk flight controller** with
 Three tiers let you start cheap and upgrade as needed. Prices are
 approximate USD as of early 2026 and exclude shipping/tax.
 
+> **Business context:** The Tier 2 BOM ($780) is the COGS basis for the
+> assembled Strype robot ($2,495 retail, 69% gross margin). See
+> `docs/business-plan.md` for full pricing strategy, unit economics, and
+> revenue model.
+
 ---
 
 ## Tier 1: $409 "Proof of Concept"

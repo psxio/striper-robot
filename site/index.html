@@ -1,0 +1,767 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Strype — Autonomous Parking Lot Striping Robot</title>
+<meta name="description" content="Strype is an autonomous robot that paints parking lot lines with 8mm GPS precision — for a fraction of the cost of a crew.">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=DM+Sans:ital,opsz,wght@0,9..40,300;0,9..40,400;0,9..40,500;0,9..40,600;0,9..40,700;1,9..40,400&family=Syne:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+:root{
+  --bg:#0d1117;--bg-card:#161b22;--border:#30363d;
+  --text:#e6edf3;--text-2:#8b949e;--text-3:#484f58;
+  --green:#3fb950;--green-dim:rgba(63,185,80,.12);--green-glow:rgba(63,185,80,.35);
+  --blue:#58a6ff;
+  --font-display:'Syne',sans-serif;
+  --font-body:'DM Sans',sans-serif;
+  --font-mono:'JetBrains Mono',monospace;
+  --max-w:1140px;--section-pad:clamp(80px,12vw,140px) clamp(20px,5vw,40px);
+}
+html{scroll-behavior:smooth;background:var(--bg);color:var(--text);font-family:var(--font-body);-webkit-font-smoothing:antialiased}
+body{overflow-x:hidden;background:var(--bg)}
+a{color:var(--blue);text-decoration:none;transition:color .2s}
+a:hover{color:var(--green)}
+img{max-width:100%;height:auto;display:block}
+
+/* ═══ NOISE TEXTURE OVERLAY ═══ */
+body::before{content:'';position:fixed;inset:0;z-index:9999;pointer-events:none;opacity:.035;
+  background-image:url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='.85' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");
+}
+
+/* ═══ GLOBAL STRIPE LINE MOTIF ═══ */
+.stripe-line{height:1px;background:linear-gradient(90deg,transparent,var(--green),transparent);opacity:.4;margin:0 auto;max-width:var(--max-w)}
+
+/* ═══ ANIMATIONS ═══ */
+@keyframes fadeUp{from{opacity:0;transform:translateY(32px)}to{opacity:1;transform:translateY(0)}}
+@keyframes fadeIn{from{opacity:0}to{opacity:1}}
+@keyframes glowPulse{0%,100%{box-shadow:0 0 20px var(--green-dim)}50%{box-shadow:0 0 40px var(--green-glow)}}
+@keyframes lineGrow{from{transform:scaleX(0)}to{transform:scaleX(1)}}
+@keyframes blink{0%,100%{opacity:1}50%{opacity:0}}
+.reveal{opacity:0;transform:translateY(32px);transition:opacity .7s cubic-bezier(.16,1,.3,1),transform .7s cubic-bezier(.16,1,.3,1)}
+.reveal.visible{opacity:1;transform:translateY(0)}
+.reveal-d1{transition-delay:.1s}.reveal-d2{transition-delay:.2s}.reveal-d3{transition-delay:.3s}.reveal-d4{transition-delay:.4s}
+
+/* ═══ NAV ═══ */
+nav{position:fixed;top:0;left:0;right:0;z-index:100;padding:0 clamp(20px,5vw,40px);height:64px;display:flex;align-items:center;justify-content:space-between;
+  background:rgba(13,17,23,.6);backdrop-filter:blur(20px) saturate(1.4);-webkit-backdrop-filter:blur(20px) saturate(1.4);
+  border-bottom:1px solid transparent;transition:border-color .3s}
+nav.scrolled{border-bottom-color:var(--border)}
+.wordmark{font-family:var(--font-display);font-weight:800;font-size:1.35rem;letter-spacing:-.02em;color:var(--text)}
+.wordmark span{color:var(--green)}
+.nav-links{display:flex;gap:32px;list-style:none}
+.nav-links a{color:var(--text-2);font-size:.875rem;font-weight:500;letter-spacing:.01em;transition:color .2s}
+.nav-links a:hover{color:var(--text)}
+.nav-mobile-toggle{display:none;background:none;border:none;color:var(--text);cursor:pointer;padding:4px}
+
+/* ═══ HERO ═══ */
+.hero{padding:140px clamp(20px,5vw,40px) 80px;max-width:var(--max-w);margin:0 auto;display:grid;grid-template-columns:1fr 1fr;gap:60px;align-items:center;min-height:90vh}
+.hero-text{animation:fadeUp .9s cubic-bezier(.16,1,.3,1) both}
+.hero h1{font-family:var(--font-display);font-size:clamp(2.2rem,5vw,3.8rem);font-weight:800;line-height:1.08;letter-spacing:-.03em;margin-bottom:24px}
+.hero h1 .accent{color:var(--green);position:relative}
+.hero h1 .accent::after{content:'';position:absolute;bottom:-2px;left:0;right:0;height:3px;background:var(--green);border-radius:2px;opacity:.5}
+.hero p{font-size:clamp(1.05rem,1.8vw,1.25rem);color:var(--text-2);line-height:1.65;margin-bottom:36px;max-width:520px}
+.hero-image{animation:fadeIn 1.2s .3s cubic-bezier(.16,1,.3,1) both;position:relative}
+.hero-image img{border-radius:16px;border:1px solid var(--border)}
+.hero-image::before{content:'';position:absolute;inset:-1px;border-radius:17px;background:conic-gradient(from 180deg,transparent,var(--green-glow),transparent 60%);z-index:-1;opacity:.5;filter:blur(24px)}
+
+.cta-btn{display:inline-flex;align-items:center;gap:8px;padding:14px 32px;background:var(--green);color:#0d1117;font-family:var(--font-body);font-weight:600;font-size:1rem;border:none;border-radius:10px;cursor:pointer;transition:all .25s;letter-spacing:-.01em}
+.cta-btn:hover{background:#4cd964;transform:translateY(-2px);box-shadow:0 8px 32px rgba(63,185,80,.3);color:#0d1117}
+.cta-btn svg{width:18px;height:18px;transition:transform .25s}
+.cta-btn:hover svg{transform:translateX(3px)}
+
+/* ═══ PROBLEM / SOLUTION ═══ */
+.prob-sol{padding:var(--section-pad);max-width:var(--max-w);margin:0 auto;display:grid;grid-template-columns:1fr 1fr;gap:clamp(40px,6vw,80px)}
+.prob-sol-col h3{font-family:var(--font-display);font-size:1.15rem;font-weight:700;text-transform:uppercase;letter-spacing:.08em;margin-bottom:28px}
+.prob-sol-col.problem h3{color:var(--text-2)}
+.prob-sol-col.solution h3{color:var(--green)}
+.prob-sol-col ul{list-style:none;display:flex;flex-direction:column;gap:18px}
+.prob-sol-col li{display:flex;gap:14px;align-items:flex-start;font-size:1rem;line-height:1.6;color:var(--text-2)}
+.prob-sol-col li .icon{flex-shrink:0;width:28px;height:28px;border-radius:8px;display:flex;align-items:center;justify-content:center;font-size:.85rem;margin-top:2px}
+.problem li .icon{background:rgba(248,81,73,.1);color:#f85149}
+.solution li .icon{background:var(--green-dim);color:var(--green)}
+
+/* ═══ STATS BAR ═══ */
+.stats-bar{padding:56px clamp(20px,5vw,40px);background:var(--bg-card);border-top:1px solid var(--border);border-bottom:1px solid var(--border)}
+.stats-inner{max-width:var(--max-w);margin:0 auto;display:grid;grid-template-columns:repeat(4,1fr);gap:32px;text-align:center}
+.stat-item .num{font-family:var(--font-display);font-size:clamp(2rem,4.5vw,3.2rem);font-weight:800;color:var(--green);letter-spacing:-.03em;line-height:1}
+.stat-item .label{font-size:.875rem;color:var(--text-2);margin-top:8px;letter-spacing:.02em}
+
+/* ═══ HOW IT WORKS ═══ */
+.how-it-works{padding:var(--section-pad);max-width:var(--max-w);margin:0 auto;text-align:center}
+.section-label{font-family:var(--font-mono);font-size:.8rem;color:var(--green);text-transform:uppercase;letter-spacing:.15em;margin-bottom:12px}
+.section-title{font-family:var(--font-display);font-size:clamp(1.8rem,3.5vw,2.6rem);font-weight:700;letter-spacing:-.02em;margin-bottom:56px}
+.steps{display:grid;grid-template-columns:repeat(3,1fr);gap:32px;text-align:left}
+.step{background:var(--bg-card);border:1px solid var(--border);border-radius:14px;padding:36px 32px;position:relative;transition:border-color .3s,transform .3s}
+.step:hover{border-color:var(--green);transform:translateY(-4px)}
+.step-num{font-family:var(--font-display);font-size:3.5rem;font-weight:800;color:var(--green);opacity:.18;position:absolute;top:16px;right:24px;line-height:1}
+.step h4{font-family:var(--font-display);font-size:1.15rem;font-weight:700;margin-bottom:12px}
+.step p{color:var(--text-2);font-size:.95rem;line-height:1.6}
+
+/* ═══ SPECS ═══ */
+.specs{padding:var(--section-pad);max-width:var(--max-w);margin:0 auto}
+.specs-grid{display:grid;grid-template-columns:1fr 1fr;gap:60px;align-items:start}
+.specs-table{display:grid;gap:1px;background:var(--border);border-radius:14px;overflow:hidden}
+.spec-row{display:grid;grid-template-columns:1fr 1.4fr;background:var(--bg-card);padding:16px 24px;font-size:.925rem}
+.spec-row .spec-label{color:var(--text-2);font-weight:500}
+.spec-row .spec-value{color:var(--text);font-family:var(--font-mono);font-size:.85rem}
+.specs-image{position:relative;border-radius:14px;overflow:hidden;border:1px solid var(--border)}
+.specs-image img{width:100%;aspect-ratio:1/1;object-fit:contain;background:var(--bg-card);padding:20px}
+
+/* ═══ ROI CALCULATOR ═══ */
+.roi{padding:var(--section-pad);background:var(--bg-card);border-top:1px solid var(--border);border-bottom:1px solid var(--border)}
+.roi-inner{max-width:var(--max-w);margin:0 auto;display:grid;grid-template-columns:1fr 1fr;gap:60px;align-items:start}
+.roi-inputs{display:flex;flex-direction:column;gap:28px}
+.input-group label{display:block;font-size:.875rem;color:var(--text-2);margin-bottom:10px;font-weight:500}
+.input-group input[type="range"]{width:100%;height:6px;-webkit-appearance:none;appearance:none;background:var(--border);border-radius:3px;outline:none;cursor:pointer}
+.input-group input[type="range"]::-webkit-slider-thumb{-webkit-appearance:none;width:20px;height:20px;border-radius:50%;background:var(--green);border:3px solid var(--bg);cursor:pointer;box-shadow:0 0 12px var(--green-glow)}
+.input-group input[type="range"]::-moz-range-thumb{width:20px;height:20px;border-radius:50%;background:var(--green);border:3px solid var(--bg);cursor:pointer}
+.input-group input[type="number"]{width:100%;padding:12px 16px;background:var(--bg);border:1px solid var(--border);border-radius:10px;color:var(--text);font-family:var(--font-mono);font-size:1rem;outline:none;transition:border-color .2s}
+.input-group input[type="number"]:focus{border-color:var(--green)}
+.range-display{display:flex;justify-content:space-between;align-items:center;margin-top:8px}
+.range-value{font-family:var(--font-mono);font-size:1.1rem;color:var(--green);font-weight:600}
+.roi-results{background:var(--bg);border:1px solid var(--border);border-radius:14px;padding:36px 32px;display:flex;flex-direction:column;gap:24px}
+.roi-result{display:flex;justify-content:space-between;align-items:baseline;padding-bottom:20px;border-bottom:1px solid var(--border)}
+.roi-result:last-child{border-bottom:none;padding-bottom:0}
+.roi-result .r-label{color:var(--text-2);font-size:.95rem}
+.roi-result .r-value{font-family:var(--font-display);font-size:1.8rem;font-weight:700;color:var(--green)}
+.roi-result .r-value.highlight{font-size:2.2rem}
+
+/* ═══ PLATFORM ═══ */
+.platform{padding:var(--section-pad);max-width:var(--max-w);margin:0 auto}
+.platform-grid{display:grid;grid-template-columns:1fr 1fr;gap:60px;align-items:center}
+.platform-text p{color:var(--text-2);font-size:1.05rem;line-height:1.65;margin-bottom:24px}
+.platform-features{display:grid;grid-template-columns:1fr 1fr;gap:16px;margin-top:28px}
+.platform-feat{display:flex;gap:12px;align-items:flex-start;padding:14px 16px;background:var(--bg-card);border:1px solid var(--border);border-radius:10px;transition:border-color .3s}
+.platform-feat:hover{border-color:var(--green)}
+.platform-feat .pf-icon{flex-shrink:0;width:32px;height:32px;border-radius:8px;background:var(--green-dim);color:var(--green);display:flex;align-items:center;justify-content:center;font-size:.9rem}
+.platform-feat .pf-text{font-size:.875rem;line-height:1.5}
+.platform-feat .pf-text strong{display:block;color:var(--text);margin-bottom:2px}
+.platform-feat .pf-text span{color:var(--text-2)}
+.platform-preview{position:relative;border-radius:14px;overflow:hidden;border:1px solid var(--border);background:var(--bg-card)}
+.platform-preview-bar{display:flex;align-items:center;gap:8px;padding:10px 16px;background:rgba(22,27,34,.8);border-bottom:1px solid var(--border)}
+.platform-preview-dot{width:10px;height:10px;border-radius:50%}
+.platform-preview-url{margin-left:8px;font-family:var(--font-mono);font-size:.75rem;color:var(--text-3);background:var(--bg);padding:4px 12px;border-radius:6px;flex:1}
+.platform-preview-body{padding:24px;display:flex;flex-direction:column;gap:16px;min-height:320px}
+.platform-mock-topbar{display:flex;gap:12px;align-items:center}
+.platform-mock-search{flex:1;height:36px;background:var(--bg);border:1px solid var(--border);border-radius:8px;padding:0 12px;display:flex;align-items:center;font-family:var(--font-mono);font-size:.75rem;color:var(--text-3)}
+.platform-mock-map{flex:1;background:linear-gradient(135deg,#1a2332 0%,#162028 40%,#1a2a20 100%);border-radius:10px;min-height:200px;position:relative;overflow:hidden;border:1px solid var(--border)}
+.platform-mock-map::after{content:'';position:absolute;inset:0;background:
+  repeating-linear-gradient(0deg,transparent,transparent 39px,rgba(63,185,80,.08) 39px,rgba(63,185,80,.08) 40px),
+  repeating-linear-gradient(90deg,transparent,transparent 39px,rgba(63,185,80,.08) 39px,rgba(63,185,80,.08) 40px)}
+.mock-lines{position:absolute;z-index:1}
+.mock-line{position:absolute;background:rgba(255,255,255,.7);border-radius:1px}
+.mock-line.h{width:120px;height:3px}.mock-line.v{width:3px;height:40px}
+.mock-line.blue{background:rgba(88,166,255,.8)}
+.mock-sidebar{position:absolute;left:0;top:0;bottom:0;width:60px;background:rgba(22,27,34,.9);border-right:1px solid var(--border);display:flex;flex-direction:column;align-items:center;gap:8px;padding:12px 0;z-index:2}
+.mock-tool{width:32px;height:32px;border-radius:6px;background:var(--bg);border:1px solid var(--border);display:flex;align-items:center;justify-content:center;font-size:.65rem;color:var(--text-3)}
+.mock-tool.active{border-color:var(--green);color:var(--green);background:var(--green-dim)}
+.platform-cta{display:inline-flex;align-items:center;gap:8px;margin-top:8px;padding:12px 24px;background:transparent;border:1px solid var(--green);color:var(--green);font-weight:600;font-size:.95rem;border-radius:10px;transition:all .25s;font-family:var(--font-body)}
+.platform-cta:hover{background:var(--green);color:#0d1117;transform:translateY(-2px);box-shadow:0 8px 32px rgba(63,185,80,.25)}
+
+/* ═══ PRICING TIERS ═══ */
+.pricing-section{padding:var(--section-pad);max-width:var(--max-w);margin:0 auto;text-align:center}
+.pricing-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:24px;margin-top:48px}
+.price-card{background:var(--bg-card);border:1px solid var(--border);border-radius:14px;padding:36px 28px;text-align:left;position:relative;transition:border-color .3s,transform .3s}
+.price-card:hover{transform:translateY(-4px)}
+.price-card.featured{border-color:var(--green)}
+.price-card.featured::before{content:'Most Popular';position:absolute;top:-13px;left:50%;transform:translateX(-50%);background:var(--green);color:#0d1117;font-size:.75rem;font-weight:700;padding:4px 16px;border-radius:20px;text-transform:uppercase;letter-spacing:.05em}
+.price-card .tier-name{font-family:var(--font-display);font-size:1.15rem;font-weight:700;margin-bottom:4px}
+.price-card .tier-desc{font-size:.85rem;color:var(--text-2);margin-bottom:20px;line-height:1.5}
+.price-card .tier-price{font-family:var(--font-display);font-size:2.4rem;font-weight:800;color:var(--text);margin-bottom:4px;letter-spacing:-.02em}
+.price-card .tier-price span{font-size:.95rem;font-weight:400;color:var(--text-2)}
+.price-card .tier-period{font-size:.8rem;color:var(--text-3);margin-bottom:24px}
+.price-card ul{list-style:none;display:flex;flex-direction:column;gap:12px;margin-bottom:28px}
+.price-card li{display:flex;gap:10px;font-size:.875rem;color:var(--text-2);line-height:1.5}
+.price-card li::before{content:'✓';color:var(--green);font-weight:700;flex-shrink:0}
+.price-card .tier-btn{display:block;width:100%;padding:12px;text-align:center;border-radius:10px;font-weight:600;font-size:.9rem;transition:all .25s;font-family:var(--font-body);border:none;cursor:pointer}
+.price-card .tier-btn.primary{background:var(--green);color:#0d1117}
+.price-card .tier-btn.primary:hover{background:#4cd964;box-shadow:0 8px 24px rgba(63,185,80,.3)}
+.price-card .tier-btn.secondary{background:transparent;border:1px solid var(--border);color:var(--text)}
+.price-card .tier-btn.secondary:hover{border-color:var(--green);color:var(--green)}
+
+/* ═══ OPEN SOURCE ═══ */
+.open-source{padding:var(--section-pad);max-width:var(--max-w);margin:0 auto;text-align:center}
+.terminal{background:#010409;border:1px solid var(--border);border-radius:14px;overflow:hidden;text-align:left;max-width:640px;margin:36px auto 0}
+.terminal-bar{display:flex;gap:8px;padding:14px 18px;background:rgba(22,27,34,.8);border-bottom:1px solid var(--border)}
+.terminal-dot{width:12px;height:12px;border-radius:50%}
+.terminal-dot.r{background:#f85149}.terminal-dot.y{background:#d29922}.terminal-dot.g{background:var(--green)}
+.terminal-body{padding:24px;font-family:var(--font-mono);font-size:.85rem;line-height:1.8;color:var(--text-2)}
+.terminal-body .prompt{color:var(--green)}
+.terminal-body .cmd{color:var(--text)}
+.terminal-body .output{color:var(--text-3)}
+.terminal-body .cursor{display:inline-block;width:8px;height:17px;background:var(--green);animation:blink 1s step-end infinite;vertical-align:text-bottom;margin-left:2px}
+.gh-link{display:inline-flex;align-items:center;gap:10px;margin-top:28px;padding:12px 24px;border:1px solid var(--border);border-radius:10px;color:var(--text);font-weight:500;font-size:.95rem;transition:all .25s}
+.gh-link:hover{border-color:var(--green);color:var(--green);transform:translateY(-2px)}
+
+/* ═══ COMPETITOR TABLE ═══ */
+.comparison{padding:var(--section-pad);max-width:var(--max-w);margin:0 auto}
+.comp-table-wrap{overflow-x:auto;border-radius:14px;border:1px solid var(--border)}
+table{width:100%;border-collapse:collapse;font-size:.9rem}
+thead th{background:var(--bg-card);padding:16px 20px;text-align:left;font-family:var(--font-display);font-weight:600;font-size:.85rem;text-transform:uppercase;letter-spacing:.06em;color:var(--text-2);border-bottom:1px solid var(--border)}
+thead th:first-child{min-width:140px}
+tbody td{padding:14px 20px;border-bottom:1px solid var(--border);color:var(--text-2)}
+tbody tr:last-child td{border-bottom:none}
+tbody td:first-child{color:var(--text);font-weight:600}
+tbody tr.highlight-row{background:var(--green-dim)}
+tbody tr.highlight-row td{color:var(--text)}
+tbody tr.highlight-row td:first-child{color:var(--green);font-weight:700}
+
+/* ═══ WAITLIST ═══ */
+.waitlist{padding:var(--section-pad);text-align:center;position:relative}
+.waitlist::before{content:'';position:absolute;top:0;left:50%;transform:translateX(-50%);width:600px;height:600px;background:radial-gradient(circle,var(--green-dim),transparent 70%);pointer-events:none;z-index:0}
+.waitlist-inner{position:relative;z-index:1;max-width:560px;margin:0 auto}
+.waitlist h2{font-family:var(--font-display);font-size:clamp(1.8rem,3.5vw,2.6rem);font-weight:700;letter-spacing:-.02em;margin-bottom:16px}
+.waitlist p{color:var(--text-2);font-size:1.05rem;margin-bottom:36px;line-height:1.6}
+.waitlist-form{display:flex;gap:12px;max-width:460px;margin:0 auto}
+.waitlist-form input[type="email"]{flex:1;padding:14px 20px;background:var(--bg-card);border:1px solid var(--border);border-radius:10px;color:var(--text);font-family:var(--font-body);font-size:1rem;outline:none;transition:border-color .2s}
+.waitlist-form input[type="email"]:focus{border-color:var(--green)}
+.waitlist-form input[type="email"]::placeholder{color:var(--text-3)}
+.waitlist-form button{padding:14px 28px;background:var(--green);color:#0d1117;font-weight:600;font-size:.95rem;border:none;border-radius:10px;cursor:pointer;font-family:var(--font-body);white-space:nowrap;transition:all .25s}
+.waitlist-form button:hover{background:#4cd964;box-shadow:0 8px 32px rgba(63,185,80,.3)}
+.waitlist-confirm{display:none;margin-top:20px;padding:16px 24px;background:var(--green-dim);border:1px solid rgba(63,185,80,.25);border-radius:10px;color:var(--green);font-weight:500;font-size:.95rem}
+
+/* ═══ FOOTER ═══ */
+footer{padding:40px clamp(20px,5vw,40px);border-top:1px solid var(--border);text-align:center}
+footer .footer-inner{max-width:var(--max-w);margin:0 auto;display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:16px}
+footer p{color:var(--text-3);font-size:.85rem}
+footer .footer-links{display:flex;gap:24px}
+footer .footer-links a{color:var(--text-3);font-size:.85rem;transition:color .2s}
+footer .footer-links a:hover{color:var(--text)}
+
+/* ═══ RESPONSIVE ═══ */
+@media(max-width:1024px){
+  .hero{grid-template-columns:1fr;text-align:center;gap:48px;min-height:auto;padding-top:120px}
+  .hero p{margin:0 auto 36px}
+  .hero-image{max-width:480px;margin:0 auto}
+  .specs-grid{grid-template-columns:1fr}
+  .roi-inner{grid-template-columns:1fr}
+  .platform-grid{grid-template-columns:1fr}
+  .platform-features{grid-template-columns:1fr 1fr}
+  .pricing-grid{grid-template-columns:1fr}
+}
+@media(max-width:768px){
+  .nav-links{display:none;position:absolute;top:64px;left:0;right:0;flex-direction:column;background:rgba(13,17,23,.95);backdrop-filter:blur(20px);padding:24px;gap:20px;border-bottom:1px solid var(--border)}
+  .nav-links.open{display:flex}
+  .nav-mobile-toggle{display:block}
+  .prob-sol{grid-template-columns:1fr;gap:48px}
+  .stats-inner{grid-template-columns:repeat(2,1fr);gap:24px}
+  .steps{grid-template-columns:1fr}
+  .pricing-grid{grid-template-columns:1fr}
+  .platform-features{grid-template-columns:1fr}
+  .waitlist-form{flex-direction:column}
+  footer .footer-inner{flex-direction:column;text-align:center}
+}
+</style>
+</head>
+<body>
+
+<!-- ═══ NAV ═══ -->
+<nav id="nav">
+  <a href="#" class="wordmark">Stry<span>pe</span></a>
+  <ul class="nav-links" id="navLinks">
+    <li><a href="#features">Features</a></li>
+    <li><a href="#platform">Platform</a></li>
+    <li><a href="#specs">Specs</a></li>
+    <li><a href="#pricing">Pricing</a></li>
+    <li><a href="#waitlist">Waitlist</a></li>
+  </ul>
+  <button class="nav-mobile-toggle" id="navToggle" aria-label="Toggle menu">
+    <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 12h18M3 6h18M3 18h18"/></svg>
+  </button>
+</nav>
+
+<!-- ═══ HERO ═══ -->
+<section class="hero" id="top">
+  <div class="hero-text">
+    <h1>Your Parking Lot, <span class="accent">Striped While You Sleep.</span></h1>
+    <p>Strype is an autonomous robot + cloud platform that paints parking lot lines with 8mm GPS precision — for a fraction of the cost of a crew.</p>
+    <a href="#waitlist" class="cta-btn">
+      Join the Waitlist
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14M12 5l7 7-7 7"/></svg>
+    </a>
+  </div>
+  <div class="hero-image">
+    <img src="assets/robot_3d.png" alt="Strype autonomous striping robot — 3D render" width="560" height="560">
+  </div>
+</section>
+
+<div class="stripe-line"></div>
+
+<!-- ═══ PROBLEM / SOLUTION ═══ -->
+<section class="prob-sol" id="features">
+  <div class="prob-sol-col problem reveal">
+    <h3>The Problem</h3>
+    <ul>
+      <li><span class="icon">&#x2717;</span><span>Crew scheduling delays — weeks of waiting, weather cancellations, no-shows</span></li>
+      <li><span class="icon">&#x2717;</span><span>$800 – $2,000 per job for a basic re-stripe — and prices climbing</span></li>
+      <li><span class="icon">&#x2717;</span><span>Inconsistent line quality — wavy edges, uneven spacing, sloppy corners</span></li>
+      <li><span class="icon">&#x2717;</span><span>Lot must close during striping — lost revenue from blocked parking</span></li>
+    </ul>
+  </div>
+  <div class="prob-sol-col solution reveal reveal-d2">
+    <h3>The Solution</h3>
+    <ul>
+      <li><span class="icon">&#x2713;</span><span>Deploy anytime — overnight, weekends, off-hours. No crew to coordinate</span></li>
+      <li><span class="icon">&#x2713;</span><span>$2,495 assembled, ready to run. Pays for itself in 2 jobs</span></li>
+      <li><span class="icon">&#x2713;</span><span>8mm RTK GPS precision — every line straight, every space identical</span></li>
+      <li><span class="icon">&#x2713;</span><span>Fully autonomous. Press start, come back to a finished lot</span></li>
+    </ul>
+  </div>
+</section>
+
+<!-- ═══ STATS BAR ═══ -->
+<section class="stats-bar">
+  <div class="stats-inner">
+    <div class="stat-item reveal">
+      <div class="num">$2,495</div>
+      <div class="label">Robot, assembled &amp; tested</div>
+    </div>
+    <div class="stat-item reveal reveal-d1">
+      <div class="num">8mm</div>
+      <div class="label">GPS accuracy (RTK)</div>
+    </div>
+    <div class="stat-item reveal reveal-d2">
+      <div class="num">2 jobs</div>
+      <div class="label">To break even</div>
+    </div>
+    <div class="stat-item reveal reveal-d3">
+      <div class="num">$21k+</div>
+      <div class="label">Annual savings (20 jobs)</div>
+    </div>
+  </div>
+</section>
+
+<!-- ═══ HOW IT WORKS ═══ -->
+<section class="how-it-works">
+  <div class="section-label reveal">How it works</div>
+  <h2 class="section-title reveal reveal-d1">Three steps to perfect lines.</h2>
+  <div class="steps">
+    <div class="step reveal">
+      <div class="step-num">01</div>
+      <h4>Design your lot in the cloud</h4>
+      <p>Open Strype Cloud, enter an address, and draw parking lines on the satellite map — or import a DXF/SVG. The platform generates optimized waypoints automatically.</p>
+    </div>
+    <div class="step reveal reveal-d1">
+      <div class="step-num">02</div>
+      <h4>Deploy &amp; press start</h4>
+      <p>Snap in a paint cartridge, place Strype at the lot origin, and upload the mission. The robot handles the rest — fully autonomous.</p>
+    </div>
+    <div class="step reveal reveal-d2">
+      <div class="step-num">03</div>
+      <h4>Come back to perfect lines</h4>
+      <p>Every line GPS-straight, every space identical. Your lot layout is saved in the cloud — re-stripe with one click next season.</p>
+    </div>
+  </div>
+</section>
+
+<div class="stripe-line"></div>
+
+<!-- ═══ TECHNICAL SPECS ═══ -->
+<section class="specs" id="specs">
+  <div class="section-label reveal">Technical specifications</div>
+  <h2 class="section-title reveal reveal-d1">Engineered for precision.</h2>
+  <div class="specs-grid">
+    <div class="specs-table reveal">
+      <div class="spec-row"><span class="spec-label">Controller</span><span class="spec-value">Pixhawk 6C Mini · ArduRover</span></div>
+      <div class="spec-row"><span class="spec-label">GPS</span><span class="spec-value">Unicore UM980 · RTK L1/L2/L5</span></div>
+      <div class="spec-row"><span class="spec-label">Accuracy</span><span class="spec-value">8mm (RTK fixed)</span></div>
+      <div class="spec-row"><span class="spec-label">Drive</span><span class="spec-value">Hoverboard hub motors · differential</span></div>
+      <div class="spec-row"><span class="spec-label">Paint system</span><span class="spec-value">Shurflo pump + solenoid + TeeJet nozzle</span></div>
+      <div class="spec-row"><span class="spec-label">Battery</span><span class="spec-value">36V 10Ah e-bike pack</span></div>
+      <div class="spec-row"><span class="spec-label">Runtime</span><span class="spec-value">45 – 70 min per charge</span></div>
+      <div class="spec-row"><span class="spec-label">Speed</span><span class="spec-value">0.5 – 1.5 m/s (paint-optimal)</span></div>
+      <div class="spec-row"><span class="spec-label">Safety</span><span class="spec-value">E-stop · geofence · DC contactor</span></div>
+      <div class="spec-row"><span class="spec-label">Weight</span><span class="spec-value">~25 kg (with paint)</span></div>
+    </div>
+    <div class="specs-image reveal reveal-d2">
+      <img src="assets/robot_top.png" alt="Strype top-down engineering view" loading="lazy">
+    </div>
+  </div>
+</section>
+
+<!-- ═══ PLATFORM ═══ -->
+<section class="platform" id="platform">
+  <div class="section-label reveal">Cloud Platform</div>
+  <h2 class="section-title reveal reveal-d1">Design lots. Manage fleets. Own your data.</h2>
+  <div class="platform-grid">
+    <div class="platform-text reveal reveal-d2">
+      <p>Strype Cloud is where the robot becomes a business. Draw parking layouts on a satellite map, generate optimized waypoints, schedule re-stripes, and manage your entire fleet — all from a browser.</p>
+      <p>Every lot you stripe becomes a reusable template. Every job generates data that makes path planning smarter. The more you use it, the better it gets.</p>
+      <div class="platform-features">
+        <div class="platform-feat">
+          <div class="pf-icon">&#x1F5FA;</div>
+          <div class="pf-text"><strong>Satellite lot designer</strong><span>Draw lines on real imagery</span></div>
+        </div>
+        <div class="platform-feat">
+          <div class="pf-icon">&#x1F504;</div>
+          <div class="pf-text"><strong>One-click re-stripe</strong><span>Saved layouts, instant deploy</span></div>
+        </div>
+        <div class="platform-feat">
+          <div class="pf-icon">&#x1F4CA;</div>
+          <div class="pf-text"><strong>Fleet management</strong><span>Multi-robot, multi-site ops</span></div>
+        </div>
+        <div class="platform-feat">
+          <div class="pf-icon">&#x1F4C5;</div>
+          <div class="pf-text"><strong>Job scheduling</strong><span>Calendar, history, invoicing</span></div>
+        </div>
+      </div>
+      <a href="platform.html" class="platform-cta">
+        Try Strype Cloud
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14M12 5l7 7-7 7"/></svg>
+      </a>
+    </div>
+    <div class="platform-preview reveal reveal-d3">
+      <div class="platform-preview-bar">
+        <span class="platform-preview-dot" style="background:#f85149"></span>
+        <span class="platform-preview-dot" style="background:#d29922"></span>
+        <span class="platform-preview-dot" style="background:var(--green)"></span>
+        <span class="platform-preview-url">cloud.strype.dev/lots/westfield-plaza</span>
+      </div>
+      <div class="platform-preview-body">
+        <div class="platform-mock-topbar">
+          <div style="font-family:var(--font-display);font-weight:700;font-size:.85rem;color:var(--green)">Stry<span style="color:var(--text)">pe</span></div>
+          <div class="platform-mock-search">&#x1F50D; 742 Evergreen Terrace, Springfield</div>
+        </div>
+        <div class="platform-mock-map">
+          <div class="mock-sidebar">
+            <div class="mock-tool active">&#x2571;</div>
+            <div class="mock-tool">&#x25AD;</div>
+            <div class="mock-tool">&#x2B21;</div>
+            <div class="mock-tool">&#x25C9;</div>
+          </div>
+          <div class="mock-lines">
+            <div class="mock-line h" style="top:40px;left:80px"></div>
+            <div class="mock-line h" style="top:40px;left:220px"></div>
+            <div class="mock-line h" style="top:80px;left:80px"></div>
+            <div class="mock-line h" style="top:80px;left:220px"></div>
+            <div class="mock-line v" style="top:40px;left:80px"></div>
+            <div class="mock-line v" style="top:40px;left:110px"></div>
+            <div class="mock-line v" style="top:40px;left:140px"></div>
+            <div class="mock-line v" style="top:40px;left:170px"></div>
+            <div class="mock-line v" style="top:40px;left:200px"></div>
+            <div class="mock-line v blue" style="top:40px;left:230px"></div>
+            <div class="mock-line v blue" style="top:40px;left:260px"></div>
+            <div class="mock-line v" style="top:40px;left:290px"></div>
+            <div class="mock-line v" style="top:40px;left:320px"></div>
+            <div class="mock-line h" style="top:120px;left:80px"></div>
+            <div class="mock-line h" style="top:120px;left:220px"></div>
+            <div class="mock-line v" style="top:120px;left:80px"></div>
+            <div class="mock-line v" style="top:120px;left:110px"></div>
+            <div class="mock-line v" style="top:120px;left:140px"></div>
+            <div class="mock-line v" style="top:120px;left:170px"></div>
+            <div class="mock-line v" style="top:120px;left:200px"></div>
+            <div class="mock-line v" style="top:120px;left:230px"></div>
+            <div class="mock-line v" style="top:120px;left:260px"></div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<div class="stripe-line"></div>
+
+<!-- ═══ PRICING TIERS ═══ -->
+<section class="pricing-section" id="pricing">
+  <div class="section-label reveal">Pricing</div>
+  <h2 class="section-title reveal reveal-d1">Choose how you Strype.</h2>
+  <div class="pricing-grid">
+    <div class="price-card reveal">
+      <div class="tier-name">DIY Builder</div>
+      <div class="tier-desc">Open-source hardware. Build it yourself from our BOM and docs.</div>
+      <div class="tier-price">$780 <span>parts</span></div>
+      <div class="tier-period">One-time · you source &amp; assemble</div>
+      <ul>
+        <li>Full open-source BOM &amp; build guide</li>
+        <li>ArduRover firmware configs</li>
+        <li>Pathgen CLI tool</li>
+        <li>Community support (GitHub)</li>
+        <li>Strype Cloud Free (1 lot)</li>
+      </ul>
+      <a href="https://github.com/psxio/striper-robot" class="tier-btn secondary">View on GitHub</a>
+    </div>
+    <div class="price-card featured reveal reveal-d1">
+      <div class="tier-name">Strype Pro</div>
+      <div class="tier-desc">Assembled robot + cloud platform. Ready to run out of the box.</div>
+      <div class="tier-price">$2,495</div>
+      <div class="tier-period">One-time robot + $99/mo platform</div>
+      <ul>
+        <li>Assembled, tested &amp; calibrated robot</li>
+        <li>Snap-in paint cartridge system</li>
+        <li>Strype Cloud Pro (unlimited lots)</li>
+        <li>Fleet management &amp; job scheduling</li>
+        <li>Priority support &amp; firmware updates</li>
+      </ul>
+      <a href="#waitlist" class="tier-btn primary">Join the Waitlist</a>
+    </div>
+    <div class="price-card reveal reveal-d2">
+      <div class="tier-name">Strype RaaS</div>
+      <div class="tier-desc">Robot-as-a-Service. We own the hardware — you just schedule jobs.</div>
+      <div class="tier-price">$299 <span>/lot/yr</span></div>
+      <div class="tier-period">No hardware purchase · we handle everything</div>
+      <ul>
+        <li>No upfront hardware cost</li>
+        <li>Robot deployment &amp; maintenance included</li>
+        <li>Paint &amp; consumables included</li>
+        <li>Strype Cloud Enterprise access</li>
+        <li>Dedicated account manager</li>
+      </ul>
+      <a href="#waitlist" class="tier-btn secondary">Contact Sales</a>
+    </div>
+  </div>
+</section>
+
+<div class="stripe-line"></div>
+
+<!-- ═══ ROI CALCULATOR ═══ -->
+<section class="roi" id="roi">
+  <div class="roi-inner">
+    <div class="reveal">
+      <div class="section-label">ROI Calculator</div>
+      <h2 class="section-title" style="text-align:left;margin-bottom:36px">See your savings.</h2>
+      <div class="roi-inputs">
+        <div class="input-group">
+          <label for="spaces">Parking spaces</label>
+          <input type="range" id="spaces" min="10" max="500" value="100" step="10">
+          <div class="range-display">
+            <span class="range-value" id="spacesVal">100 spaces</span>
+          </div>
+        </div>
+        <div class="input-group">
+          <label for="crewCost">Manual crew cost per job ($)</label>
+          <input type="number" id="crewCost" value="1200" min="200" max="10000" step="50">
+        </div>
+        <div class="input-group">
+          <label for="jobsYear">Jobs per year</label>
+          <input type="number" id="jobsYear" value="20" min="1" max="200" step="1">
+        </div>
+      </div>
+    </div>
+    <div class="roi-results reveal reveal-d2">
+      <h3 style="font-family:var(--font-display);font-size:1.1rem;font-weight:700;color:var(--text-2);margin-bottom:4px">Your results</h3>
+      <div class="roi-result">
+        <span class="r-label">Annual crew cost</span>
+        <span class="r-value" id="annualCrew">$24,000</span>
+      </div>
+      <div class="roi-result">
+        <span class="r-label">Annual Strype cost</span>
+        <span class="r-value" id="annualStrype" style="color:var(--text)">$780</span>
+      </div>
+      <div class="roi-result">
+        <span class="r-label">Annual savings</span>
+        <span class="r-value highlight" id="annualSavings">$23,220</span>
+      </div>
+      <div class="roi-result">
+        <span class="r-label">Payback period</span>
+        <span class="r-value" id="paybackPeriod">0.4 jobs</span>
+      </div>
+      <div class="roi-result">
+        <span class="r-label">3-year ROI</span>
+        <span class="r-value highlight" id="threeYearROI">$68,880</span>
+      </div>
+    </div>
+  </div>
+</section>
+
+<div class="stripe-line"></div>
+
+<!-- ═══ OPEN SOURCE ═══ -->
+<section class="open-source">
+  <div class="section-label reveal">Open Source</div>
+  <h2 class="section-title reveal reveal-d1">Built in the open.</h2>
+  <p class="reveal reveal-d2" style="color:var(--text-2);max-width:520px;margin:0 auto 0;font-size:1.05rem;line-height:1.6">Strype's path generation engine, firmware configs, and hardware docs are open source. Inspect every line, modify to your needs, contribute back.</p>
+  <div class="terminal reveal reveal-d3">
+    <div class="terminal-bar">
+      <span class="terminal-dot r"></span><span class="terminal-dot y"></span><span class="terminal-dot g"></span>
+    </div>
+    <div class="terminal-body">
+      <div><span class="prompt">$</span> <span class="cmd">pip install striper-pathgen</span></div>
+      <div>&nbsp;</div>
+      <div><span class="prompt">$</span> <span class="cmd">strype generate --template 50-space-lot</span></div>
+      <div class="output">✓ Generated 50-space parking layout</div>
+      <div class="output">✓ Optimized path: 847m total distance</div>
+      <div>&nbsp;</div>
+      <div><span class="prompt">$</span> <span class="cmd">strype export --format mission-planner</span></div>
+      <div class="output">✓ Exported 312 waypoints → lot.waypoints</div>
+      <div class="output">✓ Ready for upload to Pixhawk</div>
+      <div>&nbsp;</div>
+      <div><span class="prompt">$</span> <span class="cursor"></span></div>
+    </div>
+  </div>
+  <a href="https://github.com/psxio/striper-robot" target="_blank" rel="noopener" class="gh-link reveal reveal-d4">
+    <svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor"><path d="M12 0C5.37 0 0 5.37 0 12c0 5.31 3.435 9.795 8.205 11.385.6.105.825-.255.825-.57 0-.285-.015-1.23-.015-2.235-3.015.555-3.795-.735-4.035-1.41-.135-.345-.72-1.41-1.23-1.695-.42-.225-1.02-.78-.015-.795.945-.015 1.62.87 1.845 1.23 1.08 1.815 2.805 1.305 3.495.99.105-.78.42-1.305.765-1.605-2.67-.3-5.46-1.335-5.46-5.925 0-1.305.465-2.385 1.23-3.225-.12-.3-.54-1.53.12-3.18 0 0 1.005-.315 3.3 1.23.96-.27 1.98-.405 3-.405s2.04.135 3 .405c2.295-1.56 3.3-1.23 3.3-1.23.66 1.65.24 2.88.12 3.18.765.84 1.23 1.905 1.23 3.225 0 4.605-2.805 5.625-5.475 5.925.435.375.81 1.095.81 2.22 0 1.605-.015 2.895-.015 3.3 0 .315.225.69.825.57A12.02 12.02 0 0024 12c0-6.63-5.37-12-12-12z"/></svg>
+    View on GitHub
+  </a>
+</section>
+
+<!-- ═══ COMPETITOR COMPARISON ═══ -->
+<section class="comparison">
+  <div class="section-label reveal">Comparison</div>
+  <h2 class="section-title reveal reveal-d1">How Strype stacks up.</h2>
+  <div class="comp-table-wrap reveal reveal-d2">
+    <table>
+      <thead>
+        <tr>
+          <th></th>
+          <th>Cost</th>
+          <th>Accuracy</th>
+          <th>Cloud Platform</th>
+          <th>Autonomy</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr class="highlight-row">
+          <td>Strype Pro</td>
+          <td>$2,495 + $99/mo</td>
+          <td>8mm RTK</td>
+          <td>Lot designer, fleet mgmt, scheduling</td>
+          <td>Fully autonomous</td>
+        </tr>
+        <tr class="highlight-row" style="background:rgba(63,185,80,.05)">
+          <td>Strype RaaS</td>
+          <td>$299/lot/year</td>
+          <td>8mm RTK</td>
+          <td>Everything included</td>
+          <td>Fully managed</td>
+        </tr>
+        <tr>
+          <td>Manual crew</td>
+          <td>$800–2,000/job</td>
+          <td>~25mm</td>
+          <td>None</td>
+          <td>None</td>
+        </tr>
+        <tr>
+          <td>TurfTank</td>
+          <td>$3,000+/mo lease</td>
+          <td>10mm RTK</td>
+          <td>Proprietary app</td>
+          <td>Autonomous (sports only)</td>
+        </tr>
+        <tr>
+          <td>10Lines</td>
+          <td>Not yet priced</td>
+          <td>~10mm RTK</td>
+          <td>Unknown</td>
+          <td>Pre-commercial</td>
+        </tr>
+      </tbody>
+    </table>
+  </div>
+</section>
+
+<div class="stripe-line"></div>
+
+<!-- ═══ WAITLIST ═══ -->
+<section class="waitlist" id="waitlist">
+  <div class="waitlist-inner">
+    <div class="section-label reveal">Early Access</div>
+    <h2 class="reveal reveal-d1">Be first in line.</h2>
+    <p class="reveal reveal-d2">Join the waitlist to get notified when Strype Pro ships. Early subscribers get priority access, launch pricing, and a free year of Strype Cloud Pro.</p>
+    <form class="waitlist-form reveal reveal-d3" id="waitlistForm">
+      <input type="email" id="waitlistEmail" placeholder="you@company.com" required aria-label="Email address">
+      <button type="submit">Join the Waitlist</button>
+    </form>
+    <div class="waitlist-confirm" id="waitlistConfirm">
+      &#x2713; You're on the list! We'll be in touch.
+    </div>
+  </div>
+</section>
+
+<!-- ═══ FOOTER ═══ -->
+<footer>
+  <div class="footer-inner">
+    <p>&copy; 2026 Strype. All rights reserved.</p>
+    <div class="footer-links">
+      <a href="platform.html">Strype Cloud</a>
+      <a href="https://github.com/psxio/striper-robot" target="_blank" rel="noopener">GitHub</a>
+      <a href="mailto:hello@strype.dev">Contact</a>
+    </div>
+  </div>
+</footer>
+
+<script>
+(function(){
+  // ─── NAV SCROLL ───
+  const nav = document.getElementById('nav');
+  let ticking = false;
+  window.addEventListener('scroll', () => {
+    if (!ticking) {
+      requestAnimationFrame(() => {
+        nav.classList.toggle('scrolled', window.scrollY > 20);
+        ticking = false;
+      });
+      ticking = true;
+    }
+  });
+
+  // ─── MOBILE NAV ───
+  const navToggle = document.getElementById('navToggle');
+  const navLinks = document.getElementById('navLinks');
+  navToggle.addEventListener('click', () => navLinks.classList.toggle('open'));
+  navLinks.querySelectorAll('a').forEach(a => a.addEventListener('click', () => navLinks.classList.remove('open')));
+
+  // ─── INTERSECTION OBSERVER ───
+  const observer = new IntersectionObserver((entries) => {
+    entries.forEach(e => { if (e.isIntersecting) { e.target.classList.add('visible'); observer.unobserve(e.target); } });
+  }, { threshold: 0.15, rootMargin: '0px 0px -40px 0px' });
+  document.querySelectorAll('.reveal').forEach(el => observer.observe(el));
+
+  // ─── ROI CALCULATOR ───
+  const spacesSlider = document.getElementById('spaces');
+  const spacesVal = document.getElementById('spacesVal');
+  const crewCostInput = document.getElementById('crewCost');
+  const jobsYearInput = document.getElementById('jobsYear');
+  const annualCrewEl = document.getElementById('annualCrew');
+  const annualStrypeEl = document.getElementById('annualStrype');
+  const annualSavingsEl = document.getElementById('annualSavings');
+  const paybackEl = document.getElementById('paybackPeriod');
+  const roiEl = document.getElementById('threeYearROI');
+  const STRYPE_COST = 2495;
+  const CONSUMABLES_PER_JOB = 45; // snap-in paint cartridge
+
+  function updateROI() {
+    const spaces = parseInt(spacesSlider.value);
+    const crewCost = parseFloat(crewCostInput.value) || 0;
+    const jobsYear = parseInt(jobsYearInput.value) || 0;
+    spacesVal.textContent = spaces + ' spaces';
+
+    const annualCrew = crewCost * jobsYear;
+    const annualConsumables = CONSUMABLES_PER_JOB * jobsYear;
+    const annualStrypeCost = STRYPE_COST + annualConsumables; // first year includes robot
+    const annualSavings = annualCrew - annualConsumables; // ongoing savings (robot already paid off)
+    const paybackJobs = crewCost > 0 ? (STRYPE_COST / crewCost) : 0;
+    const threeYear = (annualCrew * 3) - STRYPE_COST - (annualConsumables * 3);
+
+    annualCrewEl.textContent = '$' + annualCrew.toLocaleString();
+    annualStrypeEl.textContent = '$' + (STRYPE_COST + annualConsumables).toLocaleString();
+    annualSavingsEl.textContent = '$' + Math.max(0, annualCrew - STRYPE_COST - annualConsumables).toLocaleString();
+    paybackEl.textContent = paybackJobs.toFixed(1) + ' jobs';
+    roiEl.textContent = '$' + Math.max(0, threeYear).toLocaleString();
+  }
+
+  spacesSlider.addEventListener('input', updateROI);
+  crewCostInput.addEventListener('input', updateROI);
+  jobsYearInput.addEventListener('input', updateROI);
+  updateROI();
+
+  // ─── WAITLIST FORM ───
+  const form = document.getElementById('waitlistForm');
+  const confirm = document.getElementById('waitlistConfirm');
+  form.addEventListener('submit', function(e) {
+    e.preventDefault();
+    const email = document.getElementById('waitlistEmail').value;
+    // Store locally as fallback (no backend)
+    const waitlist = JSON.parse(localStorage.getItem('strype_waitlist') || '[]');
+    waitlist.push({ email: email, ts: new Date().toISOString() });
+    localStorage.setItem('strype_waitlist', JSON.stringify(waitlist));
+    form.style.display = 'none';
+    confirm.style.display = 'block';
+  });
+})();
+</script>
+</body>
+</html>

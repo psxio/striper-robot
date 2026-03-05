@@ -310,6 +310,11 @@ All competitors use the same approach we planned: **low-pressure diaphragm pump 
 
 ## Business Model Notes
 
+> **Full business strategy:** See `docs/business-plan.md` for the comprehensive
+> internal business plan covering moat analysis, 5 revenue streams, pricing
+> strategy, unit economics, go-to-market phases, competitive landscape, growth
+> flywheel, and 3-year financial projections.
+
 - **Parking lot striping market is wide open** — almost zero commercial autonomous solutions
 - **Sports field market is crowded** — 6+ well-funded competitors (Turf Tank, TinyMobileRobots, SWOZI, FJD, Fleet, CivDot)
 - **RaaS (Robot-as-a-Service)** is the dominant model: $2K-5K/month recurring vs $50K+ robot sale

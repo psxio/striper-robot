@@ -1,0 +1,1646 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Strype Platform — Lot Designer</title>
+<meta name="description" content="Design parking lot layouts, draw striping lines, and export mission waypoints for the Strype autonomous striping robot.">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=DM+Sans:ital,opsz,wght@0,9..40,300;0,9..40,400;0,9..40,500;0,9..40,600;0,9..40,700;1,9..40,400&family=Syne:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css">
+<link rel="stylesheet" href="https://unpkg.com/leaflet-draw@1.0.4/dist/leaflet.draw.css">
+<style>
+/*═══════════════════════════════════════════════════════════════════════
+  STRYPE PLATFORM — CSS
+  Dark theme lot designer with Leaflet map
+═══════════════════════════════════════════════════════════════════════*/
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+:root{
+  --bg:#0d1117;--bg-card:#161b22;--bg-hover:#1c2129;--border:#30363d;--border-focus:#58a6ff;
+  --text:#e6edf3;--text-2:#8b949e;--text-3:#484f58;
+  --green:#3fb950;--green-dim:rgba(63,185,80,.12);--green-glow:rgba(63,185,80,.35);
+  --blue:#58a6ff;--red:#f85149;--yellow:#d29922;--orange:#f0883e;
+  --font-display:'Syne',sans-serif;
+  --font-body:'DM Sans',sans-serif;
+  --font-mono:'JetBrains Mono',monospace;
+  --sidebar-w:280px;--topbar-h:52px;
+  --radius:8px;--radius-lg:12px;
+}
+html,body{height:100%;overflow:hidden;background:var(--bg);color:var(--text);font-family:var(--font-body);-webkit-font-smoothing:antialiased;font-size:14px}
+a{color:var(--blue);text-decoration:none;transition:color .2s}
+a:hover{color:var(--green)}
+button{font-family:var(--font-body);cursor:pointer;border:none;background:none;color:var(--text)}
+input,select,textarea{font-family:var(--font-body);background:var(--bg);border:1px solid var(--border);color:var(--text);border-radius:var(--radius);padding:8px 12px;font-size:.8125rem;outline:none;transition:border-color .2s}
+input:focus,select:focus,textarea:focus{border-color:var(--border-focus)}
+select{-webkit-appearance:none;appearance:none;background-image:url("data:image/svg+xml,%3Csvg width='10' height='6' viewBox='0 0 10 6' fill='none' xmlns='http://www.w3.org/2000/svg'%3E%3Cpath d='M1 1L5 5L9 1' stroke='%238b949e' stroke-width='1.5' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E");background-repeat:no-repeat;background-position:right 10px center;padding-right:28px}
+::-webkit-scrollbar{width:6px}
+::-webkit-scrollbar-track{background:transparent}
+::-webkit-scrollbar-thumb{background:var(--border);border-radius:3px}
+::-webkit-scrollbar-thumb:hover{background:var(--text-3)}
+
+/*═══ APP LAYOUT ═══*/
+.app{display:flex;flex-direction:column;height:100vh;width:100vw;overflow:hidden}
+
+/*═══ TOP BAR ═══*/
+.topbar{height:var(--topbar-h);background:var(--bg-card);border-bottom:1px solid var(--border);display:flex;align-items:center;padding:0 16px;gap:12px;flex-shrink:0;z-index:1000}
+.wordmark{font-family:var(--font-display);font-weight:800;font-size:1.1rem;letter-spacing:-.02em;color:var(--text);white-space:nowrap;text-decoration:none}
+.wordmark span{color:var(--green)}
+.topbar-divider{width:1px;height:28px;background:var(--border);flex-shrink:0}
+.search-wrapper{position:relative;flex:1;max-width:420px}
+.search-wrapper svg{position:absolute;left:10px;top:50%;transform:translateY(-50%);width:15px;height:15px;color:var(--text-3);pointer-events:none}
+.search-input{width:100%;padding:7px 12px 7px 32px;font-size:.8125rem;background:var(--bg);border:1px solid var(--border);border-radius:var(--radius);color:var(--text)}
+.search-input::placeholder{color:var(--text-3)}
+.search-results{position:absolute;top:calc(100% + 4px);left:0;right:0;background:var(--bg-card);border:1px solid var(--border);border-radius:var(--radius);max-height:240px;overflow-y:auto;z-index:2000;display:none}
+.search-results.visible{display:block}
+.search-result-item{padding:10px 14px;cursor:pointer;font-size:.8125rem;color:var(--text-2);border-bottom:1px solid var(--border);transition:background .15s}
+.search-result-item:last-child{border-bottom:none}
+.search-result-item:hover{background:var(--bg-hover);color:var(--text)}
+.search-result-item .result-name{color:var(--text);font-weight:500}
+.topbar-spacer{flex:1}
+.topbar-btn{display:inline-flex;align-items:center;gap:6px;padding:6px 14px;font-size:.8125rem;font-weight:500;border-radius:var(--radius);transition:all .15s;color:var(--text-2);border:1px solid var(--border)}
+.topbar-btn:hover{background:var(--bg-hover);color:var(--text);border-color:var(--text-3)}
+.topbar-btn svg{width:14px;height:14px}
+.topbar-btn.active{background:var(--green-dim);color:var(--green);border-color:var(--green)}
+.map-style-toggle{display:flex;border:1px solid var(--border);border-radius:var(--radius);overflow:hidden}
+.map-style-toggle button{padding:6px 12px;font-size:.75rem;font-weight:500;color:var(--text-2);transition:all .15s;border-right:1px solid var(--border)}
+.map-style-toggle button:last-child{border-right:none}
+.map-style-toggle button:hover{color:var(--text);background:var(--bg-hover)}
+.map-style-toggle button.active{background:var(--green-dim);color:var(--green)}
+.export-wrapper{position:relative}
+.export-dropdown{position:absolute;top:calc(100% + 4px);right:0;background:var(--bg-card);border:1px solid var(--border);border-radius:var(--radius);min-width:200px;z-index:2000;display:none;overflow:hidden}
+.export-dropdown.visible{display:block}
+.export-dropdown button{display:flex;align-items:center;gap:10px;width:100%;padding:10px 14px;font-size:.8125rem;color:var(--text-2);transition:all .15s;text-align:left}
+.export-dropdown button:hover{background:var(--bg-hover);color:var(--text)}
+.export-dropdown button svg{width:16px;height:16px;flex-shrink:0}
+.user-avatar{width:30px;height:30px;border-radius:50%;background:var(--border);display:flex;align-items:center;justify-content:center;font-size:.75rem;font-weight:600;color:var(--text-2);cursor:pointer;transition:border-color .15s;border:2px solid transparent}
+.user-avatar:hover{border-color:var(--green)}
+
+/*═══ MAIN CONTAINER ═══*/
+.main-container{display:flex;flex:1;overflow:hidden;position:relative}
+
+/*═══ SIDEBAR ═══*/
+.sidebar{width:var(--sidebar-w);background:var(--bg-card);border-right:1px solid var(--border);display:flex;flex-direction:column;flex-shrink:0;overflow:hidden;transition:transform .3s cubic-bezier(.4,0,.2,1);z-index:900}
+.sidebar-tabs{display:flex;border-bottom:1px solid var(--border);flex-shrink:0}
+.sidebar-tab{flex:1;padding:10px 8px;font-size:.75rem;font-weight:600;text-transform:uppercase;letter-spacing:.06em;color:var(--text-3);text-align:center;transition:all .2s;border-bottom:2px solid transparent}
+.sidebar-tab:hover{color:var(--text-2)}
+.sidebar-tab.active{color:var(--green);border-bottom-color:var(--green)}
+.sidebar-content{flex:1;overflow-y:auto;overflow-x:hidden}
+.sidebar-panel{display:none;flex-direction:column;height:100%}
+.sidebar-panel.active{display:flex}
+
+/*═══ LOTS PANEL ═══*/
+.panel-section{padding:14px;border-bottom:1px solid var(--border)}
+.panel-section:last-child{border-bottom:none}
+.panel-header{display:flex;align-items:center;justify-content:space-between;margin-bottom:12px}
+.panel-title{font-family:var(--font-display);font-size:.85rem;font-weight:700;text-transform:uppercase;letter-spacing:.05em;color:var(--text-2)}
+.panel-action-btn{display:inline-flex;align-items:center;gap:4px;padding:4px 10px;font-size:.75rem;font-weight:600;color:var(--green);background:var(--green-dim);border-radius:var(--radius);transition:all .15s}
+.panel-action-btn:hover{background:rgba(63,185,80,.2)}
+.panel-action-btn svg{width:12px;height:12px}
+.lot-list{display:flex;flex-direction:column;gap:4px}
+.lot-item{display:flex;align-items:center;gap:10px;padding:10px 12px;border-radius:var(--radius);cursor:pointer;transition:all .15s;position:relative}
+.lot-item:hover{background:var(--bg-hover)}
+.lot-item.active{background:var(--green-dim);border:1px solid rgba(63,185,80,.2)}
+.lot-item:not(.active){border:1px solid transparent}
+.lot-icon{width:32px;height:32px;border-radius:var(--radius);background:var(--bg);border:1px solid var(--border);display:flex;align-items:center;justify-content:center;flex-shrink:0}
+.lot-icon svg{width:16px;height:16px;color:var(--text-3)}
+.lot-info{flex:1;min-width:0}
+.lot-name{font-size:.8125rem;font-weight:600;color:var(--text);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.lot-meta{font-size:.6875rem;color:var(--text-3);margin-top:2px}
+.lot-menu-btn{width:24px;height:24px;display:flex;align-items:center;justify-content:center;border-radius:4px;color:var(--text-3);opacity:0;transition:all .15s}
+.lot-item:hover .lot-menu-btn{opacity:1}
+.lot-menu-btn:hover{background:var(--bg);color:var(--text)}
+.empty-state{text-align:center;padding:24px 16px;color:var(--text-3);font-size:.8125rem;line-height:1.6}
+.empty-state svg{width:32px;height:32px;margin:0 auto 10px;opacity:.4}
+
+/*═══ CONTEXT MENU ═══*/
+.context-menu{position:fixed;background:var(--bg-card);border:1px solid var(--border);border-radius:var(--radius);min-width:160px;z-index:3000;overflow:hidden;display:none;box-shadow:0 8px 32px rgba(0,0,0,.5)}
+.context-menu.visible{display:block}
+.context-menu button{display:flex;align-items:center;gap:8px;width:100%;padding:8px 14px;font-size:.8125rem;color:var(--text-2);transition:all .15s;text-align:left}
+.context-menu button:hover{background:var(--bg-hover);color:var(--text)}
+.context-menu button.danger:hover{background:rgba(248,81,73,.1);color:var(--red)}
+.context-menu button svg{width:14px;height:14px;flex-shrink:0}
+
+/*═══ TOOLS PANEL ═══*/
+.tools-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:6px}
+.tool-btn{display:flex;flex-direction:column;align-items:center;gap:4px;padding:12px 6px;border-radius:var(--radius);transition:all .15s;border:1px solid transparent}
+.tool-btn:hover{background:var(--bg-hover);border-color:var(--border)}
+.tool-btn.active{background:var(--green-dim);border-color:var(--green);color:var(--green)}
+.tool-btn svg{width:20px;height:20px}
+.tool-btn span{font-size:.65rem;font-weight:600;text-transform:uppercase;letter-spacing:.04em;color:var(--text-3)}
+.tool-btn.active span{color:var(--green)}
+.tool-btn:hover span{color:var(--text-2)}
+.tool-config{margin-top:10px;display:flex;flex-direction:column;gap:8px}
+.tool-config label{font-size:.75rem;font-weight:500;color:var(--text-2);display:flex;flex-direction:column;gap:4px}
+.tool-config .inline-label{flex-direction:row;align-items:center;justify-content:space-between}
+.tool-config .inline-label input,.tool-config .inline-label select{width:120px}
+
+/*═══ PROPERTIES PANEL ═══*/
+.properties-empty{text-align:center;padding:20px 16px;color:var(--text-3);font-size:.8125rem}
+.prop-group{display:flex;flex-direction:column;gap:10px}
+.prop-field{display:flex;flex-direction:column;gap:4px}
+.prop-field label{font-size:.75rem;font-weight:500;color:var(--text-2)}
+.prop-field input,.prop-field select,.prop-field textarea{width:100%;font-size:.8125rem}
+.prop-field textarea{resize:vertical;min-height:60px}
+.prop-color-preview{display:inline-block;width:12px;height:12px;border-radius:3px;vertical-align:middle;margin-right:6px;border:1px solid var(--border)}
+.delete-feature-btn{display:flex;align-items:center;justify-content:center;gap:6px;width:100%;padding:8px;font-size:.8125rem;font-weight:600;color:var(--red);background:rgba(248,81,73,.08);border-radius:var(--radius);transition:all .15s;margin-top:6px}
+.delete-feature-btn:hover{background:rgba(248,81,73,.15)}
+.delete-feature-btn svg{width:14px;height:14px}
+
+/*═══ JOBS PANEL ═══*/
+.job-item{display:flex;align-items:center;gap:10px;padding:10px 12px;border-radius:var(--radius);border:1px solid var(--border);margin-bottom:6px;transition:all .15s}
+.job-item:hover{border-color:var(--text-3)}
+.job-status{width:8px;height:8px;border-radius:50%;flex-shrink:0}
+.job-status.pending{background:var(--yellow)}
+.job-status.completed{background:var(--green)}
+.job-info{flex:1;min-width:0}
+.job-lot-name{font-size:.8125rem;font-weight:600;color:var(--text)}
+.job-date{font-size:.6875rem;color:var(--text-3);margin-top:2px}
+.job-actions{display:flex;gap:4px}
+.job-action-btn{width:24px;height:24px;display:flex;align-items:center;justify-content:center;border-radius:4px;color:var(--text-3);transition:all .15s}
+.job-action-btn:hover{background:var(--bg);color:var(--text)}
+.add-job-form{display:flex;flex-direction:column;gap:8px;padding-top:8px;border-top:1px solid var(--border);margin-top:8px}
+.add-job-form select,.add-job-form input{width:100%;font-size:.8125rem}
+.add-job-btn{padding:8px;font-size:.8125rem;font-weight:600;color:var(--bg);background:var(--green);border-radius:var(--radius);transition:all .15s}
+.add-job-btn:hover{background:#4cd964}
+
+/*═══ MAP AREA ═══*/
+.map-area{flex:1;position:relative;overflow:hidden}
+#map{width:100%;height:100%;z-index:1}
+/* Dark leaflet controls */
+.leaflet-control-zoom a,.leaflet-control-attribution{background:var(--bg-card) !important;color:var(--text-2) !important;border-color:var(--border) !important}
+.leaflet-control-zoom a:hover{background:var(--bg-hover) !important;color:var(--text) !important}
+.leaflet-control-attribution a{color:var(--text-3) !important}
+/* Override leaflet draw toolbar for dark theme */
+.leaflet-draw-toolbar a{background-color:var(--bg-card) !important;border-color:var(--border) !important;color:var(--text) !important}
+.leaflet-draw-toolbar a:hover{background-color:var(--bg-hover) !important}
+.leaflet-draw-actions a{background-color:var(--bg-card) !important;color:var(--text) !important;border-color:var(--border) !important}
+.leaflet-draw-actions a:hover{background-color:var(--bg-hover) !important}
+.leaflet-draw-tooltip{background:var(--bg-card) !important;color:var(--text) !important;border-color:var(--border) !important}
+.leaflet-draw-tooltip-subtext{color:var(--text-2) !important}
+.leaflet-draw-guide-dash{background:var(--green) !important}
+/* Hide default draw toolbar — we use sidebar tools */
+.leaflet-draw-toolbar-top{display:none !important}
+
+/*═══ DASHBOARD OVERLAY ═══*/
+.dashboard-bar{position:absolute;bottom:0;left:0;right:0;z-index:800;background:rgba(22,27,34,.92);backdrop-filter:blur(12px);-webkit-backdrop-filter:blur(12px);border-top:1px solid var(--border);padding:8px 20px;display:flex;align-items:center;gap:24px;transition:transform .3s cubic-bezier(.4,0,.2,1)}
+.dashboard-bar.hidden{transform:translateY(100%)}
+.dashboard-stat{display:flex;align-items:center;gap:8px}
+.dashboard-stat .stat-val{font-family:var(--font-display);font-size:1rem;font-weight:700;color:var(--green)}
+.dashboard-stat .stat-label{font-size:.6875rem;color:var(--text-3);text-transform:uppercase;letter-spacing:.04em}
+.dashboard-toggle{position:absolute;top:-28px;right:16px;padding:4px 12px;font-size:.6875rem;font-weight:600;color:var(--text-3);background:rgba(22,27,34,.92);backdrop-filter:blur(12px);border-top:1px solid var(--border);border-left:1px solid var(--border);border-right:1px solid var(--border);border-radius:var(--radius) var(--radius) 0 0;cursor:pointer;transition:color .15s;text-transform:uppercase;letter-spacing:.04em}
+.dashboard-toggle:hover{color:var(--text)}
+
+/*═══ MODAL ═══*/
+.modal-overlay{position:fixed;inset:0;background:rgba(0,0,0,.6);z-index:5000;display:none;align-items:center;justify-content:center;backdrop-filter:blur(4px)}
+.modal-overlay.visible{display:flex}
+.modal{background:var(--bg-card);border:1px solid var(--border);border-radius:var(--radius-lg);padding:24px;min-width:340px;max-width:440px;width:90%}
+.modal h3{font-family:var(--font-display);font-size:1rem;font-weight:700;margin-bottom:16px}
+.modal-field{display:flex;flex-direction:column;gap:4px;margin-bottom:14px}
+.modal-field label{font-size:.75rem;font-weight:500;color:var(--text-2)}
+.modal-field input{width:100%;padding:9px 12px}
+.modal-actions{display:flex;justify-content:flex-end;gap:8px;margin-top:18px}
+.modal-btn{padding:8px 18px;border-radius:var(--radius);font-size:.8125rem;font-weight:600;transition:all .15s}
+.modal-btn.cancel{color:var(--text-2);border:1px solid var(--border)}
+.modal-btn.cancel:hover{background:var(--bg-hover);color:var(--text)}
+.modal-btn.primary{color:var(--bg);background:var(--green)}
+.modal-btn.primary:hover{background:#4cd964}
+.modal-btn.danger{color:#fff;background:var(--red)}
+.modal-btn.danger:hover{background:#ff6e69}
+
+/*═══ TOAST ═══*/
+.toast-container{position:fixed;bottom:60px;right:20px;z-index:6000;display:flex;flex-direction:column;gap:8px}
+.toast{padding:10px 16px;background:var(--bg-card);border:1px solid var(--border);border-radius:var(--radius);font-size:.8125rem;color:var(--text);box-shadow:0 8px 24px rgba(0,0,0,.4);display:flex;align-items:center;gap:8px;animation:toastIn .3s cubic-bezier(.4,0,.2,1)}
+.toast.success{border-color:var(--green)}
+.toast.error{border-color:var(--red)}
+.toast svg{width:16px;height:16px;flex-shrink:0}
+.toast.success svg{color:var(--green)}
+.toast.error svg{color:var(--red)}
+@keyframes toastIn{from{opacity:0;transform:translateY(10px)}to{opacity:1;transform:translateY(0)}}
+@keyframes toastOut{from{opacity:1;transform:translateY(0)}to{opacity:0;transform:translateY(10px)}}
+
+/*═══ MOBILE (<768px) ═══*/
+@media(max-width:768px){
+  .sidebar{position:fixed;bottom:0;left:0;right:0;width:100%;height:55vh;border-right:none;border-top:1px solid var(--border);transform:translateY(calc(100% - 44px));z-index:950;border-radius:var(--radius-lg) var(--radius-lg) 0 0}
+  .sidebar.open{transform:translateY(0)}
+  .sidebar-drag-handle{display:block;width:36px;height:4px;background:var(--border);border-radius:2px;margin:8px auto;cursor:grab;flex-shrink:0}
+  .topbar{padding:0 10px;gap:8px}
+  .search-wrapper{max-width:none}
+  .map-style-toggle{display:none}
+  .dashboard-bar{padding:6px 12px;gap:16px}
+}
+@media(min-width:769px){
+  .sidebar-drag-handle{display:none}
+}
+</style>
+</head>
+<body>
+<div class="app">
+
+<!-- ═══════════════════════════════════════════════ TOP BAR ═══════════════════════════════════════════════ -->
+<header class="topbar">
+  <a href="index.html" class="wordmark">Stryp<span>e</span></a>
+  <div class="topbar-divider"></div>
+  <div class="search-wrapper">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.3-4.3"/></svg>
+    <input type="text" class="search-input" id="addressSearch" placeholder="Search address or coordinates..." autocomplete="off">
+    <div class="search-results" id="searchResults"></div>
+  </div>
+  <div class="topbar-spacer"></div>
+  <div class="map-style-toggle">
+    <button class="active" data-style="street">Street</button>
+    <button data-style="satellite">Satellite</button>
+  </div>
+  <div class="export-wrapper">
+    <button class="topbar-btn" id="exportBtn">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+      Export
+    </button>
+    <div class="export-dropdown" id="exportDropdown">
+      <button id="exportWaypoints">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/></svg>
+        Export .waypoints
+      </button>
+      <button id="exportGeojson">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><path d="M2 12h20"/><path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"/></svg>
+        Export .geojson
+      </button>
+    </div>
+  </div>
+  <div class="user-avatar" title="Account">U</div>
+</header>
+
+<!-- ═══════════════════════════════════════════════ MAIN ═══════════════════════════════════════════════ -->
+<div class="main-container">
+
+  <!-- ═══ SIDEBAR ═══ -->
+  <aside class="sidebar" id="sidebar">
+    <div class="sidebar-drag-handle" id="sidebarDrag"></div>
+    <div class="sidebar-tabs">
+      <button class="sidebar-tab active" data-tab="design">Design</button>
+      <button class="sidebar-tab" data-tab="jobs">Jobs</button>
+    </div>
+    <div class="sidebar-content">
+
+      <!-- ═══ DESIGN TAB ═══ -->
+      <div class="sidebar-panel active" id="panel-design">
+        <!-- Lots -->
+        <div class="panel-section">
+          <div class="panel-header">
+            <span class="panel-title">My Lots</span>
+            <button class="panel-action-btn" id="newLotBtn">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
+              New
+            </button>
+          </div>
+          <div class="lot-list" id="lotList"></div>
+        </div>
+
+        <!-- Tools -->
+        <div class="panel-section">
+          <div class="panel-header">
+            <span class="panel-title">Tools</span>
+          </div>
+          <div class="tools-grid" id="toolsGrid">
+            <button class="tool-btn" data-tool="polyline" title="Draw parking lines">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 20 L10 8 L16 16 L20 4"/></svg>
+              <span>Line</span>
+            </button>
+            <button class="tool-btn" data-tool="rectangle" title="Draw rectangles">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="18" height="18" rx="2"/></svg>
+              <span>Rect</span>
+            </button>
+            <button class="tool-btn" data-tool="polygon" title="Draw zones">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2 L22 8.5 L22 15.5 L12 22 L2 15.5 L2 8.5 Z"/></svg>
+              <span>Zone</span>
+            </button>
+            <button class="tool-btn" data-tool="marker" title="Place markers">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z"/><circle cx="12" cy="10" r="3"/></svg>
+              <span>Marker</span>
+            </button>
+            <button class="tool-btn" data-tool="eraser" title="Delete features">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 20H7L3 16l9-13 8 8-5 9z"/><path d="M7 20l5-9"/></svg>
+              <span>Eraser</span>
+            </button>
+            <button class="tool-btn" data-tool="pan" title="Pan / select">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 11V6a2 2 0 0 0-4 0v1"/><path d="M14 10V4a2 2 0 0 0-4 0v2"/><path d="M10 10.5V6a2 2 0 0 0-4 0v8"/><path d="M18 8a2 2 0 1 1 4 0v6a8 8 0 0 1-8 8h-2c-2.8 0-4.5-.86-5.99-2.34L3.35 16.5a2 2 0 0 1 3.3-2.5L8 15.5"/></svg>
+              <span>Select</span>
+            </button>
+          </div>
+          <div class="tool-config" id="toolConfig">
+            <label class="inline-label">
+              Line Type
+              <select id="lineType">
+                <option value="standard">Standard (White)</option>
+                <option value="handicap">Handicap (Blue)</option>
+                <option value="fire_lane">Fire Lane (Red)</option>
+                <option value="no_parking">No Parking (Yellow)</option>
+                <option value="crosswalk">Crosswalk (Dashed)</option>
+              </select>
+            </label>
+            <label class="inline-label">
+              Width (in)
+              <input type="number" id="lineWidth" value="4" min="1" max="24" step="1" style="width:70px">
+            </label>
+          </div>
+        </div>
+
+        <!-- Properties -->
+        <div class="panel-section" id="propertiesSection">
+          <div class="panel-header">
+            <span class="panel-title">Properties</span>
+          </div>
+          <div id="propertiesContent">
+            <div class="properties-empty">Select a feature on the map to view its properties.</div>
+          </div>
+        </div>
+      </div>
+
+      <!-- ═══ JOBS TAB ═══ -->
+      <div class="sidebar-panel" id="panel-jobs">
+        <div class="panel-section" style="flex:1">
+          <div class="panel-header">
+            <span class="panel-title">Scheduled Jobs</span>
+          </div>
+          <div id="jobsList"></div>
+          <div class="add-job-form">
+            <select id="jobLotSelect"><option value="">Select a lot...</option></select>
+            <input type="date" id="jobDate">
+            <button class="add-job-btn" id="addJobBtn">Schedule Job</button>
+          </div>
+        </div>
+      </div>
+
+    </div>
+  </aside>
+
+  <!-- ═══ MAP ═══ -->
+  <div class="map-area">
+    <div id="map"></div>
+    <div class="dashboard-bar" id="dashboardBar">
+      <button class="dashboard-toggle" id="dashboardToggle">Stats</button>
+      <div class="dashboard-stat">
+        <span class="stat-val" id="statLots">0</span>
+        <span class="stat-label">Lots</span>
+      </div>
+      <div class="dashboard-stat">
+        <span class="stat-val" id="statFeatures">0</span>
+        <span class="stat-label">Features</span>
+      </div>
+      <div class="dashboard-stat">
+        <span class="stat-val" id="statPending">0</span>
+        <span class="stat-label">Pending Jobs</span>
+      </div>
+      <div class="dashboard-stat">
+        <span class="stat-val" id="statWaypoints">0</span>
+        <span class="stat-label">Est. Waypoints</span>
+      </div>
+    </div>
+  </div>
+
+</div><!-- /main-container -->
+</div><!-- /app -->
+
+<!-- ═══ MODALS ═══ -->
+<div class="modal-overlay" id="modalOverlay">
+  <div class="modal" id="modalContent"></div>
+</div>
+
+<!-- ═══ CONTEXT MENU ═══ -->
+<div class="context-menu" id="contextMenu"></div>
+
+<!-- ═══ TOASTS ═══ -->
+<div class="toast-container" id="toastContainer"></div>
+
+<!-- ═══════════════════════════════════════════════ SCRIPTS ═══════════════════════════════════════════════ -->
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+<script src="https://unpkg.com/leaflet-draw@1.0.4/dist/leaflet.draw.js"></script>
+<script>
+(function() {
+'use strict';
+
+/* ═══════════════════════════════════════════════════════════════════
+   CONSTANTS & CONFIG
+═══════════════════════════════════════════════════════════════════ */
+const LINE_TYPES = {
+  standard:  { label: 'Standard',  color: '#ffffff', dash: null },
+  handicap:  { label: 'Handicap',  color: '#58a6ff', dash: null },
+  fire_lane: { label: 'Fire Lane', color: '#f85149', dash: null },
+  no_parking:{ label: 'No Parking', color: '#d29922', dash: null },
+  crosswalk: { label: 'Crosswalk', color: '#ffffff', dash: '10, 8' }
+};
+
+const STORAGE_KEYS = {
+  lots: 'strype_lots',
+  jobs: 'strype_jobs',
+  activeLot: 'strype_active_lot',
+  mapState: 'strype_map_state'
+};
+
+const WAYPOINT_SPACING_M = 0.5;  // meters between interpolated waypoints
+const SPRAY_SPEED = 0.5;         // m/s spray speed
+const TRANSIT_SPEED = 1.0;       // m/s transit speed
+const EARTH_RADIUS = 6378137;    // meters
+
+/* ═══════════════════════════════════════════════════════════════════
+   STATE
+═══════════════════════════════════════════════════════════════════ */
+let lots = [];
+let jobs = [];
+let activeLotId = null;
+let activeTool = 'pan';
+let selectedFeatureId = null;
+let map, drawnItems, currentDrawHandler;
+let streetLayer, satelliteLayer, currentMapStyle = 'street';
+
+/* ═══════════════════════════════════════════════════════════════════
+   UTILITIES
+═══════════════════════════════════════════════════════════════════ */
+function uid() {
+  return Date.now().toString(36) + Math.random().toString(36).slice(2, 8);
+}
+
+function formatDate(iso) {
+  if (!iso) return '';
+  const d = new Date(iso);
+  const now = new Date();
+  const diff = now - d;
+  if (diff < 60000) return 'Just now';
+  if (diff < 3600000) return Math.floor(diff/60000) + 'm ago';
+  if (diff < 86400000) return Math.floor(diff/3600000) + 'h ago';
+  if (diff < 604800000) return Math.floor(diff/86400000) + 'd ago';
+  return d.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
+}
+
+function saveLots() {
+  localStorage.setItem(STORAGE_KEYS.lots, JSON.stringify(lots));
+}
+
+function saveJobs() {
+  localStorage.setItem(STORAGE_KEYS.jobs, JSON.stringify(jobs));
+}
+
+function loadState() {
+  try { lots = JSON.parse(localStorage.getItem(STORAGE_KEYS.lots)) || []; } catch(e) { lots = []; }
+  try { jobs = JSON.parse(localStorage.getItem(STORAGE_KEYS.jobs)) || []; } catch(e) { jobs = []; }
+  activeLotId = localStorage.getItem(STORAGE_KEYS.activeLot) || null;
+}
+
+function showToast(message, type) {
+  type = type || 'success';
+  const container = document.getElementById('toastContainer');
+  const toast = document.createElement('div');
+  toast.className = 'toast ' + type;
+  const iconPath = type === 'success'
+    ? '<path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/><polyline points="22 4 12 14.01 9 11.01"/>'
+    : '<circle cx="12" cy="12" r="10"/><line x1="15" y1="9" x2="9" y2="15"/><line x1="9" y1="9" x2="15" y2="15"/>';
+  toast.innerHTML = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">' + iconPath + '</svg>' + message;
+  container.appendChild(toast);
+  setTimeout(function() {
+    toast.style.animation = 'toastOut .3s forwards';
+    setTimeout(function() { toast.remove(); }, 300);
+  }, 3000);
+}
+
+/* ═══════════════════════════════════════════════════════════════════
+   MODAL
+═══════════════════════════════════════════════════════════════════ */
+function showModal(html) {
+  document.getElementById('modalContent').innerHTML = html;
+  document.getElementById('modalOverlay').classList.add('visible');
+}
+
+function hideModal() {
+  document.getElementById('modalOverlay').classList.remove('visible');
+}
+
+document.getElementById('modalOverlay').addEventListener('click', function(e) {
+  if (e.target === this) hideModal();
+});
+
+/* ═══════════════════════════════════════════════════════════════════
+   CONTEXT MENU
+═══════════════════════════════════════════════════════════════════ */
+function showContextMenu(x, y, items) {
+  const menu = document.getElementById('contextMenu');
+  menu.innerHTML = '';
+  items.forEach(function(item) {
+    var btn = document.createElement('button');
+    btn.className = item.danger ? 'danger' : '';
+    btn.innerHTML = (item.icon || '') + item.label;
+    btn.addEventListener('click', function() {
+      hideContextMenu();
+      item.action();
+    });
+    menu.appendChild(btn);
+  });
+  // Position
+  menu.style.left = x + 'px';
+  menu.style.top = y + 'px';
+  menu.classList.add('visible');
+  // Adjust if off-screen
+  requestAnimationFrame(function() {
+    const rect = menu.getBoundingClientRect();
+    if (rect.right > window.innerWidth) menu.style.left = (x - rect.width) + 'px';
+    if (rect.bottom > window.innerHeight) menu.style.top = (y - rect.height) + 'px';
+  });
+}
+
+function hideContextMenu() {
+  document.getElementById('contextMenu').classList.remove('visible');
+}
+
+document.addEventListener('click', function(e) {
+  if (!e.target.closest('.context-menu')) hideContextMenu();
+});
+
+/* ═══════════════════════════════════════════════════════════════════
+   MAP INIT
+═══════════════════════════════════════════════════════════════════ */
+function initMap() {
+  var savedState;
+  try { savedState = JSON.parse(localStorage.getItem(STORAGE_KEYS.mapState)); } catch(e) {}
+
+  var center = savedState ? [savedState.lat, savedState.lng] : [39.8, -98.5];
+  var zoom = savedState ? savedState.zoom : 4;
+
+  map = L.map('map', {
+    center: center,
+    zoom: zoom,
+    zoomControl: true,
+    attributionControl: true
+  });
+
+  streetLayer = L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+    attribution: 'OpenStreetMap',
+    maxZoom: 22,
+    maxNativeZoom: 19
+  });
+
+  satelliteLayer = L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}', {
+    attribution: 'Esri World Imagery',
+    maxZoom: 22,
+    maxNativeZoom: 19
+  });
+
+  streetLayer.addTo(map);
+
+  drawnItems = new L.FeatureGroup();
+  map.addLayer(drawnItems);
+
+  // Save map state on move
+  map.on('moveend', function() {
+    var c = map.getCenter();
+    localStorage.setItem(STORAGE_KEYS.mapState, JSON.stringify({ lat: c.lat, lng: c.lng, zoom: map.getZoom() }));
+  });
+
+  // Handle draw events
+  map.on(L.Draw.Event.CREATED, function(e) {
+    var layer = e.layer;
+    var type = e.layerType;
+    var lineTypeKey = document.getElementById('lineType').value;
+    var lineConfig = LINE_TYPES[lineTypeKey];
+    var widthIn = parseFloat(document.getElementById('lineWidth').value) || 4;
+
+    // Assign properties
+    layer.featureProps = {
+      id: uid(),
+      type: lineTypeKey,
+      lineType: lineConfig.label,
+      color: lineConfig.color,
+      width: widthIn,
+      notes: '',
+      geometryType: type,
+      created: new Date().toISOString()
+    };
+
+    styleLayer(layer);
+    drawnItems.addLayer(layer);
+    makeLayerSelectable(layer);
+    saveCurrentLot();
+    updateDashboard();
+
+    // Re-enable the same draw tool for rapid drawing
+    if (activeTool !== 'pan' && activeTool !== 'eraser') {
+      setTimeout(function() { setActiveTool(activeTool); }, 50);
+    }
+  });
+}
+
+function styleLayer(layer) {
+  var props = layer.featureProps;
+  if (!props) return;
+  var lineConfig = LINE_TYPES[props.type] || LINE_TYPES.standard;
+  var style = {
+    color: lineConfig.color,
+    weight: 3,
+    opacity: 0.9,
+    fillOpacity: 0.15,
+    fillColor: lineConfig.color
+  };
+  if (lineConfig.dash) {
+    style.dashArray = lineConfig.dash;
+  }
+  if (typeof layer.setStyle === 'function') {
+    layer.setStyle(style);
+  }
+}
+
+function makeLayerSelectable(layer) {
+  layer.on('click', function(e) {
+    L.DomEvent.stopPropagation(e);
+    if (activeTool === 'eraser') {
+      drawnItems.removeLayer(layer);
+      if (selectedFeatureId === layer.featureProps.id) {
+        selectedFeatureId = null;
+        showEmptyProperties();
+      }
+      saveCurrentLot();
+      updateDashboard();
+      showToast('Feature deleted');
+      return;
+    }
+    selectFeature(layer);
+  });
+}
+
+function selectFeature(layer) {
+  // Deselect previous
+  drawnItems.eachLayer(function(l) {
+    if (typeof l.setStyle === 'function') {
+      styleLayer(l);
+    }
+  });
+
+  selectedFeatureId = layer.featureProps.id;
+
+  // Highlight selected
+  if (typeof layer.setStyle === 'function') {
+    layer.setStyle({ weight: 5, opacity: 1 });
+  }
+
+  showProperties(layer);
+}
+
+/* ═══════════════════════════════════════════════════════════════════
+   PROPERTIES PANEL
+═══════════════════════════════════════════════════════════════════ */
+function showEmptyProperties() {
+  document.getElementById('propertiesContent').innerHTML =
+    '<div class="properties-empty">Select a feature on the map to view its properties.</div>';
+}
+
+function showProperties(layer) {
+  var props = layer.featureProps;
+  var typeOptions = Object.keys(LINE_TYPES).map(function(key) {
+    return '<option value="' + key + '"' + (key === props.type ? ' selected' : '') + '>' + LINE_TYPES[key].label + '</option>';
+  }).join('');
+
+  var html = '<div class="prop-group">' +
+    '<div class="prop-field"><label>Feature Type</label><span style="font-size:.75rem;color:var(--text-3);text-transform:uppercase">' + (props.geometryType || 'shape') + '</span></div>' +
+    '<div class="prop-field"><label>Line Type</label><select id="propType">' + typeOptions + '</select></div>' +
+    '<div class="prop-field"><label>Width (inches)</label><input type="number" id="propWidth" value="' + props.width + '" min="1" max="24" step="1"></div>' +
+    '<div class="prop-field"><label>Notes</label><textarea id="propNotes" placeholder="Add notes...">' + (props.notes || '') + '</textarea></div>' +
+    '<button class="delete-feature-btn" id="deleteFeatureBtn"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/></svg>Delete Feature</button>' +
+    '</div>';
+
+  document.getElementById('propertiesContent').innerHTML = html;
+
+  // Bind events
+  document.getElementById('propType').addEventListener('change', function() {
+    props.type = this.value;
+    props.lineType = LINE_TYPES[this.value].label;
+    props.color = LINE_TYPES[this.value].color;
+    styleLayer(layer);
+    layer.setStyle({ weight: 5, opacity: 1 }); // keep selected
+    saveCurrentLot();
+  });
+
+  document.getElementById('propWidth').addEventListener('change', function() {
+    props.width = parseFloat(this.value) || 4;
+    saveCurrentLot();
+  });
+
+  document.getElementById('propNotes').addEventListener('input', function() {
+    props.notes = this.value;
+    saveCurrentLot();
+  });
+
+  document.getElementById('deleteFeatureBtn').addEventListener('click', function() {
+    drawnItems.removeLayer(layer);
+    selectedFeatureId = null;
+    showEmptyProperties();
+    saveCurrentLot();
+    updateDashboard();
+    showToast('Feature deleted');
+  });
+}
+
+/* ═══════════════════════════════════════════════════════════════════
+   MAP STYLE TOGGLE
+═══════════════════════════════════════════════════════════════════ */
+document.querySelectorAll('.map-style-toggle button').forEach(function(btn) {
+  btn.addEventListener('click', function() {
+    var style = this.dataset.style;
+    if (style === currentMapStyle) return;
+    document.querySelectorAll('.map-style-toggle button').forEach(function(b) { b.classList.remove('active'); });
+    this.classList.add('active');
+    if (style === 'satellite') {
+      map.removeLayer(streetLayer);
+      satelliteLayer.addTo(map);
+    } else {
+      map.removeLayer(satelliteLayer);
+      streetLayer.addTo(map);
+    }
+    currentMapStyle = style;
+  });
+});
+
+/* ═══════════════════════════════════════════════════════════════════
+   ADDRESS SEARCH (Nominatim)
+═══════════════════════════════════════════════════════════════════ */
+var searchTimeout;
+var searchInput = document.getElementById('addressSearch');
+var searchResults = document.getElementById('searchResults');
+
+searchInput.addEventListener('input', function() {
+  clearTimeout(searchTimeout);
+  var query = this.value.trim();
+  if (query.length < 3) { searchResults.classList.remove('visible'); return; }
+  searchTimeout = setTimeout(function() { nominatimSearch(query); }, 400);
+});
+
+searchInput.addEventListener('keydown', function(e) {
+  if (e.key === 'Enter') {
+    clearTimeout(searchTimeout);
+    var query = this.value.trim();
+    if (query.length >= 2) nominatimSearch(query);
+  }
+  if (e.key === 'Escape') {
+    searchResults.classList.remove('visible');
+  }
+});
+
+function nominatimSearch(query) {
+  // Check if it looks like coordinates (lat, lng)
+  var coordMatch = query.match(/^(-?\d+\.?\d*)\s*,\s*(-?\d+\.?\d*)$/);
+  if (coordMatch) {
+    var lat = parseFloat(coordMatch[1]);
+    var lng = parseFloat(coordMatch[2]);
+    map.flyTo([lat, lng], 18, { duration: 1.5 });
+    searchResults.classList.remove('visible');
+    return;
+  }
+
+  fetch('https://nominatim.openstreetmap.org/search?format=json&limit=5&q=' + encodeURIComponent(query), {
+    headers: { 'Accept-Language': 'en' }
+  })
+  .then(function(r) { return r.json(); })
+  .then(function(data) {
+    if (!data.length) {
+      searchResults.innerHTML = '<div class="search-result-item">No results found</div>';
+      searchResults.classList.add('visible');
+      return;
+    }
+    searchResults.innerHTML = data.map(function(item) {
+      return '<div class="search-result-item" data-lat="' + item.lat + '" data-lng="' + item.lon + '">' +
+        '<div class="result-name">' + item.display_name.split(',').slice(0,2).join(', ') + '</div>' +
+        '<div style="font-size:.6875rem;color:var(--text-3);margin-top:2px">' + item.display_name + '</div>' +
+      '</div>';
+    }).join('');
+    searchResults.classList.add('visible');
+  })
+  .catch(function() {
+    searchResults.innerHTML = '<div class="search-result-item">Search failed. Try again.</div>';
+    searchResults.classList.add('visible');
+  });
+}
+
+searchResults.addEventListener('click', function(e) {
+  var item = e.target.closest('.search-result-item');
+  if (!item || !item.dataset.lat) return;
+  var lat = parseFloat(item.dataset.lat);
+  var lng = parseFloat(item.dataset.lng);
+  map.flyTo([lat, lng], 18, { duration: 1.5 });
+  searchInput.value = item.querySelector('.result-name').textContent;
+  searchResults.classList.remove('visible');
+});
+
+document.addEventListener('click', function(e) {
+  if (!e.target.closest('.search-wrapper')) {
+    searchResults.classList.remove('visible');
+  }
+});
+
+/* ═══════════════════════════════════════════════════════════════════
+   SIDEBAR TABS
+═══════════════════════════════════════════════════════════════════ */
+document.querySelectorAll('.sidebar-tab').forEach(function(tab) {
+  tab.addEventListener('click', function() {
+    document.querySelectorAll('.sidebar-tab').forEach(function(t) { t.classList.remove('active'); });
+    document.querySelectorAll('.sidebar-panel').forEach(function(p) { p.classList.remove('active'); });
+    this.classList.add('active');
+    document.getElementById('panel-' + this.dataset.tab).classList.add('active');
+  });
+});
+
+/* Mobile sidebar drag */
+var sidebarDrag = document.getElementById('sidebarDrag');
+if (sidebarDrag) {
+  sidebarDrag.addEventListener('click', function() {
+    document.getElementById('sidebar').classList.toggle('open');
+  });
+}
+
+/* ═══════════════════════════════════════════════════════════════════
+   TOOLS
+═══════════════════════════════════════════════════════════════════ */
+function setActiveTool(tool) {
+  // Cancel current drawing if active
+  if (currentDrawHandler) {
+    currentDrawHandler.disable();
+    currentDrawHandler = null;
+  }
+
+  activeTool = tool;
+
+  // Update UI
+  document.querySelectorAll('.tool-btn').forEach(function(btn) {
+    btn.classList.toggle('active', btn.dataset.tool === tool);
+  });
+
+  // Change cursor
+  var mapContainer = document.getElementById('map');
+  mapContainer.style.cursor = (tool === 'eraser') ? 'crosshair' : '';
+
+  // Enable leaflet draw handler if applicable
+  if (!activeLotId && tool !== 'pan' && tool !== 'eraser') {
+    showToast('Create or select a lot first', 'error');
+    activeTool = 'pan';
+    document.querySelectorAll('.tool-btn').forEach(function(btn) {
+      btn.classList.toggle('active', btn.dataset.tool === 'pan');
+    });
+    return;
+  }
+
+  var lineTypeKey = document.getElementById('lineType').value;
+  var lineConfig = LINE_TYPES[lineTypeKey];
+  var drawOptions = {
+    shapeOptions: {
+      color: lineConfig.color,
+      weight: 3,
+      opacity: 0.9,
+      fillOpacity: 0.15,
+      fillColor: lineConfig.color,
+      dashArray: lineConfig.dash || null
+    }
+  };
+
+  switch (tool) {
+    case 'polyline':
+      currentDrawHandler = new L.Draw.Polyline(map, drawOptions);
+      currentDrawHandler.enable();
+      break;
+    case 'rectangle':
+      currentDrawHandler = new L.Draw.Rectangle(map, drawOptions);
+      currentDrawHandler.enable();
+      break;
+    case 'polygon':
+      currentDrawHandler = new L.Draw.Polygon(map, drawOptions);
+      currentDrawHandler.enable();
+      break;
+    case 'marker':
+      currentDrawHandler = new L.Draw.Marker(map, {});
+      currentDrawHandler.enable();
+      break;
+  }
+}
+
+document.getElementById('toolsGrid').addEventListener('click', function(e) {
+  var btn = e.target.closest('.tool-btn');
+  if (!btn) return;
+  setActiveTool(btn.dataset.tool);
+});
+
+// Update draw color when line type changes
+document.getElementById('lineType').addEventListener('change', function() {
+  if (activeTool !== 'pan' && activeTool !== 'eraser') {
+    setActiveTool(activeTool); // re-init with new color
+  }
+});
+
+/* ═══════════════════════════════════════════════════════════════════
+   LOT MANAGEMENT
+═══════════════════════════════════════════════════════════════════ */
+function createLot(name) {
+  var center = map.getCenter();
+  var lot = {
+    id: uid(),
+    name: name || 'Untitled Lot',
+    center: { lat: center.lat, lng: center.lng },
+    zoom: map.getZoom(),
+    features: [],
+    created: new Date().toISOString(),
+    modified: new Date().toISOString()
+  };
+  lots.push(lot);
+  saveLots();
+  setActiveLot(lot.id);
+  renderLotList();
+  updateDashboard();
+  showToast('Lot "' + lot.name + '" created');
+}
+
+function setActiveLot(lotId) {
+  activeLotId = lotId;
+  localStorage.setItem(STORAGE_KEYS.activeLot, lotId);
+  loadLotFeatures(lotId);
+  renderLotList();
+  updateJobLotSelect();
+
+  // Fly to lot center
+  var lot = lots.find(function(l) { return l.id === lotId; });
+  if (lot && lot.center) {
+    map.flyTo([lot.center.lat, lot.center.lng], lot.zoom || 18, { duration: 1 });
+  }
+}
+
+function saveCurrentLot() {
+  if (!activeLotId) return;
+  var lot = lots.find(function(l) { return l.id === activeLotId; });
+  if (!lot) return;
+
+  // Save map position
+  var center = map.getCenter();
+  lot.center = { lat: center.lat, lng: center.lng };
+  lot.zoom = map.getZoom();
+  lot.modified = new Date().toISOString();
+
+  // Serialize features
+  lot.features = [];
+  drawnItems.eachLayer(function(layer) {
+    var geojson = layer.toGeoJSON();
+    geojson.properties = Object.assign({}, layer.featureProps || {});
+    lot.features.push(geojson);
+  });
+
+  saveLots();
+  renderLotList();
+  updateDashboard();
+}
+
+function loadLotFeatures(lotId) {
+  // Clear map
+  drawnItems.clearLayers();
+  selectedFeatureId = null;
+  showEmptyProperties();
+
+  var lot = lots.find(function(l) { return l.id === lotId; });
+  if (!lot || !lot.features) return;
+
+  lot.features.forEach(function(feature) {
+    var layer;
+    try {
+      layer = L.GeoJSON.geometryToLayer(feature);
+    } catch(e) { return; }
+
+    layer.featureProps = Object.assign({
+      id: uid(),
+      type: 'standard',
+      lineType: 'Standard',
+      color: '#ffffff',
+      width: 4,
+      notes: '',
+      geometryType: 'polyline',
+      created: new Date().toISOString()
+    }, feature.properties || {});
+
+    styleLayer(layer);
+    drawnItems.addLayer(layer);
+    makeLayerSelectable(layer);
+  });
+}
+
+function renameLot(lotId) {
+  var lot = lots.find(function(l) { return l.id === lotId; });
+  if (!lot) return;
+
+  showModal(
+    '<h3>Rename Lot</h3>' +
+    '<div class="modal-field"><label>Lot Name</label><input type="text" id="renameLotInput" value="' + lot.name.replace(/"/g, '&quot;') + '"></div>' +
+    '<div class="modal-actions"><button class="modal-btn cancel" onclick="hideModal()">Cancel</button><button class="modal-btn primary" id="renameLotConfirm">Rename</button></div>'
+  );
+
+  var input = document.getElementById('renameLotInput');
+  input.focus();
+  input.select();
+
+  document.getElementById('renameLotConfirm').addEventListener('click', function() {
+    var name = input.value.trim();
+    if (name) {
+      lot.name = name;
+      lot.modified = new Date().toISOString();
+      saveLots();
+      renderLotList();
+      hideModal();
+      showToast('Lot renamed');
+    }
+  });
+
+  input.addEventListener('keydown', function(e) {
+    if (e.key === 'Enter') document.getElementById('renameLotConfirm').click();
+  });
+}
+
+function duplicateLot(lotId) {
+  var lot = lots.find(function(l) { return l.id === lotId; });
+  if (!lot) return;
+
+  var copy = JSON.parse(JSON.stringify(lot));
+  copy.id = uid();
+  copy.name = lot.name + ' (Copy)';
+  copy.created = new Date().toISOString();
+  copy.modified = new Date().toISOString();
+  // Re-generate feature IDs
+  copy.features.forEach(function(f) {
+    if (f.properties) f.properties.id = uid();
+  });
+
+  lots.push(copy);
+  saveLots();
+  setActiveLot(copy.id);
+  renderLotList();
+  updateDashboard();
+  showToast('Lot duplicated');
+}
+
+function deleteLot(lotId) {
+  var lot = lots.find(function(l) { return l.id === lotId; });
+  if (!lot) return;
+
+  showModal(
+    '<h3>Delete Lot</h3>' +
+    '<p style="color:var(--text-2);font-size:.875rem;margin-bottom:16px">Are you sure you want to delete <strong>"' + lot.name + '"</strong>? This cannot be undone.</p>' +
+    '<div class="modal-actions"><button class="modal-btn cancel" onclick="hideModal()">Cancel</button><button class="modal-btn danger" id="deleteLotConfirm">Delete</button></div>'
+  );
+
+  document.getElementById('deleteLotConfirm').addEventListener('click', function() {
+    lots = lots.filter(function(l) { return l.id !== lotId; });
+    // Remove associated jobs
+    jobs = jobs.filter(function(j) { return j.lotId !== lotId; });
+    saveLots();
+    saveJobs();
+
+    if (activeLotId === lotId) {
+      activeLotId = null;
+      localStorage.removeItem(STORAGE_KEYS.activeLot);
+      drawnItems.clearLayers();
+      selectedFeatureId = null;
+      showEmptyProperties();
+    }
+
+    renderLotList();
+    renderJobsList();
+    updateJobLotSelect();
+    updateDashboard();
+    hideModal();
+    showToast('Lot deleted');
+  });
+}
+
+function renderLotList() {
+  var container = document.getElementById('lotList');
+
+  if (!lots.length) {
+    container.innerHTML =
+      '<div class="empty-state">' +
+      '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="18" height="18" rx="2"/><path d="M3 9h18"/><path d="M9 21V9"/></svg>' +
+      'No lots yet. Click <strong>+ New</strong> to create your first parking lot design.' +
+      '</div>';
+    return;
+  }
+
+  container.innerHTML = lots.map(function(lot) {
+    var featureCount = lot.features ? lot.features.length : 0;
+    var isActive = lot.id === activeLotId;
+    return '<div class="lot-item' + (isActive ? ' active' : '') + '" data-lot-id="' + lot.id + '">' +
+      '<div class="lot-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><rect x="3" y="3" width="18" height="18" rx="2"/><path d="M3 9h18"/><path d="M9 21V9"/></svg></div>' +
+      '<div class="lot-info"><div class="lot-name">' + lot.name + '</div><div class="lot-meta">' + featureCount + ' features &middot; ' + formatDate(lot.modified) + '</div></div>' +
+      '<button class="lot-menu-btn" data-lot-menu="' + lot.id + '"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="5" r="1"/><circle cx="12" cy="12" r="1"/><circle cx="12" cy="19" r="1"/></svg></button>' +
+    '</div>';
+  }).join('');
+}
+
+document.getElementById('lotList').addEventListener('click', function(e) {
+  // Menu button
+  var menuBtn = e.target.closest('[data-lot-menu]');
+  if (menuBtn) {
+    e.stopPropagation();
+    var lotId = menuBtn.dataset.lotMenu;
+    var rect = menuBtn.getBoundingClientRect();
+    showContextMenu(rect.left, rect.bottom + 4, [
+      {
+        label: 'Rename',
+        icon: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>',
+        action: function() { renameLot(lotId); }
+      },
+      {
+        label: 'Duplicate',
+        icon: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg>',
+        action: function() { duplicateLot(lotId); }
+      },
+      {
+        label: 'Delete',
+        icon: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/></svg>',
+        danger: true,
+        action: function() { deleteLot(lotId); }
+      }
+    ]);
+    return;
+  }
+
+  // Lot item click
+  var lotItem = e.target.closest('.lot-item');
+  if (lotItem) {
+    setActiveLot(lotItem.dataset.lotId);
+  }
+});
+
+// Right-click context menu on lot items
+document.getElementById('lotList').addEventListener('contextmenu', function(e) {
+  var lotItem = e.target.closest('.lot-item');
+  if (!lotItem) return;
+  e.preventDefault();
+  var lotId = lotItem.dataset.lotId;
+  showContextMenu(e.clientX, e.clientY, [
+    { label: 'Rename', action: function() { renameLot(lotId); } },
+    { label: 'Duplicate', action: function() { duplicateLot(lotId); } },
+    { label: 'Delete', danger: true, action: function() { deleteLot(lotId); } }
+  ]);
+});
+
+// New Lot button
+document.getElementById('newLotBtn').addEventListener('click', function() {
+  showModal(
+    '<h3>New Lot</h3>' +
+    '<div class="modal-field"><label>Lot Name</label><input type="text" id="newLotName" placeholder="e.g. Main Street Plaza" autofocus></div>' +
+    '<div class="modal-actions"><button class="modal-btn cancel" onclick="hideModal()">Cancel</button><button class="modal-btn primary" id="newLotConfirm">Create</button></div>'
+  );
+
+  setTimeout(function() { document.getElementById('newLotName').focus(); }, 100);
+
+  document.getElementById('newLotConfirm').addEventListener('click', function() {
+    var name = document.getElementById('newLotName').value.trim();
+    if (!name) name = 'Untitled Lot';
+    hideModal();
+    createLot(name);
+  });
+
+  document.getElementById('newLotName').addEventListener('keydown', function(e) {
+    if (e.key === 'Enter') document.getElementById('newLotConfirm').click();
+  });
+});
+
+/* ═══════════════════════════════════════════════════════════════════
+   JOBS
+═══════════════════════════════════════════════════════════════════ */
+function updateJobLotSelect() {
+  var select = document.getElementById('jobLotSelect');
+  select.innerHTML = '<option value="">Select a lot...</option>' +
+    lots.map(function(lot) {
+      return '<option value="' + lot.id + '">' + lot.name + '</option>';
+    }).join('');
+}
+
+function renderJobsList() {
+  var container = document.getElementById('jobsList');
+  if (!jobs.length) {
+    container.innerHTML = '<div class="empty-state" style="padding:16px">No scheduled jobs yet.</div>';
+    return;
+  }
+
+  container.innerHTML = jobs.map(function(job) {
+    var lot = lots.find(function(l) { return l.id === job.lotId; });
+    var lotName = lot ? lot.name : 'Deleted Lot';
+    var dateStr = new Date(job.date + 'T00:00:00').toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric', year: 'numeric' });
+    var isPast = new Date(job.date) < new Date(new Date().toDateString());
+    return '<div class="job-item">' +
+      '<div class="job-status ' + job.status + '"></div>' +
+      '<div class="job-info"><div class="job-lot-name">' + lotName + '</div><div class="job-date">' + dateStr + (isPast && job.status === 'pending' ? ' (overdue)' : '') + '</div></div>' +
+      '<div class="job-actions">' +
+        (job.status === 'pending' ?
+          '<button class="job-action-btn" data-complete-job="' + job.id + '" title="Mark complete"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg></button>' : '') +
+        '<button class="job-action-btn" data-delete-job="' + job.id + '" title="Delete job"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg></button>' +
+      '</div>' +
+    '</div>';
+  }).join('');
+}
+
+document.getElementById('jobsList').addEventListener('click', function(e) {
+  var completeBtn = e.target.closest('[data-complete-job]');
+  if (completeBtn) {
+    var jobId = completeBtn.dataset.completeJob;
+    var job = jobs.find(function(j) { return j.id === jobId; });
+    if (job) {
+      job.status = 'completed';
+      saveJobs();
+      renderJobsList();
+      updateDashboard();
+      showToast('Job marked complete');
+    }
+    return;
+  }
+
+  var deleteBtn = e.target.closest('[data-delete-job]');
+  if (deleteBtn) {
+    var jobId2 = deleteBtn.dataset.deleteJob;
+    jobs = jobs.filter(function(j) { return j.id !== jobId2; });
+    saveJobs();
+    renderJobsList();
+    updateDashboard();
+    showToast('Job removed');
+  }
+});
+
+document.getElementById('addJobBtn').addEventListener('click', function() {
+  var lotId = document.getElementById('jobLotSelect').value;
+  var date = document.getElementById('jobDate').value;
+
+  if (!lotId) { showToast('Select a lot first', 'error'); return; }
+  if (!date) { showToast('Select a date', 'error'); return; }
+
+  jobs.push({
+    id: uid(),
+    lotId: lotId,
+    date: date,
+    status: 'pending',
+    created: new Date().toISOString()
+  });
+
+  saveJobs();
+  renderJobsList();
+  updateDashboard();
+  document.getElementById('jobDate').value = '';
+  showToast('Job scheduled');
+});
+
+/* ═══════════════════════════════════════════════════════════════════
+   DASHBOARD
+═══════════════════════════════════════════════════════════════════ */
+function updateDashboard() {
+  document.getElementById('statLots').textContent = lots.length;
+
+  var totalFeatures = 0;
+  lots.forEach(function(lot) { totalFeatures += (lot.features ? lot.features.length : 0); });
+  document.getElementById('statFeatures').textContent = totalFeatures;
+
+  var pendingJobs = jobs.filter(function(j) { return j.status === 'pending'; }).length;
+  document.getElementById('statPending').textContent = pendingJobs;
+
+  // Estimate waypoints for active lot
+  var wpCount = 0;
+  if (activeLotId) {
+    var lot = lots.find(function(l) { return l.id === activeLotId; });
+    if (lot && lot.features) {
+      lot.features.forEach(function(f) {
+        var coords = extractCoords(f);
+        if (coords && coords.length >= 2) {
+          var dist = calcPolylineDistanceM(coords);
+          wpCount += Math.ceil(dist / WAYPOINT_SPACING_M) + 4; // +4 for spray on/off + speed cmds
+        }
+      });
+    }
+  }
+  document.getElementById('statWaypoints').textContent = wpCount;
+}
+
+var dashboardToggle = document.getElementById('dashboardToggle');
+dashboardToggle.addEventListener('click', function() {
+  document.getElementById('dashboardBar').classList.toggle('hidden');
+});
+
+/* ═══════════════════════════════════════════════════════════════════
+   EXPORT — GeoJSON
+═══════════════════════════════════════════════════════════════════ */
+document.getElementById('exportGeojson').addEventListener('click', function() {
+  closeExportDropdown();
+  if (!activeLotId) { showToast('No lot selected', 'error'); return; }
+
+  var lot = lots.find(function(l) { return l.id === activeLotId; });
+  if (!lot || !lot.features || !lot.features.length) { showToast('No features to export', 'error'); return; }
+
+  var fc = {
+    type: 'FeatureCollection',
+    features: lot.features.map(function(f) {
+      return {
+        type: 'Feature',
+        geometry: f.geometry,
+        properties: {
+          type: (f.properties && f.properties.type) || 'standard',
+          lineType: (f.properties && f.properties.lineType) || 'Standard',
+          color: (f.properties && f.properties.color) || '#ffffff',
+          width: (f.properties && f.properties.width) || 4,
+          notes: (f.properties && f.properties.notes) || ''
+        }
+      };
+    })
+  };
+
+  downloadFile(lot.name.replace(/[^a-zA-Z0-9_-]/g, '_') + '.geojson', JSON.stringify(fc, null, 2), 'application/geo+json');
+  showToast('GeoJSON exported: ' + lot.features.length + ' features');
+});
+
+/* ═══════════════════════════════════════════════════════════════════
+   EXPORT — Waypoints (Mission Planner .waypoints format)
+
+   Format: QGC WPL 110
+   Each row: seq  current  frame  command  p1  p2  p3  p4  lat  lng  alt  autocontinue
+
+   Commands used:
+     16  = MAV_CMD_NAV_WAYPOINT (navigate to lat/lng)
+     178 = MAV_CMD_DO_CHANGE_SPEED (p1=0 airspeed, p2=speed m/s, p3=-1 no throttle)
+     181 = MAV_CMD_DO_SET_SERVO (p1=servo channel, p2=PWM: 1=on, 0=off)
+
+   Per line segment:
+     - DO_CHANGE_SPEED to transit speed
+     - WAYPOINT at segment start (approach)
+     - DO_CHANGE_SPEED to spray speed
+     - DO_SET_SERVO spray ON
+     - WAYPOINTS along the line at 0.5m intervals
+     - DO_SET_SERVO spray OFF
+═══════════════════════════════════════════════════════════════════ */
+function extractCoords(feature) {
+  if (!feature || !feature.geometry) return null;
+  var geom = feature.geometry;
+
+  switch (geom.type) {
+    case 'Point':
+      return [[geom.coordinates[0], geom.coordinates[1]]];
+
+    case 'LineString':
+      return geom.coordinates.map(function(c) { return [c[0], c[1]]; });
+
+    case 'Polygon':
+      // Use exterior ring, close the loop
+      var ring = geom.coordinates[0];
+      return ring.map(function(c) { return [c[0], c[1]]; });
+
+    case 'MultiLineString':
+      var all = [];
+      geom.coordinates.forEach(function(line) {
+        line.forEach(function(c) { all.push([c[0], c[1]]); });
+      });
+      return all;
+
+    default:
+      return null;
+  }
+}
+
+function distanceM(lat1, lon1, lat2, lon2) {
+  var dLat = (lat2 - lat1) * Math.PI / 180;
+  var dLon = (lon2 - lon1) * Math.PI / 180;
+  var a = Math.sin(dLat/2) * Math.sin(dLat/2) +
+          Math.cos(lat1 * Math.PI / 180) * Math.cos(lat2 * Math.PI / 180) *
+          Math.sin(dLon/2) * Math.sin(dLon/2);
+  return EARTH_RADIUS * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a));
+}
+
+function calcPolylineDistanceM(coords) {
+  // coords as [[lng, lat], ...]
+  var dist = 0;
+  for (var i = 1; i < coords.length; i++) {
+    dist += distanceM(coords[i-1][1], coords[i-1][0], coords[i][1], coords[i][0]);
+  }
+  return dist;
+}
+
+function interpolatePoints(coords, spacingM) {
+  // coords: [[lng, lat], ...], returns [[lng, lat], ...]
+  var result = [coords[0]];
+
+  for (var i = 1; i < coords.length; i++) {
+    var startLng = coords[i-1][0], startLat = coords[i-1][1];
+    var endLng = coords[i][0], endLat = coords[i][1];
+    var segDist = distanceM(startLat, startLng, endLat, endLng);
+
+    if (segDist < spacingM) {
+      result.push(coords[i]);
+      continue;
+    }
+
+    var steps = Math.floor(segDist / spacingM);
+    for (var s = 1; s <= steps; s++) {
+      var frac = s / Math.ceil(segDist / spacingM);
+      var interpLng = startLng + (endLng - startLng) * frac;
+      var interpLat = startLat + (endLat - startLat) * frac;
+      result.push([interpLng, interpLat]);
+    }
+
+    // Add endpoint if not already close
+    var lastPt = result[result.length - 1];
+    var endDist = distanceM(lastPt[1], lastPt[0], endLat, endLng);
+    if (endDist > 0.05) {
+      result.push(coords[i]);
+    }
+  }
+
+  return result;
+}
+
+function waypointLine(seq, frame, cmd, p1, p2, p3, p4, lat, lng, alt) {
+  return seq + '\t0\t' + frame + '\t' + cmd + '\t' + p1 + '\t' + p2 + '\t' + p3 + '\t' + p4 + '\t' +
+    lat.toFixed(8) + '\t' + lng.toFixed(8) + '\t' + alt.toFixed(6) + '\t1';
+}
+
+document.getElementById('exportWaypoints').addEventListener('click', function() {
+  closeExportDropdown();
+  if (!activeLotId) { showToast('No lot selected', 'error'); return; }
+
+  var lot = lots.find(function(l) { return l.id === activeLotId; });
+  if (!lot || !lot.features || !lot.features.length) { showToast('No features to export', 'error'); return; }
+
+  var lines = ['QGC WPL 110'];
+  var seq = 0;
+
+  // Home position (first feature's first coordinate)
+  var firstCoords = null;
+  for (var fi = 0; fi < lot.features.length; fi++) {
+    firstCoords = extractCoords(lot.features[fi]);
+    if (firstCoords && firstCoords.length >= 1) break;
+  }
+
+  if (!firstCoords) { showToast('No valid features to export', 'error'); return; }
+
+  // Home waypoint
+  lines.push(waypointLine(seq++, 0, 16, 0, 0, 0, 0, firstCoords[0][1], firstCoords[0][0], 0));
+
+  // Process each feature
+  lot.features.forEach(function(feature) {
+    var coords = extractCoords(feature);
+    if (!coords || coords.length < 2) return;
+
+    // For polygons: ensure the path closes
+    var geomType = feature.geometry ? feature.geometry.type : '';
+    if (geomType === 'Polygon') {
+      var first = coords[0];
+      var last = coords[coords.length - 1];
+      if (first[0] !== last[0] || first[1] !== last[1]) {
+        coords.push([first[0], first[1]]);
+      }
+    }
+
+    // Interpolate waypoints along the path
+    var interpolated = interpolatePoints(coords, WAYPOINT_SPACING_M);
+
+    // Approach: set transit speed, navigate to start
+    lines.push(waypointLine(seq++, 3, 178, 0, TRANSIT_SPEED, -1, 0, 0, 0, 0));
+    lines.push(waypointLine(seq++, 3, 16, 0, 0.05, 0, 0, interpolated[0][1], interpolated[0][0], 0));
+
+    // Set spray speed
+    lines.push(waypointLine(seq++, 3, 178, 0, SPRAY_SPEED, -1, 0, 0, 0, 0));
+
+    // Spray ON
+    lines.push(waypointLine(seq++, 3, 181, 0, 1, 0, 0, 0, 0, 0));
+
+    // Waypoints along the path
+    for (var w = 1; w < interpolated.length; w++) {
+      lines.push(waypointLine(seq++, 3, 16, 0, 0.05, 0, 0, interpolated[w][1], interpolated[w][0], 0));
+    }
+
+    // Spray OFF
+    lines.push(waypointLine(seq++, 3, 181, 0, 0, 0, 0, 0, 0, 0));
+  });
+
+  var content = lines.join('\n') + '\n';
+  downloadFile(lot.name.replace(/[^a-zA-Z0-9_-]/g, '_') + '.waypoints', content, 'text/plain');
+  showToast('Waypoints exported: ' + seq + ' commands for ' + lot.features.length + ' features');
+});
+
+/* ═══════════════════════════════════════════════════════════════════
+   EXPORT DROPDOWN
+═══════════════════════════════════════════════════════════════════ */
+document.getElementById('exportBtn').addEventListener('click', function(e) {
+  e.stopPropagation();
+  document.getElementById('exportDropdown').classList.toggle('visible');
+});
+
+function closeExportDropdown() {
+  document.getElementById('exportDropdown').classList.remove('visible');
+}
+
+document.addEventListener('click', function(e) {
+  if (!e.target.closest('.export-wrapper')) closeExportDropdown();
+});
+
+/* ═══════════════════════════════════════════════════════════════════
+   FILE DOWNLOAD HELPER
+═══════════════════════════════════════════════════════════════════ */
+function downloadFile(filename, content, mimeType) {
+  var blob = new Blob([content], { type: mimeType || 'text/plain' });
+  var url = URL.createObjectURL(blob);
+  var a = document.createElement('a');
+  a.href = url;
+  a.download = filename;
+  document.body.appendChild(a);
+  a.click();
+  setTimeout(function() {
+    URL.revokeObjectURL(url);
+    a.remove();
+  }, 100);
+}
+
+/* ═══════════════════════════════════════════════════════════════════
+   KEYBOARD SHORTCUTS
+═══════════════════════════════════════════════════════════════════ */
+document.addEventListener('keydown', function(e) {
+  // Don't trigger shortcuts when typing in inputs
+  if (e.target.matches('input, textarea, select')) return;
+
+  switch(e.key.toLowerCase()) {
+    case 'l': setActiveTool('polyline'); break;
+    case 'r': setActiveTool('rectangle'); break;
+    case 'p': setActiveTool('polygon'); break;
+    case 'm': setActiveTool('marker'); break;
+    case 'x': setActiveTool('eraser'); break;
+    case 'v': case 'escape': setActiveTool('pan'); break;
+    case 'delete': case 'backspace':
+      if (selectedFeatureId) {
+        drawnItems.eachLayer(function(layer) {
+          if (layer.featureProps && layer.featureProps.id === selectedFeatureId) {
+            drawnItems.removeLayer(layer);
+            selectedFeatureId = null;
+            showEmptyProperties();
+            saveCurrentLot();
+            updateDashboard();
+            showToast('Feature deleted');
+          }
+        });
+      }
+      break;
+    case 's':
+      if (e.ctrlKey || e.metaKey) {
+        e.preventDefault();
+        saveCurrentLot();
+        showToast('Lot saved');
+      }
+      break;
+  }
+});
+
+/* ═══════════════════════════════════════════════════════════════════
+   MAP CLICK — deselect
+═══════════════════════════════════════════════════════════════════ */
+function initMapClickHandler() {
+  map.on('click', function() {
+    if (activeTool === 'pan' && selectedFeatureId) {
+      selectedFeatureId = null;
+      drawnItems.eachLayer(function(l) { styleLayer(l); });
+      showEmptyProperties();
+    }
+  });
+}
+
+/* ═══════════════════════════════════════════════════════════════════
+   INIT
+═══════════════════════════════════════════════════════════════════ */
+function init() {
+  loadState();
+  initMap();
+  initMapClickHandler();
+  renderLotList();
+  renderJobsList();
+  updateJobLotSelect();
+  updateDashboard();
+
+  // Restore active lot
+  if (activeLotId) {
+    var lot = lots.find(function(l) { return l.id === activeLotId; });
+    if (lot) {
+      loadLotFeatures(activeLotId);
+      if (lot.center) {
+        map.setView([lot.center.lat, lot.center.lng], lot.zoom || 18);
+      }
+    } else {
+      activeLotId = null;
+      localStorage.removeItem(STORAGE_KEYS.activeLot);
+    }
+  }
+
+  // Set default date for job scheduler
+  var today = new Date();
+  var dd = String(today.getDate()).padStart(2, '0');
+  var mm = String(today.getMonth() + 1).padStart(2, '0');
+  var yyyy = today.getFullYear();
+  document.getElementById('jobDate').value = yyyy + '-' + mm + '-' + dd;
+}
+
+// Make hideModal globally accessible for inline onclick
+window.hideModal = hideModal;
+
+init();
+
+})();
+</script>
+</body>
+</html>

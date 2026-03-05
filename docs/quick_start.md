@@ -5,6 +5,10 @@ lot. This guide assumes the Tier 2 "Best Value" build (~$780).
 
 Total estimated time: 2 weekends (20-25 hours of hands-on work).
 
+> **Prefer a ready-to-run robot?** The assembled Strype robot ships
+> pre-built, pre-flashed, pre-calibrated, and ready to paint in 30 minutes.
+> See `docs/business-plan.md` for details on the assembled product vs. DIY.
+
 **Tools required**: soldering iron, multimeter, hex key set (M3, M5), drill
 with bits, wire strippers, crimping tool, screwdrivers (Phillips, flat),
 tape measure, adjustable wrench, laptop with USB-C port.
