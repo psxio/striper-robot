@@ -123,7 +123,13 @@
 
     <script>
     var API_BASE = window.location.origin + '/api';
-    var token = localStorage.getItem('strype_auth_token');
+    var token = localStorage.getItem('strype_token');
+
+    function escapeHtml(str) {
+        var div = document.createElement('div');
+        div.appendChild(document.createTextNode(str));
+        return div.innerHTML;
+    }
 
     function api(method, path, body) {
         var opts = {
@@ -177,8 +183,8 @@
                 if (u.is_admin) planBadge += ' <span class="badge badge-admin">admin</span>';
                 var date = new Date(u.created_at).toLocaleDateString();
                 return '<tr>' +
-                    '<td>' + u.email + '</td>' +
-                    '<td>' + (u.name || '-') + '</td>' +
+                    '<td>' + escapeHtml(u.email) + '</td>' +
+                    '<td>' + escapeHtml(u.name || '-') + '</td>' +
                     '<td>' + planBadge + '</td>' +
                     '<td>' + u.lot_count + '</td>' +
                     '<td>' + u.job_count + '</td>' +
@@ -200,7 +206,7 @@
             if (!data.items.length) { tbody.innerHTML = '<tr><td colspan="3" class="empty">No entries</td></tr>'; return; }
             tbody.innerHTML = data.items.map(function(w) {
                 var date = new Date(w.created_at).toLocaleDateString();
-                return '<tr><td>' + w.email + '</td><td>' + w.source + '</td><td>' + date + '</td></tr>';
+                return '<tr><td>' + escapeHtml(w.email) + '</td><td>' + escapeHtml(w.source) + '</td><td>' + date + '</td></tr>';
             }).join('');
             renderPagination('waitlistPagination', data, loadWaitlist);
         });

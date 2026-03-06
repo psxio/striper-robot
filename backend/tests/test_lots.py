@@ -158,6 +158,32 @@ async def test_lot_isolation(client):
 
 
 @pytest.mark.asyncio
+async def test_lot_search(auth_client):
+    """Search lots by name."""
+    me = await auth_client.get("/api/auth/me")
+    await set_user_plan(me.json()["id"], "pro")
+
+    await auth_client.post("/api/lots", json={
+        "name": "Alpha Parking",
+        "center": {"lat": 40.0, "lng": -74.0},
+    })
+    await auth_client.post("/api/lots", json={
+        "name": "Beta Garage",
+        "center": {"lat": 41.0, "lng": -75.0},
+    })
+
+    # Search for "Alpha" -> 1 result
+    resp = await auth_client.get("/api/lots?search=Alpha")
+    assert resp.status_code == 200
+    assert resp.json()["total"] == 1
+    assert resp.json()["items"][0]["name"] == "Alpha Parking"
+
+    # Search with no match -> 0
+    resp = await auth_client.get("/api/lots?search=Gamma")
+    assert resp.json()["total"] == 0
+
+
+@pytest.mark.asyncio
 async def test_unauthorized(client):
     resp = await client.get("/api/lots")
     assert resp.status_code == 401

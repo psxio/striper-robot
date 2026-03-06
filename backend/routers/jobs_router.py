@@ -1,13 +1,17 @@
 """Job management routes with tenant isolation."""
 
+import logging
+
 from fastapi import APIRouter, Depends, HTTPException, Query
+from typing import Optional
 
 from ..auth import get_current_user
 from ..config import settings
 from ..models.schemas import JobCreate, JobUpdate, JobResponse, PaginatedJobResponse
-from ..services import job_store
+from ..services import job_store, lot_store
 
 router = APIRouter(prefix="/api/jobs", tags=["jobs"])
+logger = logging.getLogger("strype.jobs")
 
 
 def _to_response(job: dict) -> JobResponse:
@@ -19,9 +23,11 @@ def _to_response(job: dict) -> JobResponse:
 async def list_jobs(
     page: int = Query(default=1, ge=1),
     limit: int = Query(default=50, ge=1, le=200),
+    status: Optional[str] = Query(default=None),
+    lot_id: Optional[str] = Query(default=None, alias="lotId"),
     user: dict = Depends(get_current_user),
 ):
-    items, total = await job_store.list_jobs(user["id"], page=page, limit=limit)
+    items, total = await job_store.list_jobs(user["id"], page=page, limit=limit, status=status, lot_id=lot_id)
     return PaginatedJobResponse(
         items=[_to_response(j) for j in items],
         total=total,
@@ -32,16 +38,23 @@ async def list_jobs(
 
 @router.post("", response_model=JobResponse, status_code=201)
 async def create_job(body: JobCreate, user: dict = Depends(get_current_user)):
-    # Plan enforcement
+    # Validate lot ownership
+    lot = await lot_store.get_lot(user["id"], body.lotId)
+    if not lot:
+        raise HTTPException(status_code=404, detail="Lot not found")
+
+    # Atomic plan enforcement
     plan = user.get("plan") or "free"
     limits = settings.PLAN_LIMITS.get(plan, settings.PLAN_LIMITS["free"])
-    current_count = await job_store.count_jobs(user["id"])
-    if current_count >= limits["max_jobs"]:
+    job = await job_store.create_job_atomic(
+        user["id"], body.lotId, body.date, limits["max_jobs"]
+    )
+    if not job:
         raise HTTPException(
             status_code=403,
-            detail=f"Free plan limited to {limits['max_jobs']} jobs",
+            detail=f"Plan limited to {limits['max_jobs']} jobs",
         )
-    job = await job_store.create_job(user["id"], body.lotId, body.date)
+    logger.info("Job created: %s for lot %s", job["id"], body.lotId)
     return _to_response(job)
 
 

@@ -1,5 +1,8 @@
 """Billing routes: Stripe Checkout, webhook, and customer portal."""
 
+import logging
+from urllib.parse import urlparse
+
 from fastapi import APIRouter, Depends, HTTPException, Request
 
 from ..auth import get_current_user
@@ -7,10 +10,26 @@ from ..config import settings
 from ..services import billing_store, user_store
 
 router = APIRouter(prefix="/api/billing", tags=["billing"])
+logger = logging.getLogger("strype.billing")
+
+# Webhook idempotency: track processed event IDs (capped at 10k)
+_processed_events: set[str] = set()
 
 
 def _stripe_configured() -> bool:
     return bool(settings.STRIPE_SECRET_KEY and settings.STRIPE_PRICE_ID)
+
+
+def _get_safe_origin(request: Request) -> str:
+    """Return a safe redirect origin, preferring FRONTEND_URL config."""
+    if settings.FRONTEND_URL:
+        return settings.FRONTEND_URL.rstrip("/")
+    origin = request.headers.get("origin", "")
+    if origin:
+        allowed = [o.strip() for o in settings.CORS_ORIGINS.split(",") if o.strip()]
+        if "*" not in allowed and origin not in allowed:
+            origin = ""
+    return origin or "http://localhost:8000"
 
 
 @router.post("/create-checkout")
@@ -39,16 +58,21 @@ async def create_checkout(request: Request, user: dict = Depends(get_current_use
             )
             await db.commit()
 
-    origin = request.headers.get("origin", "http://localhost:8000")
-    session = stripe.checkout.Session.create(
-        customer=customer_id,
-        payment_method_types=["card"],
-        line_items=[{"price": settings.STRIPE_PRICE_ID, "quantity": 1}],
-        mode="subscription",
-        success_url=f"{origin}/platform.html?billing=success",
-        cancel_url=f"{origin}/platform.html?billing=cancel",
-        metadata={"user_id": user["id"]},
-    )
+    origin = _get_safe_origin(request)
+    try:
+        session = stripe.checkout.Session.create(
+            customer=customer_id,
+            payment_method_types=["card"],
+            line_items=[{"price": settings.STRIPE_PRICE_ID, "quantity": 1}],
+            mode="subscription",
+            success_url=f"{origin}/platform.html?billing=success",
+            cancel_url=f"{origin}/platform.html?billing=cancel",
+            metadata={"user_id": user["id"]},
+        )
+    except stripe.error.StripeError as e:
+        logger.error("Stripe checkout error: %s", e)
+        raise HTTPException(status_code=502, detail="Payment service unavailable")
+    logger.info("Checkout session created for user %s", user["id"])
     return {"url": session.url}
 
 
@@ -70,6 +94,14 @@ async def stripe_webhook(request: Request):
         )
     except (ValueError, stripe.error.SignatureVerificationError):
         raise HTTPException(status_code=400, detail="Invalid webhook signature")
+
+    # Idempotency check
+    event_id = event.get("id", "")
+    if event_id in _processed_events:
+        return {"ok": True}
+    if len(_processed_events) >= 10000:
+        _processed_events.clear()
+    _processed_events.add(event_id)
 
     if event["type"] == "checkout.session.completed":
         session = event["data"]["object"]
@@ -106,9 +138,13 @@ async def billing_portal(request: Request, user: dict = Depends(get_current_user
     import stripe
     stripe.api_key = settings.STRIPE_SECRET_KEY
 
-    origin = request.headers.get("origin", "http://localhost:8000")
-    session = stripe.billing_portal.Session.create(
-        customer=customer_id,
-        return_url=f"{origin}/platform.html",
-    )
+    origin = _get_safe_origin(request)
+    try:
+        session = stripe.billing_portal.Session.create(
+            customer=customer_id,
+            return_url=f"{origin}/platform.html",
+        )
+    except stripe.error.StripeError as e:
+        logger.error("Stripe portal error: %s", e)
+        raise HTTPException(status_code=502, detail="Payment service unavailable")
     return {"url": session.url}

@@ -1,6 +1,7 @@
 """Database initialization and connection management using aiosqlite."""
 
 import os
+from datetime import datetime, timezone
 
 import aiosqlite
 
@@ -111,5 +112,18 @@ async def init_db():
         await db.execute("CREATE INDEX IF NOT EXISTS idx_jobs_user ON jobs(user_id)")
         await db.execute("CREATE INDEX IF NOT EXISTS idx_jobs_lot ON jobs(lot_id)")
         await db.execute("CREATE INDEX IF NOT EXISTS idx_users_email ON users(email)")
+        await db.execute("CREATE INDEX IF NOT EXISTS idx_subs_user ON subscriptions(user_id)")
+        await db.execute("CREATE INDEX IF NOT EXISTS idx_subs_stripe ON subscriptions(stripe_subscription_id)")
+        await db.execute("CREATE INDEX IF NOT EXISTS idx_resets_token ON password_resets(token_hash)")
+
+        # Cleanup expired password reset tokens
+        now = datetime.now(timezone.utc).isoformat()
+        await db.execute("DELETE FROM password_resets WHERE expires_at < ?", (now,))
+
+        # Add soft-delete column to lots (idempotent)
+        try:
+            await db.execute("ALTER TABLE lots ADD COLUMN deleted_at TEXT")
+        except Exception:
+            pass  # Column already exists
 
         await db.commit()

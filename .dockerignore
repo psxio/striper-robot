@@ -1,0 +1,12 @@
+.git
+archive/
+ardurover/
+striper_pathgen/
+docs/
+scripts/
+*.md
+*.db
+__pycache__
+.pytest_cache
+venv/
+.claude/

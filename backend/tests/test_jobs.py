@@ -135,6 +135,86 @@ async def test_job_isolation(client):
 
 
 @pytest.mark.asyncio
+async def test_create_job_for_other_users_lot(client):
+    """Verify that a user cannot create a job for another user's lot."""
+    # Register user 1 and create a lot
+    resp1 = await client.post("/api/auth/register", json={
+        "email": "owner@example.com",
+        "password": "password123",
+    })
+    token1 = resp1.json()["token"]
+    client.headers["Authorization"] = f"Bearer {token1}"
+
+    lot_resp = await client.post("/api/lots", json={
+        "name": "Owner's Lot",
+        "center": {"lat": 40.0, "lng": -74.0},
+    })
+    lot_id = lot_resp.json()["id"]
+
+    # Register user 2
+    del client.headers["Authorization"]
+    resp2 = await client.post("/api/auth/register", json={
+        "email": "attacker@example.com",
+        "password": "password123",
+    })
+    token2 = resp2.json()["token"]
+    client.headers["Authorization"] = f"Bearer {token2}"
+
+    # User 2 tries to create a job for user 1's lot
+    resp = await client.post("/api/jobs", json={
+        "lotId": lot_id,
+        "date": "2026-04-01",
+    })
+    assert resp.status_code == 404
+
+
+@pytest.mark.asyncio
+async def test_job_filter_by_status(auth_client, lot_id):
+    """Filter jobs by status."""
+    # Create two jobs
+    resp1 = await auth_client.post("/api/jobs", json={"lotId": lot_id, "date": "2026-04-01"})
+    resp2 = await auth_client.post("/api/jobs", json={"lotId": lot_id, "date": "2026-04-02"})
+    job1_id = resp1.json()["id"]
+
+    # Complete one
+    await auth_client.patch(f"/api/jobs/{job1_id}", json={"status": "completed"})
+
+    # Filter pending
+    resp = await auth_client.get("/api/jobs?status=pending")
+    assert resp.json()["total"] == 1
+    assert resp.json()["items"][0]["status"] == "pending"
+
+    # Filter completed
+    resp = await auth_client.get("/api/jobs?status=completed")
+    assert resp.json()["total"] == 1
+    assert resp.json()["items"][0]["status"] == "completed"
+
+
+@pytest.mark.asyncio
+async def test_job_filter_by_lot(auth_client):
+    """Filter jobs by lot ID."""
+    from backend.services.billing_store import set_user_plan
+    me = await auth_client.get("/api/auth/me")
+    await set_user_plan(me.json()["id"], "pro")
+
+    lot1 = await auth_client.post("/api/lots", json={
+        "name": "Lot A", "center": {"lat": 40.0, "lng": -74.0},
+    })
+    lot2 = await auth_client.post("/api/lots", json={
+        "name": "Lot B", "center": {"lat": 41.0, "lng": -75.0},
+    })
+    lot1_id = lot1.json()["id"]
+    lot2_id = lot2.json()["id"]
+
+    await auth_client.post("/api/jobs", json={"lotId": lot1_id, "date": "2026-04-01"})
+    await auth_client.post("/api/jobs", json={"lotId": lot2_id, "date": "2026-04-02"})
+
+    resp = await auth_client.get(f"/api/jobs?lotId={lot1_id}")
+    assert resp.json()["total"] == 1
+    assert resp.json()["items"][0]["lotId"] == lot1_id
+
+
+@pytest.mark.asyncio
 async def test_unauthorized(client):
     resp = await client.get("/api/jobs")
     assert resp.status_code == 401

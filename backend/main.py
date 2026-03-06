@@ -1,5 +1,6 @@
 """FastAPI entry point for the Strype Cloud Platform."""
 
+import logging
 from contextlib import asynccontextmanager
 
 from fastapi import FastAPI, Request, Response
@@ -13,9 +14,16 @@ from .database import init_db, get_db
 from .rate_limit import limiter
 from .routers import auth_router, lots_router, jobs_router, waitlist_router, user_router, billing_router, admin_router
 
+logging.basicConfig(
+    level=logging.INFO,
+    format="%(asctime)s %(levelname)s [%(name)s] %(message)s",
+)
+logger = logging.getLogger("strype")
+
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
+    logger.info("Strype Cloud Platform starting up (env=%s)", settings.ENV)
     await init_db()
     yield
 
@@ -44,6 +52,7 @@ async def security_headers(request: Request, call_next):
     response.headers["X-Content-Type-Options"] = "nosniff"
     response.headers["X-Frame-Options"] = "DENY"
     response.headers["Referrer-Policy"] = "strict-origin-when-cross-origin"
+    response.headers["Strict-Transport-Security"] = "max-age=63072000; includeSubDomains"
     return response
 
 

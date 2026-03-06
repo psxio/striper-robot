@@ -1,6 +1,7 @@
 """Lot management routes with tenant isolation."""
 
 import json
+import logging
 import os
 import tempfile
 import uuid
@@ -16,6 +17,7 @@ from ..models.schemas import LotCreate, LotUpdate, LotResponse, PaginatedLotResp
 from ..services import lot_store
 
 router = APIRouter(prefix="/api/lots", tags=["lots"])
+logger = logging.getLogger("strype.lots")
 
 MAX_IMPORT_SIZE = 5 * 1024 * 1024  # 5 MB
 
@@ -29,9 +31,10 @@ def _to_response(lot: dict) -> LotResponse:
 async def list_lots(
     page: int = Query(default=1, ge=1),
     limit: int = Query(default=50, ge=1, le=200),
+    search: str = Query(default=None, max_length=200),
     user: dict = Depends(get_current_user),
 ):
-    items, total = await lot_store.list_lots(user["id"], page=page, limit=limit)
+    items, total = await lot_store.list_lots(user["id"], page=page, limit=limit, search=search)
     return PaginatedLotResponse(
         items=[_to_response(l) for l in items],
         total=total,
@@ -42,17 +45,17 @@ async def list_lots(
 
 @router.post("", response_model=LotResponse, status_code=201)
 async def create_lot(body: LotCreate, user: dict = Depends(get_current_user)):
-    # Plan enforcement
+    # Atomic plan enforcement
     plan = user.get("plan") or "free"
     limits = settings.PLAN_LIMITS.get(plan, settings.PLAN_LIMITS["free"])
-    current_count = await lot_store.count_lots(user["id"])
-    if current_count >= limits["max_lots"]:
+    lot = await lot_store.create_lot_atomic(user["id"], body, limits["max_lots"])
+    if not lot:
         raise HTTPException(
             status_code=403,
-            detail=f"Free plan limited to {limits['max_lots']} lot"
+            detail=f"Plan limited to {limits['max_lots']} lot"
                    + ("s" if limits["max_lots"] != 1 else ""),
         )
-    lot = await lot_store.create_lot(user["id"], body)
+    logger.info("Lot created: %s by user %s", lot["id"], user["id"])
     return _to_response(lot)
 
 
@@ -113,6 +116,16 @@ async def import_file(
     content = await file.read()
     if len(content) > MAX_IMPORT_SIZE:
         raise HTTPException(status_code=413, detail="File exceeds 5 MB limit")
+
+    # Validate magic bytes
+    try:
+        text_preview = content[:500].decode("utf-8", errors="ignore")
+    except Exception:
+        text_preview = ""
+    if ext == ".dxf" and not text_preview.lstrip().startswith("0"):
+        raise HTTPException(status_code=400, detail="Invalid DXF file content")
+    if ext == ".svg" and "<svg" not in text_preview.lower():
+        raise HTTPException(status_code=400, detail="Invalid SVG file content")
 
     # Write to temp file and import
     suffix = ext

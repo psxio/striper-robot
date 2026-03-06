@@ -24,18 +24,27 @@ def _row_to_dict(row) -> dict:
     }
 
 
-async def list_jobs(user_id: str, page: int = 1, limit: int = 50) -> tuple[list[dict], int]:
-    """Return paginated jobs for a given user."""
+async def list_jobs(user_id: str, page: int = 1, limit: int = 50, status: str | None = None, lot_id: str | None = None) -> tuple[list[dict], int]:
+    """Return paginated jobs for a given user, optionally filtered."""
     async for db in get_db():
+        where = "WHERE user_id = ?"
+        params: list = [user_id]
+        if status:
+            where += " AND status = ?"
+            params.append(status)
+        if lot_id:
+            where += " AND lot_id = ?"
+            params.append(lot_id)
+
         cursor = await db.execute(
-            "SELECT COUNT(*) FROM jobs WHERE user_id = ?", (user_id,)
+            f"SELECT COUNT(*) FROM jobs {where}", tuple(params)
         )
         total = (await cursor.fetchone())[0]
 
         offset = (page - 1) * limit
         cursor = await db.execute(
-            "SELECT * FROM jobs WHERE user_id = ? ORDER BY updated_at DESC LIMIT ? OFFSET ?",
-            (user_id, limit, offset),
+            f"SELECT * FROM jobs {where} ORDER BY updated_at DESC LIMIT ? OFFSET ?",
+            tuple(params + [limit, offset]),
         )
         rows = await cursor.fetchall()
         return [_row_to_dict(r) for r in rows], total
@@ -48,6 +57,34 @@ async def count_jobs(user_id: str) -> int:
             "SELECT COUNT(*) FROM jobs WHERE user_id = ?", (user_id,)
         )
         return (await cursor.fetchone())[0]
+
+
+async def create_job_atomic(user_id: str, lot_id: str, date: str, max_jobs: int) -> Optional[dict]:
+    """Create a job atomically with plan limit check. Returns None if over limit."""
+    job_id = str(uuid.uuid4())
+    now = _now()
+    async for db in get_db():
+        await db.execute("BEGIN IMMEDIATE")
+        try:
+            cursor = await db.execute(
+                "SELECT COUNT(*) FROM jobs WHERE user_id = ?", (user_id,)
+            )
+            count = (await cursor.fetchone())[0]
+            if count >= max_jobs:
+                await db.execute("ROLLBACK")
+                return None
+            await db.execute(
+                """INSERT INTO jobs (id, user_id, lot_id, date, status, created_at, updated_at)
+                   VALUES (?, ?, ?, ?, 'pending', ?, ?)""",
+                (job_id, user_id, lot_id, date, now, now),
+            )
+            await db.execute("COMMIT")
+        except Exception:
+            await db.execute("ROLLBACK")
+            raise
+        cursor = await db.execute("SELECT * FROM jobs WHERE id = ?", (job_id,))
+        row = await cursor.fetchone()
+        return _row_to_dict(row)
 
 
 async def create_job(user_id: str, lot_id: str, date: str) -> dict:

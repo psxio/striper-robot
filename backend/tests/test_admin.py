@@ -3,25 +3,6 @@
 import pytest
 import pytest_asyncio
 
-from backend.services.admin_store import set_admin
-
-
-@pytest_asyncio.fixture
-async def admin_client(client):
-    """Client with an admin user."""
-    resp = await client.post("/api/auth/register", json={
-        "email": "admin@example.com",
-        "password": "adminpass123",
-        "name": "Admin User",
-    })
-    token = resp.json()["token"]
-    user_id = resp.json()["user"]["id"]
-    client.headers["Authorization"] = f"Bearer {token}"
-
-    # Make admin
-    await set_admin(user_id, True)
-    yield client
-
 
 @pytest.mark.asyncio
 async def test_non_admin_forbidden(auth_client):

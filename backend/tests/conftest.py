@@ -52,3 +52,35 @@ async def auth_client(client):
     token = resp.json()["token"]
     client.headers["Authorization"] = f"Bearer {token}"
     yield client
+
+
+@pytest_asyncio.fixture
+async def pro_client(client):
+    """Client with a registered Pro user."""
+    resp = await client.post("/api/auth/register", json={
+        "email": "pro@example.com",
+        "password": "propass123",
+        "name": "Pro User",
+    })
+    token = resp.json()["token"]
+    user_id = resp.json()["user"]["id"]
+    client.headers["Authorization"] = f"Bearer {token}"
+    from backend.services.billing_store import set_user_plan
+    await set_user_plan(user_id, "pro")
+    yield client
+
+
+@pytest_asyncio.fixture
+async def admin_client(client):
+    """Client with an admin user."""
+    resp = await client.post("/api/auth/register", json={
+        "email": "admin@example.com",
+        "password": "adminpass123",
+        "name": "Admin User",
+    })
+    token = resp.json()["token"]
+    user_id = resp.json()["user"]["id"]
+    client.headers["Authorization"] = f"Bearer {token}"
+    from backend.services.admin_store import set_admin
+    await set_admin(user_id, True)
+    yield client

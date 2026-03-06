@@ -149,3 +149,47 @@ async def test_export_empty_lot(auth_client, lot_id):
         json={"format": "geojson"},
     )
     assert resp.status_code == 400
+
+
+# --- Magic Byte Validation ---
+
+@pytest.mark.asyncio
+async def test_import_fake_dxf(auth_client, lot_id):
+    """Non-DXF content with .dxf extension should be rejected."""
+    resp = await auth_client.post(
+        f"/api/lots/{lot_id}/import",
+        files={"file": ("fake.dxf", b"This is not a DXF file at all", "application/octet-stream")},
+    )
+    assert resp.status_code == 400
+
+
+@pytest.mark.asyncio
+async def test_import_fake_svg(auth_client, lot_id):
+    """Non-SVG content with .svg extension should be rejected."""
+    resp = await auth_client.post(
+        f"/api/lots/{lot_id}/import",
+        files={"file": ("fake.svg", b"This is not an SVG file", "image/svg+xml")},
+    )
+    assert resp.status_code == 400
+
+
+@pytest.mark.asyncio
+async def test_import_svg_xxe_attempt(auth_client, lot_id):
+    """SVG with XXE entity should be handled safely."""
+    xxe_svg = b'''<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE svg [
+  <!ENTITY xxe SYSTEM "file:///etc/passwd">
+]>
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100">
+  <text>&xxe;</text>
+  <line x1="0" y1="0" x2="10" y2="10" stroke="black"/>
+</svg>'''
+    resp = await auth_client.post(
+        f"/api/lots/{lot_id}/import",
+        files={"file": ("xxe.svg", xxe_svg, "image/svg+xml")},
+    )
+    # Should either succeed safely (ignoring entity) or fail with parse error — never expose file contents
+    assert resp.status_code in (200, 400)
+    if resp.status_code == 200:
+        # If it parsed, ensure /etc/passwd content is not in the response
+        assert "root:" not in resp.text

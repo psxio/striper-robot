@@ -27,18 +27,24 @@ def _row_to_dict(row) -> dict:
     }
 
 
-async def list_lots(user_id: str, page: int = 1, limit: int = 50) -> tuple[list[dict], int]:
+async def list_lots(user_id: str, page: int = 1, limit: int = 50, search: str | None = None) -> tuple[list[dict], int]:
     """Return paginated lots for a given user."""
     async for db in get_db():
+        where = "WHERE user_id = ? AND deleted_at IS NULL"
+        params: list = [user_id]
+        if search:
+            where += " AND name LIKE ?"
+            params.append(f"%{search}%")
+
         cursor = await db.execute(
-            "SELECT COUNT(*) FROM lots WHERE user_id = ?", (user_id,)
+            f"SELECT COUNT(*) FROM lots {where}", tuple(params)
         )
         total = (await cursor.fetchone())[0]
 
         offset = (page - 1) * limit
         cursor = await db.execute(
-            "SELECT * FROM lots WHERE user_id = ? ORDER BY updated_at DESC LIMIT ? OFFSET ?",
-            (user_id, limit, offset),
+            f"SELECT * FROM lots {where} ORDER BY updated_at DESC LIMIT ? OFFSET ?",
+            tuple(params + [limit, offset]),
         )
         rows = await cursor.fetchall()
         return [_row_to_dict(r) for r in rows], total
@@ -48,9 +54,39 @@ async def count_lots(user_id: str) -> int:
     """Return the total number of lots for a user."""
     async for db in get_db():
         cursor = await db.execute(
-            "SELECT COUNT(*) FROM lots WHERE user_id = ?", (user_id,)
+            "SELECT COUNT(*) FROM lots WHERE user_id = ? AND deleted_at IS NULL", (user_id,)
         )
         return (await cursor.fetchone())[0]
+
+
+async def create_lot_atomic(user_id: str, data: LotCreate, max_lots: int) -> Optional[dict]:
+    """Create a lot atomically with plan limit check. Returns None if over limit."""
+    lot_id = str(uuid.uuid4())
+    now = _now()
+    features_json = json.dumps(data.features)
+    async for db in get_db():
+        await db.execute("BEGIN IMMEDIATE")
+        try:
+            cursor = await db.execute(
+                "SELECT COUNT(*) FROM lots WHERE user_id = ? AND deleted_at IS NULL", (user_id,)
+            )
+            count = (await cursor.fetchone())[0]
+            if count >= max_lots:
+                await db.execute("ROLLBACK")
+                return None
+            await db.execute(
+                """INSERT INTO lots (id, user_id, name, center_lat, center_lng, zoom, features, created_at, updated_at)
+                   VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)""",
+                (lot_id, user_id, data.name, data.center.lat, data.center.lng,
+                 data.zoom, features_json, now, now),
+            )
+            await db.execute("COMMIT")
+        except Exception:
+            await db.execute("ROLLBACK")
+            raise
+        cursor = await db.execute("SELECT * FROM lots WHERE id = ?", (lot_id,))
+        row = await cursor.fetchone()
+        return _row_to_dict(row)
 
 
 async def create_lot(user_id: str, data: LotCreate) -> dict:
@@ -75,7 +111,7 @@ async def get_lot(user_id: str, lot_id: str) -> Optional[dict]:
     """Get a single lot, scoped to the given user."""
     async for db in get_db():
         cursor = await db.execute(
-            "SELECT * FROM lots WHERE id = ? AND user_id = ?",
+            "SELECT * FROM lots WHERE id = ? AND user_id = ? AND deleted_at IS NULL",
             (lot_id, user_id),
         )
         row = await cursor.fetchone()
@@ -125,11 +161,11 @@ async def update_lot(user_id: str, lot_id: str, data: LotUpdate) -> Optional[dic
 
 
 async def delete_lot(user_id: str, lot_id: str) -> bool:
-    """Delete a lot. Returns True if it existed and was deleted."""
+    """Soft-delete a lot. Returns True if it existed and was deleted."""
     async for db in get_db():
         cursor = await db.execute(
-            "DELETE FROM lots WHERE id = ? AND user_id = ?",
-            (lot_id, user_id),
+            "UPDATE lots SET deleted_at = ? WHERE id = ? AND user_id = ? AND deleted_at IS NULL",
+            (_now(), lot_id, user_id),
         )
         await db.commit()
         return cursor.rowcount > 0
