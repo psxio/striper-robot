@@ -30,7 +30,7 @@ async def test_free_user_lot_limit(auth_client):
         "center": {"lat": 41.0, "lng": -75.0},
     })
     assert resp.status_code == 403
-    assert "Free plan" in resp.json()["detail"]
+    assert "limited to" in resp.json()["detail"].lower()
 
 
 @pytest.mark.asyncio
@@ -71,7 +71,7 @@ async def test_free_user_job_limit(auth_client, lot_id):
         "date": "2026-04-06",
     })
     assert resp.status_code == 403
-    assert "Free plan" in resp.json()["detail"]
+    assert "limited to" in resp.json()["detail"].lower()
 
 
 @pytest.mark.asyncio

@@ -39,9 +39,12 @@ async def list_users(page: int = 1, limit: int = 50) -> tuple[list[dict], int]:
         cursor = await db.execute(
             """SELECT u.id, u.email, u.name, u.plan, u.is_admin,
                       u.created_at, u.updated_at,
-                      (SELECT COUNT(*) FROM lots WHERE lots.user_id = u.id) as lot_count,
-                      (SELECT COUNT(*) FROM jobs WHERE jobs.user_id = u.id) as job_count
+                      COUNT(DISTINCT l.id) as lot_count,
+                      COUNT(DISTINCT j.id) as job_count
                FROM users u
+               LEFT JOIN lots l ON l.user_id = u.id
+               LEFT JOIN jobs j ON j.user_id = u.id
+               GROUP BY u.id
                ORDER BY u.created_at DESC
                LIMIT ? OFFSET ?""",
             (limit, offset),

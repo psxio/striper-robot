@@ -116,6 +116,17 @@ async def test_job_invalid_status(auth_client):
 
 
 @pytest.mark.asyncio
+async def test_lot_feature_limit(auth_client):
+    """Verify that lots reject more than 10000 features."""
+    resp = await auth_client.post("/api/lots", json={
+        "name": "Too Many Features",
+        "center": {"lat": 40.0, "lng": -74.0},
+        "features": [{"type": "Feature"} for _ in range(10001)],
+    })
+    assert resp.status_code == 422
+
+
+@pytest.mark.asyncio
 async def test_waitlist_bad_email(client):
     resp = await client.post("/api/waitlist", json={
         "email": "not-valid",

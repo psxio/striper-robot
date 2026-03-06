@@ -18,6 +18,7 @@ class Settings:
             os.environ.get("ACCESS_TOKEN_EXPIRE_MINUTES", "1440")
         )
         self.CORS_ORIGINS: str = os.environ.get("CORS_ORIGINS", "*")
+        self.FRONTEND_URL: str = os.environ.get("FRONTEND_URL", "")
 
         # Stripe billing
         self.STRIPE_SECRET_KEY: str = os.environ.get("STRIPE_SECRET_KEY", "")
@@ -34,4 +35,17 @@ class Settings:
         }
 
 
+    def validate(self):
+        """Warn about insecure defaults at startup."""
+        import logging
+        log = logging.getLogger("strype")
+        if self.SECRET_KEY == "dev-secret-key-change-in-production" and self.ENV != "dev":
+            log.warning("SECRET_KEY is using the default value — set a secure key for production")
+        if self.CORS_ORIGINS.strip() == "*" and self.ENV != "dev":
+            log.warning("CORS_ORIGINS is set to wildcard '*' — restrict in production")
+        if not self.STRIPE_WEBHOOK_SECRET and self.STRIPE_SECRET_KEY:
+            log.warning("STRIPE_WEBHOOK_SECRET is not set — webhook verification will fail")
+
+
 settings = Settings()
+settings.validate()

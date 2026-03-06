@@ -2,6 +2,7 @@
 
 import csv
 import io
+import logging
 
 from fastapi import APIRouter, Depends, HTTPException, Query
 from fastapi.responses import Response
@@ -12,6 +13,7 @@ from ..services import admin_store, user_store
 from ..services.billing_store import set_user_plan
 
 router = APIRouter(prefix="/api/admin", tags=["admin"])
+logger = logging.getLogger("strype.admin")
 
 
 @router.get("/stats")
@@ -71,6 +73,7 @@ async def set_plan(
     if not user:
         raise HTTPException(status_code=404, detail="User not found")
     await set_user_plan(user_id, body.plan)
+    logger.info("Admin %s changed user %s plan to %s", admin["email"], user_id, body.plan)
     return {"ok": True, "plan": body.plan}
 
 
@@ -85,4 +88,5 @@ async def delete_user(
     deleted = await user_store.delete_user(user_id)
     if not deleted:
         raise HTTPException(status_code=404, detail="User not found")
+    logger.info("Admin %s deleted user %s", admin["email"], user_id)
     return {"ok": True}

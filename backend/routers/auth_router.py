@@ -1,5 +1,7 @@
 """Authentication routes: register, login, current user."""
 
+import logging
+
 from fastapi import APIRouter, Depends, HTTPException, Request
 
 from ..auth import hash_password, verify_password, create_access_token, get_current_user
@@ -15,29 +17,10 @@ from ..models.schemas import (
 )
 from ..rate_limit import limiter
 from ..services import user_store
+from ..shared import user_to_response
 
 router = APIRouter(prefix="/api/auth", tags=["auth"])
-
-
-def _user_to_response(user: dict) -> UserResponse:
-    """Convert a DB user dict to the API response shape."""
-    map_state = None
-    if user.get("map_lat") is not None and user.get("map_lng") is not None:
-        map_state = {
-            "lat": user["map_lat"],
-            "lng": user["map_lng"],
-            "zoom": user.get("map_zoom"),
-        }
-    plan = user["plan"] or "free"
-    return UserResponse(
-        id=user["id"],
-        email=user["email"],
-        name=user["name"] or "",
-        plan=plan,
-        active_lot_id=user.get("active_lot_id"),
-        map_state=map_state,
-        limits=settings.PLAN_LIMITS.get(plan),
-    )
+logger = logging.getLogger("strype.auth")
 
 
 @router.post("/register", response_model=AuthResponse, status_code=201)
@@ -50,7 +33,8 @@ async def register(request: Request, body: RegisterRequest):
     password_hash = hash_password(body.password)
     user = await user_store.create_user(body.email, password_hash, body.name)
     token = create_access_token(user["id"])
-    return AuthResponse(token=token, user=_user_to_response(user))
+    logger.info("User registered: %s", body.email)
+    return AuthResponse(token=token, user=user_to_response(user))
 
 
 @router.post("/login", response_model=AuthResponse)
@@ -70,12 +54,13 @@ async def login(request: Request, body: LoginRequest):
         user["is_admin"] = 1
 
     token = create_access_token(user["id"])
-    return AuthResponse(token=token, user=_user_to_response(user))
+    logger.info("User logged in: %s", body.email)
+    return AuthResponse(token=token, user=user_to_response(user))
 
 
 @router.get("/me", response_model=UserResponse)
 async def me(user: dict = Depends(get_current_user)):
-    return _user_to_response(user)
+    return user_to_response(user)
 
 
 @router.post("/forgot-password")
@@ -101,6 +86,7 @@ async def reset_password(body: ResetPasswordRequest):
         raise HTTPException(status_code=400, detail="Invalid or expired token")
     new_hash = hash_password(body.new_password)
     await user_store.update_password(user_id, new_hash)
+    logger.info("Password reset completed for user %s", user_id)
     return {"ok": True}
 
 
