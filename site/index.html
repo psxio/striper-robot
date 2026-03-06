@@ -751,15 +751,41 @@ footer .footer-links a:hover{color:var(--text)}
   // ─── WAITLIST FORM ───
   const form = document.getElementById('waitlistForm');
   const confirm = document.getElementById('waitlistConfirm');
-  form.addEventListener('submit', function(e) {
+  form.addEventListener('submit', async function(e) {
     e.preventDefault();
     const email = document.getElementById('waitlistEmail').value;
-    // Store locally as fallback (no backend)
-    const waitlist = JSON.parse(localStorage.getItem('strype_waitlist') || '[]');
-    waitlist.push({ email: email, ts: new Date().toISOString() });
-    localStorage.setItem('strype_waitlist', JSON.stringify(waitlist));
-    form.style.display = 'none';
-    confirm.style.display = 'block';
+    const btn = form.querySelector('button[type="submit"]');
+    const originalText = btn.textContent;
+
+    try {
+      btn.textContent = 'Joining...';
+      btn.disabled = true;
+
+      const resp = await fetch('/api/waitlist', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email: email, source: 'landing' })
+      });
+
+      if (resp.ok) {
+        form.style.display = 'none';
+        confirm.style.display = 'block';
+      } else {
+        throw new Error('Failed');
+      }
+    } catch (err) {
+      // Fallback: store in localStorage
+      const waitlist = JSON.parse(localStorage.getItem('strype_waitlist') || '[]');
+      waitlist.push({ email: email, source: 'landing', date: new Date().toISOString() });
+      localStorage.setItem('strype_waitlist', JSON.stringify(waitlist));
+      form.style.display = 'none';
+      confirm.style.display = 'block';
+    }
+
+    setTimeout(function() {
+      btn.textContent = originalText;
+      btn.disabled = false;
+    }, 3000);
   });
 })();
 </script>

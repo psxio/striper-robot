@@ -1,0 +1,253 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Strype Admin</title>
+    <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        :root {
+            --bg: #0d1117; --card: #161b22; --border: #30363d;
+            --text: #e6edf3; --text2: #8b949e; --green: #3fb950;
+            --blue: #58a6ff; --red: #f85149; --yellow: #d29922;
+            --radius: 8px;
+        }
+        body { font-family: 'DM Sans', sans-serif; background: var(--bg); color: var(--text); min-height: 100vh; }
+        a { color: var(--blue); text-decoration: none; }
+        .topbar {
+            display: flex; align-items: center; justify-content: space-between;
+            padding: 12px 24px; border-bottom: 1px solid var(--border); background: var(--card);
+        }
+        .topbar h1 { font-size: 18px; font-weight: 700; }
+        .topbar .links { display: flex; gap: 16px; align-items: center; font-size: 14px; }
+        .container { max-width: 1200px; margin: 0 auto; padding: 24px; }
+        .tabs { display: flex; gap: 4px; margin-bottom: 24px; }
+        .tab {
+            padding: 8px 20px; border-radius: var(--radius); cursor: pointer;
+            font-size: 14px; font-weight: 500; background: transparent; color: var(--text2);
+            border: 1px solid transparent; transition: all 0.15s;
+        }
+        .tab.active { background: var(--card); color: var(--text); border-color: var(--border); }
+        .tab:hover:not(.active) { color: var(--text); }
+        .stats-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 16px; margin-bottom: 32px; }
+        .stat-card {
+            background: var(--card); border: 1px solid var(--border); border-radius: var(--radius);
+            padding: 20px; text-align: center;
+        }
+        .stat-card .value { font-size: 36px; font-weight: 700; color: var(--green); }
+        .stat-card .label { font-size: 13px; color: var(--text2); margin-top: 4px; text-transform: uppercase; letter-spacing: 0.5px; }
+        table { width: 100%; border-collapse: collapse; font-size: 14px; }
+        th { text-align: left; padding: 10px 12px; color: var(--text2); font-weight: 500; border-bottom: 1px solid var(--border); font-size: 12px; text-transform: uppercase; letter-spacing: 0.5px; }
+        td { padding: 10px 12px; border-bottom: 1px solid var(--border); }
+        tr:hover td { background: rgba(255,255,255,0.02); }
+        .badge {
+            display: inline-block; padding: 2px 8px; border-radius: 12px;
+            font-size: 12px; font-weight: 500;
+        }
+        .badge-free { background: rgba(139,148,158,0.2); color: var(--text2); }
+        .badge-pro { background: rgba(63,185,80,0.2); color: var(--green); }
+        .badge-admin { background: rgba(210,153,34,0.2); color: var(--yellow); }
+        .btn {
+            padding: 6px 14px; border-radius: 6px; cursor: pointer;
+            font-size: 13px; font-weight: 500; border: 1px solid var(--border);
+            background: var(--card); color: var(--text); transition: all 0.15s;
+        }
+        .btn:hover { border-color: var(--text2); }
+        .btn-sm { padding: 4px 10px; font-size: 12px; }
+        .btn-danger { border-color: var(--red); color: var(--red); }
+        .btn-danger:hover { background: var(--red); color: white; }
+        .panel { display: none; }
+        .panel.active { display: block; }
+        .actions { display: flex; gap: 6px; }
+        .pagination { display: flex; justify-content: center; gap: 8px; margin-top: 16px; }
+        .empty { text-align: center; padding: 48px; color: var(--text2); }
+        .auth-gate { display: flex; flex-direction: column; align-items: center; justify-content: center; min-height: 60vh; }
+        .auth-gate h2 { margin-bottom: 8px; }
+        .auth-gate p { color: var(--text2); }
+        select { background: var(--card); color: var(--text); border: 1px solid var(--border); border-radius: 6px; padding: 4px 8px; font-size: 12px; }
+    </style>
+</head>
+<body>
+    <div class="topbar">
+        <h1>Strype Admin</h1>
+        <div class="links">
+            <a href="/platform.html">Platform</a>
+            <span id="userEmail" style="color: var(--text2); font-size: 13px;"></span>
+        </div>
+    </div>
+
+    <div id="authGate" class="auth-gate" style="display:none;">
+        <h2>Access Denied</h2>
+        <p>You must be an admin to access this page.</p>
+        <a href="/platform.html" style="margin-top:12px;">Back to Platform</a>
+    </div>
+
+    <div id="mainContent" class="container" style="display:none;">
+        <div class="tabs">
+            <div class="tab active" onclick="switchTab('stats')">Stats</div>
+            <div class="tab" onclick="switchTab('users')">Users</div>
+            <div class="tab" onclick="switchTab('waitlist')">Waitlist</div>
+        </div>
+
+        <!-- Stats Panel -->
+        <div id="panel-stats" class="panel active">
+            <div class="stats-grid" id="statsGrid"></div>
+        </div>
+
+        <!-- Users Panel -->
+        <div id="panel-users" class="panel">
+            <table>
+                <thead>
+                    <tr><th>Email</th><th>Name</th><th>Plan</th><th>Lots</th><th>Jobs</th><th>Joined</th><th>Actions</th></tr>
+                </thead>
+                <tbody id="usersBody"></tbody>
+            </table>
+            <div class="pagination" id="usersPagination"></div>
+        </div>
+
+        <!-- Waitlist Panel -->
+        <div id="panel-waitlist" class="panel">
+            <div style="margin-bottom:12px;text-align:right;">
+                <button class="btn btn-sm" onclick="exportWaitlistCSV()">Export CSV</button>
+            </div>
+            <table>
+                <thead>
+                    <tr><th>Email</th><th>Source</th><th>Date</th></tr>
+                </thead>
+                <tbody id="waitlistBody"></tbody>
+            </table>
+            <div class="pagination" id="waitlistPagination"></div>
+        </div>
+    </div>
+
+    <script>
+    var API_BASE = window.location.origin + '/api';
+    var token = localStorage.getItem('strype_auth_token');
+
+    function api(method, path, body) {
+        var opts = {
+            method: method,
+            headers: { 'Authorization': 'Bearer ' + token, 'Content-Type': 'application/json' },
+        };
+        if (body) opts.body = JSON.stringify(body);
+        return fetch(API_BASE + path, opts).then(function(r) {
+            if (!r.ok) throw { status: r.status };
+            if (r.headers.get('content-type')?.includes('text/csv')) return r.text();
+            return r.json();
+        });
+    }
+
+    function switchTab(name) {
+        document.querySelectorAll('.tab').forEach(function(t, i) {
+            t.classList.toggle('active', ['stats','users','waitlist'][i] === name);
+        });
+        document.querySelectorAll('.panel').forEach(function(p) {
+            p.classList.toggle('active', p.id === 'panel-' + name);
+        });
+        if (name === 'stats') loadStats();
+        if (name === 'users') loadUsers(1);
+        if (name === 'waitlist') loadWaitlist(1);
+    }
+
+    function loadStats() {
+        api('GET', '/admin/stats').then(function(data) {
+            var grid = document.getElementById('statsGrid');
+            grid.innerHTML = [
+                card(data.users, 'Total Users'),
+                card(data.lots, 'Total Lots'),
+                card(data.jobs, 'Total Jobs'),
+                card(data.waitlist, 'Waitlist'),
+                card(data.users_by_plan.free || 0, 'Free Users'),
+                card(data.users_by_plan.pro || 0, 'Pro Users'),
+            ].join('');
+        });
+    }
+
+    function card(value, label) {
+        return '<div class="stat-card"><div class="value">' + value + '</div><div class="label">' + label + '</div></div>';
+    }
+
+    function loadUsers(page) {
+        api('GET', '/admin/users?page=' + page + '&limit=20').then(function(data) {
+            var tbody = document.getElementById('usersBody');
+            if (!data.items.length) { tbody.innerHTML = '<tr><td colspan="7" class="empty">No users</td></tr>'; return; }
+            tbody.innerHTML = data.items.map(function(u) {
+                var planBadge = '<span class="badge badge-' + u.plan + '">' + u.plan + '</span>';
+                if (u.is_admin) planBadge += ' <span class="badge badge-admin">admin</span>';
+                var date = new Date(u.created_at).toLocaleDateString();
+                return '<tr>' +
+                    '<td>' + u.email + '</td>' +
+                    '<td>' + (u.name || '-') + '</td>' +
+                    '<td>' + planBadge + '</td>' +
+                    '<td>' + u.lot_count + '</td>' +
+                    '<td>' + u.job_count + '</td>' +
+                    '<td>' + date + '</td>' +
+                    '<td class="actions">' +
+                        '<select onchange="changePlan(\'' + u.id + '\', this.value)">' +
+                            '<option value="free"' + (u.plan==='free'?' selected':'') + '>Free</option>' +
+                            '<option value="pro"' + (u.plan==='pro'?' selected':'') + '>Pro</option>' +
+                        '</select>' +
+                    '</td></tr>';
+            }).join('');
+            renderPagination('usersPagination', data, loadUsers);
+        });
+    }
+
+    function loadWaitlist(page) {
+        api('GET', '/admin/waitlist?page=' + page + '&limit=20').then(function(data) {
+            var tbody = document.getElementById('waitlistBody');
+            if (!data.items.length) { tbody.innerHTML = '<tr><td colspan="3" class="empty">No entries</td></tr>'; return; }
+            tbody.innerHTML = data.items.map(function(w) {
+                var date = new Date(w.created_at).toLocaleDateString();
+                return '<tr><td>' + w.email + '</td><td>' + w.source + '</td><td>' + date + '</td></tr>';
+            }).join('');
+            renderPagination('waitlistPagination', data, loadWaitlist);
+        });
+    }
+
+    function renderPagination(id, data, loadFn) {
+        var totalPages = Math.ceil(data.total / data.limit);
+        if (totalPages <= 1) { document.getElementById(id).innerHTML = ''; return; }
+        var html = '';
+        for (var i = 1; i <= totalPages; i++) {
+            html += '<button class="btn btn-sm' + (i === data.page ? ' active' : '') + '" onclick="(' + loadFn.name + ')(' + i + ')">' + i + '</button>';
+        }
+        document.getElementById(id).innerHTML = html;
+    }
+
+    function changePlan(userId, plan) {
+        api('PUT', '/admin/users/' + userId + '/plan', { plan: plan }).then(function() {
+            loadUsers(1);
+        });
+    }
+
+    function exportWaitlistCSV() {
+        fetch(API_BASE + '/admin/waitlist?format=csv&limit=10000', {
+            headers: { 'Authorization': 'Bearer ' + token },
+        }).then(function(r) { return r.blob(); }).then(function(blob) {
+            var a = document.createElement('a');
+            a.href = URL.createObjectURL(blob);
+            a.download = 'waitlist.csv';
+            a.click();
+        });
+    }
+
+    // Init: check auth
+    if (!token) {
+        document.getElementById('authGate').style.display = 'flex';
+    } else {
+        api('GET', '/auth/me').then(function(user) {
+            document.getElementById('userEmail').textContent = user.email;
+            // Check admin via admin stats endpoint
+            return api('GET', '/admin/stats');
+        }).then(function() {
+            document.getElementById('mainContent').style.display = 'block';
+            loadStats();
+        }).catch(function(e) {
+            document.getElementById('authGate').style.display = 'flex';
+        });
+    }
+    </script>
+</body>
+</html>

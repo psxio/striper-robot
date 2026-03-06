@@ -232,6 +232,76 @@ select{-webkit-appearance:none;appearance:none;background-image:url("data:image/
 @media(min-width:769px){
   .sidebar-drag-handle{display:none}
 }
+
+/*═══ TEMPLATE SYSTEM ═══*/
+.template-section{padding:14px;border-bottom:1px solid var(--border)}
+.template-grid{display:grid;grid-template-columns:repeat(2,1fr);gap:6px}
+.template-btn{display:flex;flex-direction:column;align-items:center;gap:6px;padding:12px 8px;border-radius:var(--radius);border:1px solid var(--border);transition:all .15s;cursor:pointer;text-align:center}
+.template-btn:hover{background:var(--bg-hover);border-color:var(--text-3)}
+.template-btn.active{background:var(--green-dim);border-color:var(--green);color:var(--green)}
+.template-btn svg{width:24px;height:24px;color:var(--text-2)}
+.template-btn.active svg{color:var(--green)}
+.template-btn span{font-size:.65rem;font-weight:600;text-transform:uppercase;letter-spacing:.04em;color:var(--text-3)}
+.template-btn.active span{color:var(--green)}
+.template-config{margin-top:10px;display:none;flex-direction:column;gap:8px;padding:10px;background:var(--bg);border-radius:var(--radius);border:1px solid var(--border)}
+.template-config.visible{display:flex}
+.template-config label{font-size:.75rem;font-weight:500;color:var(--text-2);display:flex;align-items:center;justify-content:space-between;gap:8px}
+.template-config label input,.template-config label select{width:100px;padding:5px 8px;font-size:.75rem}
+.template-config .tpl-place-btn{padding:8px;font-size:.8125rem;font-weight:600;color:var(--bg);background:var(--green);border-radius:var(--radius);transition:all .15s;text-align:center;cursor:pointer}
+.template-config .tpl-place-btn:hover{background:#4cd964}
+.template-config .tpl-preview{font-size:.7rem;color:var(--text-3);text-align:center;padding:4px 0}
+.autofill-config{margin-top:10px;display:none;flex-direction:column;gap:8px;padding:10px;background:var(--bg);border-radius:var(--radius);border:1px solid var(--border)}
+.autofill-config.visible{display:flex}
+.autofill-config label{font-size:.75rem;font-weight:500;color:var(--text-2);display:flex;align-items:center;justify-content:space-between;gap:8px}
+.autofill-config label input,.autofill-config label select{width:100px;padding:5px 8px;font-size:.75rem}
+.autofill-config .tpl-place-btn{padding:8px;font-size:.8125rem;font-weight:600;color:var(--bg);background:var(--green);border-radius:var(--radius);transition:all .15s;text-align:center;cursor:pointer}
+.autofill-config .tpl-place-btn:hover{background:#4cd964}
+
+/*═══ COST ESTIMATOR ═══*/
+.cost-panel{position:absolute;bottom:0;left:0;right:0;z-index:800;background:rgba(22,27,34,.92);backdrop-filter:blur(12px);-webkit-backdrop-filter:blur(12px);border-top:1px solid var(--border);padding:8px 20px;display:flex;align-items:center;gap:20px;flex-wrap:wrap;transition:transform .3s cubic-bezier(.4,0,.2,1)}
+.cost-panel.hidden{transform:translateY(100%)}
+.cost-stat{display:flex;flex-direction:column;gap:2px}
+.cost-stat .cost-val{font-family:var(--font-display);font-size:.9rem;font-weight:700;color:var(--green)}
+.cost-stat .cost-label{font-size:.6rem;color:var(--text-3);text-transform:uppercase;letter-spacing:.04em}
+.cost-divider{width:1px;height:28px;background:var(--border);flex-shrink:0}
+.cost-savings{color:var(--green);font-size:.75rem;font-weight:600;margin-left:auto}
+.cost-toggle{position:absolute;top:-28px;right:16px;padding:4px 12px;font-size:.6875rem;font-weight:600;color:var(--text-3);background:rgba(22,27,34,.92);backdrop-filter:blur(12px);border-top:1px solid var(--border);border-left:1px solid var(--border);border-right:1px solid var(--border);border-radius:var(--radius) var(--radius) 0 0;cursor:pointer;transition:color .15s;text-transform:uppercase;letter-spacing:.04em}
+.cost-toggle:hover{color:var(--text)}
+
+/*═══ MEASUREMENT TOOL ═══*/
+.measure-label{background:rgba(22,27,34,.9);color:var(--green);padding:2px 8px;border-radius:4px;font-family:var(--font-mono);font-size:.75rem;font-weight:600;border:1px solid var(--green);white-space:nowrap;pointer-events:none}
+
+/*═══ UNDO/REDO ═══*/
+.undo-redo{display:flex;gap:2px;border:1px solid var(--border);border-radius:var(--radius);overflow:hidden}
+.undo-redo button{padding:6px 10px;color:var(--text-3);transition:all .15s;display:flex;align-items:center}
+.undo-redo button:hover:not(:disabled){background:var(--bg-hover);color:var(--text)}
+.undo-redo button:disabled{opacity:.3;cursor:default}
+.undo-redo button svg{width:14px;height:14px}
+
+/*═══ HELP MODAL ═══*/
+.help-overlay{position:fixed;inset:0;background:rgba(0,0,0,.6);z-index:5000;display:none;align-items:center;justify-content:center;backdrop-filter:blur(4px)}
+.help-overlay.visible{display:flex}
+.help-modal{background:var(--bg-card);border:1px solid var(--border);border-radius:var(--radius-lg);padding:28px;max-width:520px;width:92%;max-height:80vh;overflow-y:auto;position:relative}
+.help-modal h3{font-family:var(--font-display);font-size:1.1rem;font-weight:700;margin-bottom:16px;color:var(--green)}
+.help-modal .help-close{position:absolute;top:12px;right:12px;width:28px;height:28px;display:flex;align-items:center;justify-content:center;border-radius:50%;color:var(--text-3);transition:all .15s;cursor:pointer}
+.help-modal .help-close:hover{background:var(--bg-hover);color:var(--text)}
+.help-section{margin-bottom:18px}
+.help-section h4{font-size:.8rem;font-weight:700;text-transform:uppercase;letter-spacing:.05em;color:var(--text-2);margin-bottom:8px}
+.help-shortcut{display:flex;align-items:center;justify-content:space-between;padding:5px 0;border-bottom:1px solid var(--border);font-size:.8125rem}
+.help-shortcut:last-child{border-bottom:none}
+.help-shortcut kbd{background:var(--bg);border:1px solid var(--border);border-radius:4px;padding:2px 8px;font-family:var(--font-mono);font-size:.75rem;color:var(--text-2)}
+.help-steps{counter-reset:steps}
+.help-steps li{counter-increment:steps;padding:8px 0 8px 32px;position:relative;font-size:.8125rem;color:var(--text-2);border-bottom:1px solid var(--border)}
+.help-steps li:last-child{border-bottom:none}
+.help-steps li::before{content:counter(steps);position:absolute;left:0;top:8px;width:22px;height:22px;background:var(--green-dim);color:var(--green);border-radius:50%;font-size:.7rem;font-weight:700;display:flex;align-items:center;justify-content:center}
+
+.topbar-icon-btn{display:inline-flex;align-items:center;justify-content:center;width:32px;height:32px;border-radius:var(--radius);color:var(--text-3);transition:all .15s;border:1px solid transparent}
+.topbar-icon-btn:hover{background:var(--bg-hover);color:var(--text);border-color:var(--border)}
+
+@media(max-width:768px){
+  .cost-panel{padding:6px 12px;gap:12px}
+  .undo-redo{display:none}
+}
 </style>
 </head>
 <body>
@@ -247,6 +317,14 @@ select{-webkit-appearance:none;appearance:none;background-image:url("data:image/
     <div class="search-results" id="searchResults"></div>
   </div>
   <div class="topbar-spacer"></div>
+  <div class="undo-redo">
+    <button id="undoBtn" title="Undo (Ctrl+Z)" disabled>
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="1 4 1 10 7 10"/><path d="M3.51 15a9 9 0 1 0 2.13-9.36L1 10"/></svg>
+    </button>
+    <button id="redoBtn" title="Redo (Ctrl+Shift+Z)" disabled>
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="23 4 23 10 17 10"/><path d="M20.49 15a9 9 0 1 1-2.13-9.36L23 10"/></svg>
+    </button>
+  </div>
   <div class="map-style-toggle">
     <button class="active" data-style="street">Street</button>
     <button data-style="satellite">Satellite</button>
@@ -267,7 +345,10 @@ select{-webkit-appearance:none;appearance:none;background-image:url("data:image/
       </button>
     </div>
   </div>
-  <div class="user-avatar" title="Account">U</div>
+  <button class="topbar-icon-btn" id="helpBtn" title="Help (?)">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><path d="M9.09 9a3 3 0 0 1 5.83 1c0 2-3 3-3 3"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>
+  </button>
+  <div class="user-avatar" id="userAvatar" title="Account" onclick="openAuthModal()">&#x1F464;</div>
 </header>
 
 <!-- ═══════════════════════════════════════════════ MAIN ═══════════════════════════════════════════════ -->
@@ -322,6 +403,10 @@ select{-webkit-appearance:none;appearance:none;background-image:url("data:image/
               <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 20H7L3 16l9-13 8 8-5 9z"/><path d="M7 20l5-9"/></svg>
               <span>Eraser</span>
             </button>
+            <button class="tool-btn" data-tool="measure" title="Measure distance (D)">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M2 20h20"/><path d="M2 20V4"/><path d="M6 20v-4"/><path d="M10 20v-8"/><path d="M14 20v-4"/><path d="M18 20v-12"/></svg>
+              <span>Measure</span>
+            </button>
             <button class="tool-btn" data-tool="pan" title="Pan / select">
               <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 11V6a2 2 0 0 0-4 0v1"/><path d="M14 10V4a2 2 0 0 0-4 0v2"/><path d="M10 10.5V6a2 2 0 0 0-4 0v8"/><path d="M18 8a2 2 0 1 1 4 0v6a8 8 0 0 1-8 8h-2c-2.8 0-4.5-.86-5.99-2.34L3.35 16.5a2 2 0 0 1 3.3-2.5L8 15.5"/></svg>
               <span>Select</span>
@@ -342,6 +427,72 @@ select{-webkit-appearance:none;appearance:none;background-image:url("data:image/
               Width (in)
               <input type="number" id="lineWidth" value="4" min="1" max="24" step="1" style="width:70px">
             </label>
+          </div>
+        </div>
+
+        <!-- Templates -->
+        <div class="panel-section template-section">
+          <div class="panel-header">
+            <span class="panel-title">Templates</span>
+          </div>
+          <div class="template-grid" id="templateGrid">
+            <button class="template-btn" data-template="parking_row" title="Parking Row">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><rect x="2" y="4" width="4" height="16"/><rect x="7" y="4" width="4" height="16"/><rect x="12" y="4" width="4" height="16"/><rect x="17" y="4" width="4" height="16"/></svg>
+              <span>Parking Row</span>
+            </button>
+            <button class="template-btn" data-template="handicap" title="Handicap Space">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="12" cy="10" r="3"/><path d="M12 13v3"/><path d="M9 19h6"/></svg>
+              <span>Handicap</span>
+            </button>
+            <button class="template-btn" data-template="crosswalk" title="Crosswalk">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><line x1="4" y1="4" x2="4" y2="20"/><line x1="8" y1="4" x2="8" y2="20"/><line x1="12" y1="4" x2="12" y2="20"/><line x1="16" y1="4" x2="16" y2="20"/><line x1="20" y1="4" x2="20" y2="20"/></svg>
+              <span>Crosswalk</span>
+            </button>
+            <button class="template-btn" data-template="arrow" title="Arrow">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="12" y1="19" x2="12" y2="5"/><polyline points="5 12 12 5 19 12"/></svg>
+              <span>Arrow</span>
+            </button>
+          </div>
+          <!-- Parking Row Config -->
+          <div class="template-config" id="tplParkingRow">
+            <label>Spaces <input type="number" id="tplRowCount" value="10" min="2" max="50"></label>
+            <label>Angle <select id="tplRowAngle"><option value="90">90°</option><option value="60">60°</option><option value="45">45°</option><option value="30">30°</option><option value="0">0° (parallel)</option></select></label>
+            <label>Spacing (m) <input type="number" id="tplRowSpacing" value="2.7" min="2" max="5" step="0.1"></label>
+            <label>Length (m) <input type="number" id="tplRowLength" value="5.5" min="3" max="10" step="0.1"></label>
+            <div class="tpl-preview" id="tplRowPreview">10 spaces, ~27.0m wide</div>
+            <button class="tpl-place-btn" id="tplRowPlace">Click Map to Place</button>
+          </div>
+          <!-- Handicap Config -->
+          <div class="template-config" id="tplHandicap">
+            <label>Angle <select id="tplHandicapAngle"><option value="90">90°</option><option value="60">60°</option><option value="45">45°</option><option value="0">0°</option></select></label>
+            <button class="tpl-place-btn" id="tplHandicapPlace">Click Map to Place</button>
+          </div>
+          <!-- Crosswalk Config -->
+          <div class="template-config" id="tplCrosswalk">
+            <label>Width (m) <input type="number" id="tplCrosswalkWidth" value="3.0" min="1" max="10" step="0.5"></label>
+            <label>Length (m) <input type="number" id="tplCrosswalkLength" value="6.0" min="2" max="15" step="0.5"></label>
+            <label>Angle <select id="tplCrosswalkAngle"><option value="0">0°</option><option value="90">90°</option><option value="45">45°</option></select></label>
+            <button class="tpl-place-btn" id="tplCrosswalkPlace">Click Map to Place</button>
+          </div>
+          <!-- Arrow Config -->
+          <div class="template-config" id="tplArrow">
+            <label>Type <select id="tplArrowType"><option value="straight">Straight</option><option value="left">Left Turn</option><option value="right">Right Turn</option><option value="u_turn">U-Turn</option></select></label>
+            <label>Angle <input type="number" id="tplArrowAngle" value="0" min="0" max="360" step="15"></label>
+            <button class="tpl-place-btn" id="tplArrowPlace">Click Map to Place</button>
+          </div>
+          <!-- Auto-Fill -->
+          <div style="margin-top:10px">
+            <button class="template-btn" data-template="autofill" title="Auto-Fill Parking" style="width:100%">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><rect x="3" y="3" width="18" height="18" rx="2"/><path d="M3 9h18M3 15h18M9 3v18M15 3v18"/></svg>
+              <span>Auto-Fill Parking (draw rectangle first)</span>
+            </button>
+          </div>
+          <div class="autofill-config" id="autofillConfig">
+            <label>Angle <select id="autofillAngle"><option value="90">90°</option><option value="60">60°</option><option value="45">45°</option></select></label>
+            <label>Spacing (m) <input type="number" id="autofillSpacing" value="2.7" min="2" max="5" step="0.1"></label>
+            <label>Handicap spaces <input type="number" id="autofillHandicap" value="1" min="0" max="10"></label>
+            <div class="tpl-preview" id="autofillPreview">Draw a rectangle on the map first</div>
+            <button class="tpl-place-btn" id="autofillGenerate">Generate Parking</button>
           </div>
         </div>
 
@@ -377,24 +528,38 @@ select{-webkit-appearance:none;appearance:none;background-image:url("data:image/
   <!-- ═══ MAP ═══ -->
   <div class="map-area">
     <div id="map"></div>
-    <div class="dashboard-bar" id="dashboardBar">
-      <button class="dashboard-toggle" id="dashboardToggle">Stats</button>
-      <div class="dashboard-stat">
-        <span class="stat-val" id="statLots">0</span>
-        <span class="stat-label">Lots</span>
+    <div class="cost-panel" id="costPanel">
+      <button class="cost-toggle" id="costToggle">Estimate</button>
+      <div class="cost-stat">
+        <span class="cost-val" id="costFeatures">0</span>
+        <span class="cost-label">Features</span>
       </div>
-      <div class="dashboard-stat">
-        <span class="stat-val" id="statFeatures">0</span>
-        <span class="stat-label">Features</span>
+      <div class="cost-divider"></div>
+      <div class="cost-stat">
+        <span class="cost-val" id="costDistance">0 m</span>
+        <span class="cost-label">Paint Distance</span>
       </div>
-      <div class="dashboard-stat">
-        <span class="stat-val" id="statPending">0</span>
-        <span class="stat-label">Pending Jobs</span>
+      <div class="cost-divider"></div>
+      <div class="cost-stat">
+        <span class="cost-val" id="costGallons">0.0 gal</span>
+        <span class="cost-label">Paint Usage</span>
       </div>
-      <div class="dashboard-stat">
-        <span class="stat-val" id="statWaypoints">0</span>
-        <span class="stat-label">Est. Waypoints</span>
+      <div class="cost-divider"></div>
+      <div class="cost-stat">
+        <span class="cost-val" id="costDollars">$0</span>
+        <span class="cost-label">Paint Cost</span>
       </div>
+      <div class="cost-divider"></div>
+      <div class="cost-stat">
+        <span class="cost-val" id="costRuntime">0 min</span>
+        <span class="cost-label">Est. Runtime</span>
+      </div>
+      <div class="cost-divider"></div>
+      <div class="cost-stat">
+        <span class="cost-val" id="costWaypoints">0</span>
+        <span class="cost-label">Waypoints</span>
+      </div>
+      <span class="cost-savings" id="costSavings"></span>
     </div>
   </div>
 
@@ -411,6 +576,79 @@ select{-webkit-appearance:none;appearance:none;background-image:url("data:image/
 
 <!-- ═══ TOASTS ═══ -->
 <div class="toast-container" id="toastContainer"></div>
+
+<!-- ═══ HELP MODAL ═══ -->
+<div class="help-overlay" id="helpOverlay">
+  <div class="help-modal">
+    <button class="help-close" id="helpClose">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+    </button>
+    <h3>Strype Platform — Quick Start</h3>
+    <div class="help-section">
+      <h4>Getting Started</h4>
+      <ol class="help-steps">
+        <li>Search for an address or paste coordinates to find your parking lot</li>
+        <li>Click <strong>+ New</strong> to create a lot, then use tools or templates to design</li>
+        <li>Use <strong>Templates</strong> to quickly place parking rows, handicap spaces, crosswalks, and arrows</li>
+        <li><strong>Export</strong> as .waypoints for Mission Planner or .geojson for reference</li>
+      </ol>
+    </div>
+    <div class="help-section">
+      <h4>Keyboard Shortcuts</h4>
+      <div class="help-shortcut"><span>Draw Line</span><kbd>L</kbd></div>
+      <div class="help-shortcut"><span>Draw Rectangle</span><kbd>R</kbd></div>
+      <div class="help-shortcut"><span>Draw Polygon</span><kbd>P</kbd></div>
+      <div class="help-shortcut"><span>Place Marker</span><kbd>M</kbd></div>
+      <div class="help-shortcut"><span>Measure Distance</span><kbd>D</kbd></div>
+      <div class="help-shortcut"><span>Eraser</span><kbd>X</kbd></div>
+      <div class="help-shortcut"><span>Select / Pan</span><kbd>V</kbd> or <kbd>Esc</kbd></div>
+      <div class="help-shortcut"><span>Delete Selected</span><kbd>Del</kbd></div>
+      <div class="help-shortcut"><span>Undo</span><kbd>Ctrl+Z</kbd></div>
+      <div class="help-shortcut"><span>Redo</span><kbd>Ctrl+Shift+Z</kbd></div>
+      <div class="help-shortcut"><span>Save</span><kbd>Ctrl+S</kbd></div>
+      <div class="help-shortcut"><span>Help</span><kbd>?</kbd></div>
+    </div>
+  </div>
+</div>
+
+<!-- ═══ AUTH MODAL ═══ -->
+<div id="authModal" style="display:none; position:fixed; top:0; left:0; width:100%; height:100%; background:rgba(0,0,0,0.5); z-index:10000; justify-content:center; align-items:center;">
+    <div style="background:var(--bg-card); border:1px solid var(--border); border-radius:12px; padding:32px; width:400px; max-width:90vw; position:relative;">
+        <button onclick="closeAuthModal()" style="position:absolute; top:12px; right:16px; background:none; border:none; font-size:20px; cursor:pointer; color:var(--text-2);">&times;</button>
+        <div style="display:flex; gap:0; margin-bottom:24px; border-bottom:2px solid var(--border);">
+            <button id="authTabLogin" onclick="switchAuthTab('login')" style="flex:1; padding:12px; border:none; background:none; font-size:16px; font-weight:600; cursor:pointer; border-bottom:2px solid #f59e0b; margin-bottom:-2px; color:#f59e0b;">Log In</button>
+            <button id="authTabRegister" onclick="switchAuthTab('register')" style="flex:1; padding:12px; border:none; background:none; font-size:16px; font-weight:600; cursor:pointer; color:var(--text-3); margin-bottom:-2px;">Sign Up</button>
+        </div>
+        <div id="authError" style="display:none; background:rgba(248,81,73,.1); color:var(--red); padding:8px 12px; border-radius:6px; margin-bottom:16px; font-size:14px;"></div>
+        <form id="authForm" onsubmit="handleAuth(event)">
+            <div id="nameField" style="display:none; margin-bottom:16px;">
+                <label style="display:block; font-size:14px; font-weight:500; margin-bottom:4px; color:var(--text-2);">Name</label>
+                <input type="text" id="authName" style="width:100%; padding:10px 12px; border:1px solid var(--border); border-radius:8px; font-size:14px; box-sizing:border-box; background:var(--bg); color:var(--text);" placeholder="Your name">
+            </div>
+            <div style="margin-bottom:16px;">
+                <label style="display:block; font-size:14px; font-weight:500; margin-bottom:4px; color:var(--text-2);">Email</label>
+                <input type="email" id="authEmail" required style="width:100%; padding:10px 12px; border:1px solid var(--border); border-radius:8px; font-size:14px; box-sizing:border-box; background:var(--bg); color:var(--text);" placeholder="you@example.com">
+            </div>
+            <div style="margin-bottom:24px;">
+                <label style="display:block; font-size:14px; font-weight:500; margin-bottom:4px; color:var(--text-2);">Password</label>
+                <input type="password" id="authPassword" required minlength="6" style="width:100%; padding:10px 12px; border:1px solid var(--border); border-radius:8px; font-size:14px; box-sizing:border-box; background:var(--bg); color:var(--text);" placeholder="Min 6 characters">
+            </div>
+            <button type="submit" id="authSubmitBtn" style="width:100%; padding:12px; background:#f59e0b; color:white; border:none; border-radius:8px; font-size:16px; font-weight:600; cursor:pointer;">Log In</button>
+        </form>
+        <div id="forgotPasswordLink" style="text-align:center; margin-top:12px;">
+            <a href="#" onclick="showForgotPassword(); return false;" style="font-size:13px; color:var(--text-2);">Forgot password?</a>
+        </div>
+        <div id="forgotPasswordForm" style="display:none; margin-top:16px;">
+            <p style="font-size:13px; color:var(--text-2); margin-bottom:12px;">Enter your email to receive a reset link.</p>
+            <input type="email" id="resetEmail" style="width:100%; padding:10px 12px; border:1px solid var(--border); border-radius:8px; font-size:14px; box-sizing:border-box; background:var(--bg); color:var(--text); margin-bottom:8px;" placeholder="you@example.com">
+            <input type="text" id="resetToken" style="display:none; width:100%; padding:10px 12px; border:1px solid var(--border); border-radius:8px; font-size:14px; box-sizing:border-box; background:var(--bg); color:var(--text); margin-bottom:8px;" placeholder="Reset token">
+            <input type="password" id="resetNewPassword" style="display:none; width:100%; padding:10px 12px; border:1px solid var(--border); border-radius:8px; font-size:14px; box-sizing:border-box; background:var(--bg); color:var(--text); margin-bottom:8px;" placeholder="New password (min 8 chars)">
+            <div id="resetMessage" style="display:none; padding:8px 12px; border-radius:6px; margin-bottom:8px; font-size:13px;"></div>
+            <button onclick="handleForgotPassword()" style="width:100%; padding:10px; background:var(--blue); color:white; border:none; border-radius:8px; font-size:14px; font-weight:600; cursor:pointer;">Send Reset</button>
+        </div>
+        <p style="text-align:center; margin-top:16px; font-size:13px; color:var(--text-3);">Your lots and jobs are saved securely in the cloud.</p>
+    </div>
+</div>
 
 <!-- ═══════════════════════════════════════════════ SCRIPTS ═══════════════════════════════════════════════ -->
 <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
@@ -453,6 +691,362 @@ let selectedFeatureId = null;
 let map, drawnItems, currentDrawHandler;
 let streetLayer, satelliteLayer, currentMapStyle = 'street';
 
+// Undo/Redo stacks
+var undoStack = [];
+var redoStack = [];
+var UNDO_MAX = 50;
+
+// Template placement state
+var placementMode = null; // { type, config, handler }
+
+// Measurement state
+var measurePoints = [];
+var measureLayers = [];
+var measureLabels = [];
+
+/* ═══════════════════════════════════════════════════════════════════
+   API LAYER
+═══════════════════════════════════════════════════════════════════ */
+const api = {
+    baseUrl: window.location.origin,
+
+    getToken() { return localStorage.getItem('strype_token'); },
+    setToken(t) { localStorage.setItem('strype_token', t); },
+    removeToken() { localStorage.removeItem('strype_token'); },
+    isLoggedIn() { return !!this.getToken(); },
+
+    async _fetch(method, path, body) {
+        var headers = { 'Content-Type': 'application/json' };
+        var token = this.getToken();
+        if (token) headers['Authorization'] = 'Bearer ' + token;
+
+        try {
+            var resp = await fetch(this.baseUrl + path, {
+                method: method,
+                headers: headers,
+                body: body ? JSON.stringify(body) : undefined
+            });
+
+            if (resp.status === 401) {
+                this.removeToken();
+                updateAuthUI();
+                return null;
+            }
+
+            if (resp.status === 403) {
+                var errData = await resp.json().catch(function() { return {}; });
+                if (errData.detail && errData.detail.indexOf('plan') >= 0) {
+                    showUpgradePrompt(errData.detail);
+                }
+                throw new Error(errData.detail || 'Forbidden');
+            }
+
+            if (!resp.ok) {
+                var err = await resp.json().catch(function() { return {}; });
+                throw new Error(err.detail || 'HTTP ' + resp.status);
+            }
+
+            return resp.json();
+        } catch (e) {
+            if (e.message && !e.message.startsWith('HTTP')) {
+                console.warn('API unavailable, using localStorage fallback');
+                return null;
+            }
+            throw e;
+        }
+    },
+
+    get: function(p) { return this._fetch('GET', p); },
+    post: function(p, b) { return this._fetch('POST', p, b); },
+    put: function(p, b) { return this._fetch('PUT', p, b); },
+    patch: function(p, b) { return this._fetch('PATCH', p, b); },
+    del: function(p) { return this._fetch('DELETE', p); }
+};
+
+/* ═══════════════════════════════════════════════════════════════════
+   AUTH UI
+═══════════════════════════════════════════════════════════════════ */
+var currentAuthTab = 'login';
+
+function switchAuthTab(tab) {
+    currentAuthTab = tab;
+    document.getElementById('authTabLogin').style.borderBottom = tab === 'login' ? '2px solid #f59e0b' : 'none';
+    document.getElementById('authTabLogin').style.color = tab === 'login' ? '#f59e0b' : '#999';
+    document.getElementById('authTabRegister').style.borderBottom = tab === 'register' ? '2px solid #f59e0b' : 'none';
+    document.getElementById('authTabRegister').style.color = tab === 'register' ? '#f59e0b' : '#999';
+    document.getElementById('nameField').style.display = tab === 'register' ? 'block' : 'none';
+    document.getElementById('authSubmitBtn').textContent = tab === 'login' ? 'Log In' : 'Sign Up';
+    document.getElementById('authError').style.display = 'none';
+}
+
+function openAuthModal() {
+    document.getElementById('authModal').style.display = 'flex';
+    switchAuthTab('login');
+}
+
+function closeAuthModal() {
+    document.getElementById('authModal').style.display = 'none';
+    document.getElementById('authForm').reset();
+    document.getElementById('authError').style.display = 'none';
+}
+
+async function handleAuth(e) {
+    e.preventDefault();
+    var email = document.getElementById('authEmail').value;
+    var password = document.getElementById('authPassword').value;
+    var name = document.getElementById('authName').value;
+    var errorEl = document.getElementById('authError');
+
+    try {
+        var result;
+        if (currentAuthTab === 'login') {
+            result = await api.post('/api/auth/login', { email: email, password: password });
+        } else {
+            result = await api.post('/api/auth/register', { email: email, password: password, name: name });
+        }
+
+        if (!result) {
+            errorEl.textContent = 'Server unavailable. Please try again.';
+            errorEl.style.display = 'block';
+            return;
+        }
+
+        api.setToken(result.token);
+        closeAuthModal();
+        await loadState();
+        updateAuthUI();
+    } catch (err) {
+        errorEl.textContent = err.message || 'Authentication failed';
+        errorEl.style.display = 'block';
+    }
+}
+
+function updateAuthUI() {
+    var avatarEl = document.getElementById('userAvatar');
+    if (!avatarEl) return;
+
+    if (api.isLoggedIn()) {
+        var userData = JSON.parse(localStorage.getItem('strype_user') || '{}');
+        var initials = (userData.name || userData.email || 'U').substring(0, 2).toUpperCase();
+        avatarEl.textContent = initials;
+        avatarEl.style.background = '#f59e0b';
+        avatarEl.style.color = 'white';
+        avatarEl.onclick = showUserMenu;
+    } else {
+        avatarEl.textContent = '\uD83D\uDC64';
+        avatarEl.style.background = '';
+        avatarEl.style.color = '';
+        avatarEl.onclick = openAuthModal;
+    }
+}
+
+function showUserMenu() {
+    var existing = document.getElementById('userMenu');
+    if (existing) { existing.remove(); return; }
+
+    var menu = document.createElement('div');
+    menu.id = 'userMenu';
+    menu.style.cssText = 'position:fixed; top:56px; right:16px; background:var(--bg-card); border:1px solid var(--border); border-radius:8px; box-shadow:0 4px 12px rgba(0,0,0,0.4); padding:8px 0; z-index:10001; min-width:160px;';
+
+    var userData = JSON.parse(localStorage.getItem('strype_user') || '{}');
+    var planBadge = userData.plan === 'pro'
+        ? '<span style="background:rgba(63,185,80,.2); color:#3fb950; padding:2px 6px; border-radius:8px; font-size:11px; margin-left:6px;">PRO</span>'
+        : '<span style="background:rgba(139,148,158,.2); color:#8b949e; padding:2px 6px; border-radius:8px; font-size:11px; margin-left:6px;">FREE</span>';
+    menu.innerHTML =
+        '<div style="padding:8px 16px; border-bottom:1px solid var(--border); font-size:13px; color:var(--text-2);">' + (userData.email || '') + planBadge + '</div>' +
+        '<button onclick="openSettingsModal()" style="display:block; width:100%; text-align:left; padding:10px 16px; border:none; background:none; cursor:pointer; font-size:14px; color:var(--text);">Settings</button>' +
+        (userData.plan !== 'pro' ? '<button onclick="showUpgradePrompt()" style="display:block; width:100%; text-align:left; padding:10px 16px; border:none; background:none; cursor:pointer; font-size:14px; color:#3fb950;">Upgrade to Pro</button>' : '') +
+        '<button onclick="handleLogout()" style="display:block; width:100%; text-align:left; padding:10px 16px; border:none; background:none; cursor:pointer; font-size:14px; color:var(--text);">Log out</button>';
+    document.body.appendChild(menu);
+
+    setTimeout(function() {
+        document.addEventListener('click', function closeMenu(e) {
+            if (!menu.contains(e.target)) { menu.remove(); document.removeEventListener('click', closeMenu); }
+        });
+    }, 0);
+}
+
+function handleLogout() {
+    api.removeToken();
+    localStorage.removeItem('strype_user');
+    var userMenu = document.getElementById('userMenu');
+    if (userMenu) userMenu.remove();
+    updateAuthUI();
+    loadState();
+}
+
+// --- Forgot Password ---
+var resetStep = 'email'; // 'email' | 'token'
+
+function showForgotPassword() {
+    document.getElementById('authForm').style.display = 'none';
+    document.getElementById('forgotPasswordLink').style.display = 'none';
+    document.getElementById('forgotPasswordForm').style.display = 'block';
+    resetStep = 'email';
+}
+
+async function handleForgotPassword() {
+    var msgEl = document.getElementById('resetMessage');
+    try {
+        if (resetStep === 'email') {
+            var email = document.getElementById('resetEmail').value;
+            var result = await api.post('/api/auth/forgot-password', { email: email });
+            if (result && result.token) {
+                // Dev mode: auto-fill token
+                document.getElementById('resetToken').value = result.token;
+            }
+            document.getElementById('resetToken').style.display = 'block';
+            document.getElementById('resetNewPassword').style.display = 'block';
+            document.getElementById('resetEmail').disabled = true;
+            msgEl.textContent = 'Check your email for the reset token.';
+            msgEl.style.display = 'block';
+            msgEl.style.background = 'rgba(63,185,80,.1)';
+            msgEl.style.color = '#3fb950';
+            resetStep = 'token';
+            var btn = document.getElementById('forgotPasswordForm').querySelector('button');
+            btn.textContent = 'Reset Password';
+        } else {
+            var token = document.getElementById('resetToken').value;
+            var newPassword = document.getElementById('resetNewPassword').value;
+            await api.post('/api/auth/reset-password', { token: token, new_password: newPassword });
+            msgEl.textContent = 'Password reset! You can now log in.';
+            msgEl.style.display = 'block';
+            msgEl.style.background = 'rgba(63,185,80,.1)';
+            msgEl.style.color = '#3fb950';
+            setTimeout(function() {
+                document.getElementById('forgotPasswordForm').style.display = 'none';
+                document.getElementById('authForm').style.display = 'block';
+                document.getElementById('forgotPasswordLink').style.display = 'block';
+                resetStep = 'email';
+                document.getElementById('resetEmail').disabled = false;
+                document.getElementById('resetToken').style.display = 'none';
+                document.getElementById('resetNewPassword').style.display = 'none';
+                msgEl.style.display = 'none';
+            }, 2000);
+        }
+    } catch (err) {
+        msgEl.textContent = err.message || 'Reset failed';
+        msgEl.style.display = 'block';
+        msgEl.style.background = 'rgba(248,81,73,.1)';
+        msgEl.style.color = '#f85149';
+    }
+}
+
+// --- Upgrade Prompt ---
+function showUpgradePrompt(message) {
+    var userMenu = document.getElementById('userMenu');
+    if (userMenu) userMenu.remove();
+
+    var modal = document.createElement('div');
+    modal.id = 'upgradeModal';
+    modal.style.cssText = 'position:fixed; top:0; left:0; width:100%; height:100%; background:rgba(0,0,0,0.5); z-index:10000; display:flex; justify-content:center; align-items:center;';
+    modal.innerHTML =
+        '<div style="background:var(--bg-card); border:1px solid var(--border); border-radius:12px; padding:32px; width:420px; max-width:90vw; text-align:center;">' +
+            '<h3 style="font-size:20px; margin-bottom:12px;">Upgrade to Pro</h3>' +
+            '<p style="color:var(--text-2); margin-bottom:20px;">' + (message || 'Free plan limit reached. Upgrade to Pro for unlimited lots and jobs.') + '</p>' +
+            '<div style="font-size:28px; font-weight:700; color:#3fb950; margin-bottom:20px;">$99<span style="font-size:14px; font-weight:400; color:var(--text-2);">/month</span></div>' +
+            '<button onclick="startCheckout()" style="width:100%; padding:12px; background:#3fb950; color:white; border:none; border-radius:8px; font-size:16px; font-weight:600; cursor:pointer; margin-bottom:8px;">Upgrade Now</button>' +
+            '<button onclick="document.getElementById(\'upgradeModal\').remove()" style="width:100%; padding:10px; background:none; border:1px solid var(--border); border-radius:8px; font-size:14px; cursor:pointer; color:var(--text-2);">Maybe Later</button>' +
+        '</div>';
+    document.body.appendChild(modal);
+    modal.addEventListener('click', function(e) { if (e.target === modal) modal.remove(); });
+}
+
+async function startCheckout() {
+    try {
+        var result = await api.post('/api/billing/create-checkout');
+        if (result && result.url) {
+            window.location.href = result.url;
+        }
+    } catch (err) {
+        alert(err.message || 'Billing not available');
+    }
+    var modal = document.getElementById('upgradeModal');
+    if (modal) modal.remove();
+}
+
+// --- Settings Modal ---
+function openSettingsModal() {
+    var userMenu = document.getElementById('userMenu');
+    if (userMenu) userMenu.remove();
+
+    var userData = JSON.parse(localStorage.getItem('strype_user') || '{}');
+    var modal = document.createElement('div');
+    modal.id = 'settingsModal';
+    modal.style.cssText = 'position:fixed; top:0; left:0; width:100%; height:100%; background:rgba(0,0,0,0.5); z-index:10000; display:flex; justify-content:center; align-items:center;';
+    modal.innerHTML =
+        '<div style="background:var(--bg-card); border:1px solid var(--border); border-radius:12px; padding:32px; width:440px; max-width:90vw; position:relative;">' +
+            '<button onclick="document.getElementById(\'settingsModal\').remove()" style="position:absolute; top:12px; right:16px; background:none; border:none; font-size:20px; cursor:pointer; color:var(--text-2);">&times;</button>' +
+            '<h3 style="font-size:18px; margin-bottom:20px;">Account Settings</h3>' +
+            '<div id="settingsMsg" style="display:none; padding:8px 12px; border-radius:6px; margin-bottom:12px; font-size:13px;"></div>' +
+            '<label style="display:block; font-size:13px; color:var(--text-2); margin-bottom:4px;">Name</label>' +
+            '<input type="text" id="settingsName" value="' + (userData.name || '') + '" style="width:100%; padding:10px 12px; border:1px solid var(--border); border-radius:8px; font-size:14px; box-sizing:border-box; background:var(--bg); color:var(--text); margin-bottom:12px;">' +
+            '<button onclick="updateSettingsName()" style="width:100%; padding:10px; background:var(--blue); color:white; border:none; border-radius:8px; font-size:14px; font-weight:600; cursor:pointer; margin-bottom:20px;">Update Name</button>' +
+            '<hr style="border:none; border-top:1px solid var(--border); margin-bottom:16px;">' +
+            '<label style="display:block; font-size:13px; color:var(--text-2); margin-bottom:4px;">Current Password</label>' +
+            '<input type="password" id="settingsOldPass" style="width:100%; padding:10px 12px; border:1px solid var(--border); border-radius:8px; font-size:14px; box-sizing:border-box; background:var(--bg); color:var(--text); margin-bottom:8px;">' +
+            '<label style="display:block; font-size:13px; color:var(--text-2); margin-bottom:4px;">New Password</label>' +
+            '<input type="password" id="settingsNewPass" style="width:100%; padding:10px 12px; border:1px solid var(--border); border-radius:8px; font-size:14px; box-sizing:border-box; background:var(--bg); color:var(--text); margin-bottom:12px;">' +
+            '<button onclick="updateSettingsPassword()" style="width:100%; padding:10px; background:var(--blue); color:white; border:none; border-radius:8px; font-size:14px; font-weight:600; cursor:pointer; margin-bottom:20px;">Change Password</button>' +
+            '<hr style="border:none; border-top:1px solid var(--border); margin-bottom:16px;">' +
+            '<button onclick="confirmDeleteAccount()" style="width:100%; padding:10px; background:none; border:1px solid #f85149; border-radius:8px; font-size:14px; cursor:pointer; color:#f85149;">Delete Account</button>' +
+        '</div>';
+    document.body.appendChild(modal);
+    modal.addEventListener('click', function(e) { if (e.target === modal) modal.remove(); });
+}
+
+async function updateSettingsName() {
+    var msgEl = document.getElementById('settingsMsg');
+    try {
+        var name = document.getElementById('settingsName').value;
+        var result = await api.put('/api/user/profile', { name: name });
+        if (result) localStorage.setItem('strype_user', JSON.stringify(result));
+        msgEl.textContent = 'Name updated!';
+        msgEl.style.display = 'block';
+        msgEl.style.background = 'rgba(63,185,80,.1)';
+        msgEl.style.color = '#3fb950';
+        updateAuthUI();
+    } catch (err) {
+        msgEl.textContent = err.message;
+        msgEl.style.display = 'block';
+        msgEl.style.background = 'rgba(248,81,73,.1)';
+        msgEl.style.color = '#f85149';
+    }
+}
+
+async function updateSettingsPassword() {
+    var msgEl = document.getElementById('settingsMsg');
+    try {
+        var oldPass = document.getElementById('settingsOldPass').value;
+        var newPass = document.getElementById('settingsNewPass').value;
+        await api.put('/api/auth/password', { current_password: oldPass, new_password: newPass });
+        msgEl.textContent = 'Password changed!';
+        msgEl.style.display = 'block';
+        msgEl.style.background = 'rgba(63,185,80,.1)';
+        msgEl.style.color = '#3fb950';
+        document.getElementById('settingsOldPass').value = '';
+        document.getElementById('settingsNewPass').value = '';
+    } catch (err) {
+        msgEl.textContent = err.message;
+        msgEl.style.display = 'block';
+        msgEl.style.background = 'rgba(248,81,73,.1)';
+        msgEl.style.color = '#f85149';
+    }
+}
+
+async function confirmDeleteAccount() {
+    var password = prompt('Type your password to permanently delete your account:');
+    if (!password) return;
+    try {
+        await api._fetch('DELETE', '/api/user/account', { password: password });
+        api.removeToken();
+        localStorage.clear();
+        window.location.reload();
+    } catch (err) {
+        alert(err.message || 'Failed to delete account');
+    }
+}
+
 /* ═══════════════════════════════════════════════════════════════════
    UTILITIES
 ═══════════════════════════════════════════════════════════════════ */
@@ -472,15 +1066,103 @@ function formatDate(iso) {
   return d.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
 }
 
+function debounce(fn, ms) {
+    var timer;
+    return function() {
+        var args = arguments;
+        var ctx = this;
+        clearTimeout(timer);
+        timer = setTimeout(function() { fn.apply(ctx, args); }, ms);
+    };
+}
+
+var debouncedSaveLot = debounce(async function(lot) {
+    if (!api.isLoggedIn() || !lot) return;
+    try {
+        await api.put('/api/lots/' + lot.id, {
+            name: lot.name,
+            center: lot.center,
+            zoom: lot.zoom,
+            features: lot.features
+        });
+    } catch (e) {
+        console.warn('Failed to sync lot to API:', e);
+    }
+}, 1000);
+
+var debouncedSaveMapState = debounce(async function() {
+    if (!api.isLoggedIn()) return;
+    try {
+        var c = map.getCenter();
+        await api.put('/api/user/preferences', {
+            active_lot_id: activeLotId,
+            map_state: { lat: c.lat, lng: c.lng, zoom: map.getZoom() }
+        });
+    } catch (e) {
+        console.warn('Failed to sync preferences to API:', e);
+    }
+}, 2000);
+
 function saveLots() {
   localStorage.setItem(STORAGE_KEYS.lots, JSON.stringify(lots));
+  // Sync active lot to API
+  if (api.isLoggedIn() && activeLotId) {
+    var activeLot = lots.find(function(l) { return l.id === activeLotId; });
+    debouncedSaveLot(activeLot);
+  }
 }
 
 function saveJobs() {
   localStorage.setItem(STORAGE_KEYS.jobs, JSON.stringify(jobs));
 }
 
-function loadState() {
+async function loadState() {
+  // Try API first if logged in
+  if (api.isLoggedIn()) {
+    try {
+      var me = await api.get('/api/auth/me');
+      if (me) {
+        localStorage.setItem('strype_user', JSON.stringify(me));
+      }
+
+      var apiLots = await api.get('/api/lots');
+      if (apiLots && apiLots.items) {
+        lots = apiLots.items;
+        localStorage.setItem(STORAGE_KEYS.lots, JSON.stringify(lots));
+      } else if (apiLots && Array.isArray(apiLots)) {
+        lots = apiLots;
+        localStorage.setItem(STORAGE_KEYS.lots, JSON.stringify(lots));
+      }
+
+      var apiJobs = await api.get('/api/jobs');
+      if (apiJobs && apiJobs.items) {
+        jobs = apiJobs.items;
+        localStorage.setItem(STORAGE_KEYS.jobs, JSON.stringify(jobs));
+      } else if (apiJobs && Array.isArray(apiJobs)) {
+        jobs = apiJobs;
+        localStorage.setItem(STORAGE_KEYS.jobs, JSON.stringify(jobs));
+      }
+
+      // Set active lot from user preferences if available
+      if (me && me.active_lot_id) {
+        activeLotId = me.active_lot_id;
+        localStorage.setItem(STORAGE_KEYS.activeLot, activeLotId);
+      } else {
+        activeLotId = localStorage.getItem(STORAGE_KEYS.activeLot) || null;
+      }
+
+      // Set map state from user preferences
+      if (me && me.map_state) {
+        localStorage.setItem(STORAGE_KEYS.mapState, JSON.stringify(me.map_state));
+      }
+
+      return;
+    } catch (e) {
+      console.warn('API load failed, falling back to localStorage:', e);
+    }
+  }
+
+  // Fallback to localStorage
   try { lots = JSON.parse(localStorage.getItem(STORAGE_KEYS.lots)) || []; } catch(e) { lots = []; }
   try { jobs = JSON.parse(localStorage.getItem(STORAGE_KEYS.jobs)) || []; } catch(e) { jobs = []; }
   activeLotId = localStorage.getItem(STORAGE_KEYS.activeLot) || null;
@@ -592,6 +1274,7 @@ function initMap() {
   map.on('moveend', function() {
     var c = map.getCenter();
     localStorage.setItem(STORAGE_KEYS.mapState, JSON.stringify({ lat: c.lat, lng: c.lng, zoom: map.getZoom() }));
+    debouncedSaveMapState();
   });
 
   // Handle draw events
@@ -617,11 +1300,17 @@ function initMap() {
     styleLayer(layer);
     drawnItems.addLayer(layer);
     makeLayerSelectable(layer);
+
+    // Push to undo stack
+    var gj = layer.toGeoJSON();
+    gj.properties = Object.assign({}, layer.featureProps);
+    pushUndo({ type: 'add_feature', featureId: layer.featureProps.id, geojson: gj });
+
     saveCurrentLot();
     updateDashboard();
 
     // Re-enable the same draw tool for rapid drawing
-    if (activeTool !== 'pan' && activeTool !== 'eraser') {
+    if (activeTool !== 'pan' && activeTool !== 'eraser' && activeTool !== 'measure') {
       setTimeout(function() { setActiveTool(activeTool); }, 50);
     }
   });
@@ -650,7 +1339,30 @@ function makeLayerSelectable(layer) {
   layer.on('click', function(e) {
     L.DomEvent.stopPropagation(e);
     if (activeTool === 'eraser') {
-      drawnItems.removeLayer(layer);
+      // Save for undo
+      var gj = layer.toGeoJSON();
+      gj.properties = Object.assign({}, layer.featureProps);
+      if (layer.featureProps.groupId) {
+        // Delete entire group
+        var groupFeatures = [];
+        var gid = layer.featureProps.groupId;
+        drawnItems.eachLayer(function(gl) {
+          if (gl.featureProps && gl.featureProps.groupId === gid) {
+            var ggj = gl.toGeoJSON();
+            ggj.properties = Object.assign({}, gl.featureProps);
+            groupFeatures.push(ggj);
+          }
+        });
+        drawnItems.eachLayer(function(gl) {
+          if (gl.featureProps && gl.featureProps.groupId === gid) {
+            drawnItems.removeLayer(gl);
+          }
+        });
+        pushUndo({ type: 'delete_group', groupId: gid, features: groupFeatures });
+      } else {
+        drawnItems.removeLayer(layer);
+        pushUndo({ type: 'delete_feature', featureId: layer.featureProps.id, geojson: gj });
+      }
       if (selectedFeatureId === layer.featureProps.id) {
         selectedFeatureId = null;
         showEmptyProperties();
@@ -727,6 +1439,9 @@ function showProperties(layer) {
   });
 
   document.getElementById('deleteFeatureBtn').addEventListener('click', function() {
+    var gj = layer.toGeoJSON();
+    gj.properties = Object.assign({}, layer.featureProps);
+    pushUndo({ type: 'delete_feature', featureId: layer.featureProps.id, geojson: gj });
     drawnItems.removeLayer(layer);
     selectedFeatureId = null;
     showEmptyProperties();
@@ -862,6 +1577,14 @@ function setActiveTool(tool) {
     currentDrawHandler = null;
   }
 
+  // Clear measurement when switching tools
+  if (activeTool === 'measure' && tool !== 'measure') {
+    clearMeasure();
+  }
+
+  // Exit placement mode
+  exitPlacementMode();
+
   activeTool = tool;
 
   // Update UI
@@ -871,9 +1594,15 @@ function setActiveTool(tool) {
 
   // Change cursor
   var mapContainer = document.getElementById('map');
-  mapContainer.style.cursor = (tool === 'eraser') ? 'crosshair' : '';
+  mapContainer.style.cursor = (tool === 'eraser' || tool === 'measure') ? 'crosshair' : '';
 
   // Enable leaflet draw handler if applicable
+  // Measure tool works without a lot selected
+  if (tool === 'measure') {
+    activateMeasure();
+    return;
+  }
+
   if (!activeLotId && tool !== 'pan' && tool !== 'eraser') {
     showToast('Create or select a lot first', 'error');
     activeTool = 'pan';
@@ -932,7 +1661,7 @@ document.getElementById('lineType').addEventListener('change', function() {
 /* ═══════════════════════════════════════════════════════════════════
    LOT MANAGEMENT
 ═══════════════════════════════════════════════════════════════════ */
-function createLot(name) {
+async function createLot(name) {
   var center = map.getCenter();
   var lot = {
     id: uid(),
@@ -943,6 +1672,26 @@ function createLot(name) {
     created: new Date().toISOString(),
     modified: new Date().toISOString()
   };
+
+  // Try API first to get server-generated ID
+  if (api.isLoggedIn()) {
+    try {
+      var result = await api.post('/api/lots', {
+        name: lot.name,
+        center: lot.center,
+        zoom: lot.zoom,
+        features: lot.features
+      });
+      if (result && result.id) {
+        lot.id = result.id;
+        if (result.created) lot.created = result.created;
+        if (result.modified) lot.modified = result.modified;
+      }
+    } catch (e) {
+      console.warn('Failed to create lot via API:', e);
+    }
+  }
+
   lots.push(lot);
   saveLots();
   setActiveLot(lot.id);
@@ -957,6 +1706,17 @@ function setActiveLot(lotId) {
   loadLotFeatures(lotId);
   renderLotList();
   updateJobLotSelect();
+
+  // Sync active lot preference to API
+  if (api.isLoggedIn()) {
+    try {
+      api.put('/api/user/preferences', { active_lot_id: lotId }).catch(function(e) {
+        console.warn('Failed to sync active lot preference:', e);
+      });
+    } catch (e) {
+      console.warn('Failed to sync active lot preference:', e);
+    }
+  }
 
   // Fly to lot center
   var lot = lots.find(function(l) { return l.id === lotId; });
@@ -1052,7 +1812,49 @@ function renameLot(lotId) {
   });
 }
 
-function duplicateLot(lotId) {
+function importDxfSvg(lotId) {
+    var input = document.createElement('input');
+    input.type = 'file';
+    input.accept = '.dxf,.svg';
+    input.onchange = async function(e) {
+        var file = e.target.files[0];
+        if (!file) return;
+        if (file.size > 5 * 1024 * 1024) {
+            showToast('File too large (max 5 MB)', 'error');
+            return;
+        }
+        showToast('Importing ' + file.name + '...');
+        try {
+            var formData = new FormData();
+            formData.append('file', file);
+            var token = api.getToken();
+            var resp = await fetch(api.baseUrl + '/api/lots/' + lotId + '/import', {
+                method: 'POST',
+                headers: { 'Authorization': 'Bearer ' + token },
+                body: formData
+            });
+            if (!resp.ok) {
+                var err = await resp.json().catch(function() { return {}; });
+                throw new Error(err.detail || 'Import failed');
+            }
+            var result = await resp.json();
+            // Update lot in state
+            var idx = lots.findIndex(function(l) { return l.id === lotId; });
+            if (idx >= 0 && result.features) {
+                lots[idx].features = result.features;
+                saveLots();
+                if (activeLotId === lotId) loadLotFeatures(lots[idx]);
+                renderLotList();
+            }
+            showToast('Imported ' + file.name + ' successfully');
+        } catch (err) {
+            showToast(err.message || 'Import failed', 'error');
+        }
+    };
+    input.click();
+}
+
+async function duplicateLot(lotId) {
   var lot = lots.find(function(l) { return l.id === lotId; });
   if (!lot) return;
 
@@ -1065,6 +1867,22 @@ function duplicateLot(lotId) {
   copy.features.forEach(function(f) {
     if (f.properties) f.properties.id = uid();
   });
+
+  // Try API duplicate
+  if (api.isLoggedIn()) {
+    try {
+      var result = await api.post('/api/lots/' + lotId + '/duplicate');
+      if (result && result.id) {
+        copy.id = result.id;
+        if (result.name) copy.name = result.name;
+        if (result.created) copy.created = result.created;
+        if (result.modified) copy.modified = result.modified;
+        if (result.features) copy.features = result.features;
+      }
+    } catch (e) {
+      console.warn('Failed to duplicate lot via API:', e);
+    }
+  }
 
   lots.push(copy);
   saveLots();
@@ -1084,7 +1902,16 @@ function deleteLot(lotId) {
     '<div class="modal-actions"><button class="modal-btn cancel" onclick="hideModal()">Cancel</button><button class="modal-btn danger" id="deleteLotConfirm">Delete</button></div>'
   );
 
-  document.getElementById('deleteLotConfirm').addEventListener('click', function() {
+  document.getElementById('deleteLotConfirm').addEventListener('click', async function() {
+    // Delete via API if logged in
+    if (api.isLoggedIn()) {
+      try {
+        await api.del('/api/lots/' + lotId);
+      } catch (e) {
+        console.warn('Failed to delete lot via API:', e);
+      }
+    }
+
     lots = lots.filter(function(l) { return l.id !== lotId; });
     // Remove associated jobs
     jobs = jobs.filter(function(j) { return j.lotId !== lotId; });
@@ -1143,6 +1970,11 @@ document.getElementById('lotList').addEventListener('click', function(e) {
         label: 'Rename',
         icon: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>',
         action: function() { renameLot(lotId); }
+      },
+      {
+        label: 'Import DXF/SVG',
+        icon: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>',
+        action: function() { importDxfSvg(lotId); }
       },
       {
         label: 'Duplicate',
@@ -1236,13 +2068,23 @@ function renderJobsList() {
   }).join('');
 }
 
-document.getElementById('jobsList').addEventListener('click', function(e) {
+document.getElementById('jobsList').addEventListener('click', async function(e) {
   var completeBtn = e.target.closest('[data-complete-job]');
   if (completeBtn) {
     var jobId = completeBtn.dataset.completeJob;
     var job = jobs.find(function(j) { return j.id === jobId; });
     if (job) {
       job.status = 'completed';
+
+      // Sync to API
+      if (api.isLoggedIn()) {
+        try {
+          await api.patch('/api/jobs/' + jobId, { status: 'completed' });
+        } catch (e) {
+          console.warn('Failed to update job via API:', e);
+        }
+      }
+
       saveJobs();
       renderJobsList();
       updateDashboard();
@@ -1254,6 +2096,16 @@ document.getElementById('jobsList').addEventListener('click', function(e) {
   var deleteBtn = e.target.closest('[data-delete-job]');
   if (deleteBtn) {
     var jobId2 = deleteBtn.dataset.deleteJob;
+
+    // Delete via API
+    if (api.isLoggedIn()) {
+      try {
+        await api.del('/api/jobs/' + jobId2);
+      } catch (e) {
+        console.warn('Failed to delete job via API:', e);
+      }
+    }
+
     jobs = jobs.filter(function(j) { return j.id !== jobId2; });
     saveJobs();
     renderJobsList();
@@ -1262,21 +2114,39 @@ document.getElementById('jobsList').addEventListener('click', function(e) {
   }
 });
 
-document.getElementById('addJobBtn').addEventListener('click', function() {
+document.getElementById('addJobBtn').addEventListener('click', async function() {
   var lotId = document.getElementById('jobLotSelect').value;
   var date = document.getElementById('jobDate').value;
 
   if (!lotId) { showToast('Select a lot first', 'error'); return; }
   if (!date) { showToast('Select a date', 'error'); return; }
 
-  jobs.push({
+  var newJob = {
     id: uid(),
     lotId: lotId,
     date: date,
     status: 'pending',
     created: new Date().toISOString()
-  });
+  };
 
+  // Try API first to get server-generated ID
+  if (api.isLoggedIn()) {
+    try {
+      var result = await api.post('/api/jobs', {
+        lotId: lotId,
+        date: date,
+        status: 'pending'
+      });
+      if (result && result.id) {
+        newJob.id = result.id;
+        if (result.created) newJob.created = result.created;
+      }
+    } catch (e) {
+      console.warn('Failed to create job via API:', e);
+    }
+  }
+
+  jobs.push(newJob);
   saveJobs();
   renderJobsList();
   updateDashboard();
@@ -1285,39 +2155,720 @@ document.getElementById('addJobBtn').addEventListener('click', function() {
 });
 
 /* ═══════════════════════════════════════════════════════════════════
-   DASHBOARD
+   COST & TIME ESTIMATOR (replaces old dashboard)
 ═══════════════════════════════════════════════════════════════════ */
-function updateDashboard() {
-  document.getElementById('statLots').textContent = lots.length;
+var PAINT_COST_PER_GAL = 20;
+var CREW_COST_DEFAULT = 1200;
+var LINE_WIDTH_M = 0.1016; // 4 inches in meters
 
-  var totalFeatures = 0;
-  lots.forEach(function(lot) { totalFeatures += (lot.features ? lot.features.length : 0); });
-  document.getElementById('statFeatures').textContent = totalFeatures;
-
-  var pendingJobs = jobs.filter(function(j) { return j.status === 'pending'; }).length;
-  document.getElementById('statPending').textContent = pendingJobs;
-
-  // Estimate waypoints for active lot
+function calculateEstimate() {
+  var paintDist = 0;
+  var transitDist = 0;
+  var featureCount = 0;
   var wpCount = 0;
+  var lastCoord = null;
+
   if (activeLotId) {
     var lot = lots.find(function(l) { return l.id === activeLotId; });
     if (lot && lot.features) {
+      featureCount = lot.features.length;
       lot.features.forEach(function(f) {
         var coords = extractCoords(f);
         if (coords && coords.length >= 2) {
-          var dist = calcPolylineDistanceM(coords);
-          wpCount += Math.ceil(dist / WAYPOINT_SPACING_M) + 4; // +4 for spray on/off + speed cmds
+          // Transit distance from last feature end to this feature start
+          if (lastCoord) {
+            transitDist += distanceM(lastCoord[1], lastCoord[0], coords[0][1], coords[0][0]);
+          }
+          var segDist = calcPolylineDistanceM(coords);
+          paintDist += segDist;
+          wpCount += Math.ceil(segDist / WAYPOINT_SPACING_M) + 4;
+          lastCoord = coords[coords.length - 1];
         }
       });
     }
   }
-  document.getElementById('statWaypoints').textContent = wpCount;
+
+  // Paint usage: distance_m * width_m / 3.02 (350 sq ft/gal ≈ 3.02 sq m/gal)
+  var gallons = (paintDist * LINE_WIDTH_M) / 3.02;
+  var cost = gallons * PAINT_COST_PER_GAL;
+  // Runtime: paint at 0.5 m/s + transit at 1.0 m/s → seconds → minutes
+  var runtimeMin = ((paintDist / SPRAY_SPEED) + (transitDist / TRANSIT_SPEED)) / 60;
+  var savings = CREW_COST_DEFAULT - cost;
+
+  return {
+    featureCount: featureCount,
+    paintDist: paintDist,
+    gallons: gallons,
+    cost: cost,
+    runtimeMin: runtimeMin,
+    wpCount: wpCount,
+    savings: savings
+  };
 }
 
-var dashboardToggle = document.getElementById('dashboardToggle');
-dashboardToggle.addEventListener('click', function() {
-  document.getElementById('dashboardBar').classList.toggle('hidden');
+function updateDashboard() {
+  var est = calculateEstimate();
+  document.getElementById('costFeatures').textContent = est.featureCount;
+  document.getElementById('costDistance').textContent = est.paintDist < 1000
+    ? Math.round(est.paintDist) + ' m'
+    : (est.paintDist / 1000).toFixed(2) + ' km';
+  document.getElementById('costGallons').textContent = est.gallons.toFixed(1) + ' gal';
+  document.getElementById('costDollars').textContent = '$' + Math.round(est.cost);
+  document.getElementById('costRuntime').textContent = Math.round(est.runtimeMin) + ' min';
+  document.getElementById('costWaypoints').textContent = est.wpCount;
+
+  var savingsEl = document.getElementById('costSavings');
+  if (est.featureCount > 0 && est.savings > 0) {
+    savingsEl.textContent = 'Save $' + Math.round(est.savings) + ' vs crew ($' + CREW_COST_DEFAULT + ')';
+  } else {
+    savingsEl.textContent = '';
+  }
+}
+
+document.getElementById('costToggle').addEventListener('click', function() {
+  document.getElementById('costPanel').classList.toggle('hidden');
 });
+
+/* ═══════════════════════════════════════════════════════════════════
+   UNDO / REDO
+═══════════════════════════════════════════════════════════════════ */
+function pushUndo(action) {
+  // action: { type: 'add_feature'|'delete_feature'|'add_group'|'delete_group', data }
+  undoStack.push(action);
+  if (undoStack.length > UNDO_MAX) undoStack.shift();
+  redoStack = [];
+  updateUndoButtons();
+}
+
+function updateUndoButtons() {
+  document.getElementById('undoBtn').disabled = undoStack.length === 0;
+  document.getElementById('redoBtn').disabled = redoStack.length === 0;
+}
+
+function undo() {
+  if (undoStack.length === 0) return;
+  var action = undoStack.pop();
+
+  switch (action.type) {
+    case 'add_feature':
+      // Undo adding: remove the feature
+      drawnItems.eachLayer(function(l) {
+        if (l.featureProps && l.featureProps.id === action.featureId) {
+          drawnItems.removeLayer(l);
+        }
+      });
+      redoStack.push(action);
+      break;
+
+    case 'delete_feature':
+      // Undo deleting: re-add the feature
+      var layer = restoreFeature(action.geojson);
+      if (layer) {
+        redoStack.push({ type: 'delete_feature', featureId: layer.featureProps.id, geojson: action.geojson });
+      }
+      break;
+
+    case 'add_group':
+      // Undo adding group: remove all features with groupId
+      var removedFeatures = [];
+      drawnItems.eachLayer(function(l) {
+        if (l.featureProps && l.featureProps.groupId === action.groupId) {
+          removedFeatures.push(l.toGeoJSON());
+          removedFeatures[removedFeatures.length - 1].properties = Object.assign({}, l.featureProps);
+          drawnItems.removeLayer(l);
+        }
+      });
+      redoStack.push({ type: 'add_group', groupId: action.groupId, features: removedFeatures });
+      break;
+
+    case 'delete_group':
+      // Undo deleting group: re-add all features
+      var restoredGroupId = action.groupId;
+      (action.features || []).forEach(function(gj) {
+        restoreFeature(gj);
+      });
+      redoStack.push({ type: 'delete_group', groupId: restoredGroupId, features: action.features });
+      break;
+  }
+
+  saveCurrentLot();
+  updateDashboard();
+  updateUndoButtons();
+}
+
+function redo() {
+  if (redoStack.length === 0) return;
+  var action = redoStack.pop();
+
+  switch (action.type) {
+    case 'add_feature':
+      var layer2 = restoreFeature(action.geojson);
+      if (layer2) {
+        undoStack.push(action);
+      }
+      break;
+
+    case 'delete_feature':
+      drawnItems.eachLayer(function(l) {
+        if (l.featureProps && l.featureProps.id === action.featureId) {
+          drawnItems.removeLayer(l);
+        }
+      });
+      undoStack.push(action);
+      break;
+
+    case 'add_group':
+      (action.features || []).forEach(function(gj) {
+        restoreFeature(gj);
+      });
+      undoStack.push({ type: 'add_group', groupId: action.groupId });
+      break;
+
+    case 'delete_group':
+      drawnItems.eachLayer(function(l) {
+        if (l.featureProps && l.featureProps.groupId === action.groupId) {
+          drawnItems.removeLayer(l);
+        }
+      });
+      undoStack.push({ type: 'delete_group', groupId: action.groupId, features: action.features });
+      break;
+  }
+
+  saveCurrentLot();
+  updateDashboard();
+  updateUndoButtons();
+}
+
+function restoreFeature(geojson) {
+  var layer;
+  try { layer = L.GeoJSON.geometryToLayer(geojson); } catch(e) { return null; }
+  layer.featureProps = Object.assign({
+    id: uid(), type: 'standard', lineType: 'Standard', color: '#ffffff',
+    width: 4, notes: '', geometryType: 'polyline', created: new Date().toISOString()
+  }, geojson.properties || {});
+  styleLayer(layer);
+  drawnItems.addLayer(layer);
+  makeLayerSelectable(layer);
+  return layer;
+}
+
+document.getElementById('undoBtn').addEventListener('click', undo);
+document.getElementById('redoBtn').addEventListener('click', redo);
+
+/* ═══════════════════════════════════════════════════════════════════
+   COORDINATE MATH (ported from pathgen)
+═══════════════════════════════════════════════════════════════════ */
+function localToGeo(originLat, originLon, x, y) {
+  return {
+    lat: originLat + y / 110540,
+    lon: originLon + x / (111320 * Math.cos(originLat * Math.PI / 180))
+  };
+}
+
+function rotatePoint(x, y, angleDeg) {
+  var rad = angleDeg * Math.PI / 180;
+  return {
+    x: x * Math.cos(rad) - y * Math.sin(rad),
+    y: x * Math.sin(rad) + y * Math.cos(rad)
+  };
+}
+
+/* ═══════════════════════════════════════════════════════════════════
+   TEMPLATE GENERATORS (ported from template_generator.py)
+═══════════════════════════════════════════════════════════════════ */
+function generateParkingRow(originLat, originLon, angle, count, spacing, length) {
+  var groupId = 'row_' + uid();
+  var features = [];
+
+  for (var i = 0; i <= count; i++) {
+    var localX = i * spacing;
+    var bot = rotatePoint(localX, 0, angle);
+    var top = rotatePoint(localX, length, angle);
+    var p1 = localToGeo(originLat, originLon, bot.x, bot.y);
+    var p2 = localToGeo(originLat, originLon, top.x, top.y);
+
+    features.push({
+      type: 'Feature',
+      geometry: { type: 'LineString', coordinates: [[p1.lon, p1.lat], [p2.lon, p2.lat]] },
+      properties: {
+        id: uid(), type: 'standard', lineType: 'Standard', color: '#ffffff',
+        width: 4, notes: '', geometryType: 'polyline', groupId: groupId,
+        created: new Date().toISOString()
+      }
+    });
+  }
+  return { features: features, groupId: groupId };
+}
+
+function generateHandicapSpace(originLat, originLon, angle) {
+  var groupId = 'hc_' + uid();
+  var features = [];
+  var width = 3.6;
+  var length = 5.5;
+  var aisleX = width * 0.6;
+  var color = '#58a6ff';
+
+  // Left line
+  var b1 = rotatePoint(0, 0, angle);
+  var t1 = rotatePoint(0, length, angle);
+  var p1 = localToGeo(originLat, originLon, b1.x, b1.y);
+  var p2 = localToGeo(originLat, originLon, t1.x, t1.y);
+  features.push(makeTemplateFeature([[p1.lon, p1.lat], [p2.lon, p2.lat]], 'handicap', color, groupId));
+
+  // Right line
+  var b2 = rotatePoint(width, 0, angle);
+  var t2 = rotatePoint(width, length, angle);
+  var p3 = localToGeo(originLat, originLon, b2.x, b2.y);
+  var p4 = localToGeo(originLat, originLon, t2.x, t2.y);
+  features.push(makeTemplateFeature([[p3.lon, p3.lat], [p4.lon, p4.lat]], 'handicap', color, groupId));
+
+  // Aisle line
+  var b3 = rotatePoint(aisleX, 0, angle);
+  var t3 = rotatePoint(aisleX, length, angle);
+  var p5 = localToGeo(originLat, originLon, b3.x, b3.y);
+  var p6 = localToGeo(originLat, originLon, t3.x, t3.y);
+  features.push(makeTemplateFeature([[p5.lon, p5.lat], [p6.lon, p6.lat]], 'handicap', color, groupId));
+
+  // Cross-hatching in access aisle
+  var hatchSpacing = 0.6;
+  for (var y = hatchSpacing; y < length; y += hatchSpacing) {
+    var hl = rotatePoint(aisleX, y, angle);
+    var hr = rotatePoint(width, y, angle);
+    var hp1 = localToGeo(originLat, originLon, hl.x, hl.y);
+    var hp2 = localToGeo(originLat, originLon, hr.x, hr.y);
+    features.push(makeTemplateFeature([[hp1.lon, hp1.lat], [hp2.lon, hp2.lat]], 'handicap', color, groupId));
+  }
+
+  return { features: features, groupId: groupId };
+}
+
+function generateCrosswalk(originLat, originLon, angle, cwWidth, cwLength) {
+  var groupId = 'cw_' + uid();
+  var features = [];
+  var stripeWidth = 0.3;
+  var gap = 0.3;
+
+  var x = 0;
+  while (x + stripeWidth <= cwWidth + 0.001) {
+    var cx = x + stripeWidth / 2;
+    var bot = rotatePoint(cx, 0, angle);
+    var top = rotatePoint(cx, cwLength, angle);
+    var p1 = localToGeo(originLat, originLon, bot.x, bot.y);
+    var p2 = localToGeo(originLat, originLon, top.x, top.y);
+    features.push(makeTemplateFeature([[p1.lon, p1.lat], [p2.lon, p2.lat]], 'crosswalk', '#ffffff', groupId));
+    x += stripeWidth + gap;
+  }
+  return { features: features, groupId: groupId };
+}
+
+var ARROW_TEMPLATES = {
+  straight: [
+    [[0, 0], [0, 2.0]],
+    [[-0.4, 1.4], [0, 2.0]],
+    [[0.4, 1.4], [0, 2.0]]
+  ],
+  left: [
+    [[0, 0], [0, 1.2], [-0.8, 1.2]],
+    [[-0.4, 0.8], [-0.8, 1.2]],
+    [[-0.4, 1.6], [-0.8, 1.2]]
+  ],
+  right: [
+    [[0, 0], [0, 1.2], [0.8, 1.2]],
+    [[0.4, 0.8], [0.8, 1.2]],
+    [[0.4, 1.6], [0.8, 1.2]]
+  ],
+  u_turn: [
+    [[0, 0], [0, 1.5]],
+    [[0, 1.5], [0.3, 1.8], [0.6, 1.5]],
+    [[0.6, 1.5], [0.6, 0.6]],
+    [[0.2, 1.0], [0.6, 0.6]],
+    [[1.0, 1.0], [0.6, 0.6]]
+  ]
+};
+
+function generateArrow(originLat, originLon, angle, arrowType) {
+  var groupId = 'arrow_' + uid();
+  var features = [];
+  var template = ARROW_TEMPLATES[arrowType] || ARROW_TEMPLATES.straight;
+
+  template.forEach(function(polyline) {
+    var coords = polyline.map(function(pt) {
+      var rot = rotatePoint(pt[0], pt[1], angle);
+      var geo = localToGeo(originLat, originLon, rot.x, rot.y);
+      return [geo.lon, geo.lat];
+    });
+    features.push(makeTemplateFeature(coords, 'standard', '#ffffff', groupId));
+  });
+
+  return { features: features, groupId: groupId };
+}
+
+function makeTemplateFeature(coords, lineType, color, groupId) {
+  return {
+    type: 'Feature',
+    geometry: { type: 'LineString', coordinates: coords },
+    properties: {
+      id: uid(), type: lineType, lineType: LINE_TYPES[lineType] ? LINE_TYPES[lineType].label : lineType,
+      color: color, width: 4, notes: '', geometryType: 'polyline', groupId: groupId,
+      created: new Date().toISOString()
+    }
+  };
+}
+
+/* ═══════════════════════════════════════════════════════════════════
+   AUTO-FILL PARKING
+═══════════════════════════════════════════════════════════════════ */
+function autoFillBounds(bounds, angle, spacing, handicapCount) {
+  // bounds: L.LatLngBounds
+  var sw = bounds.getSouthWest();
+  var ne = bounds.getNorthEast();
+  var widthM = distanceM(sw.lat, sw.lng, sw.lat, ne.lng);
+  var heightM = distanceM(sw.lat, sw.lng, ne.lat, sw.lng);
+
+  // For angled parking, effective width per space changes
+  var angleRad = angle * Math.PI / 180;
+  var effectiveSpacing = Math.abs(spacing * Math.sin(angleRad)) || spacing;
+  var stallLength = 5.5;
+
+  // Determine how many rows fit vertically and spaces fit horizontally
+  var spacesPerRow = Math.max(1, Math.floor(widthM / effectiveSpacing));
+  var rowDepth = stallLength + 1.0; // space + aisle buffer
+  var rows = Math.max(1, Math.floor(heightM / (rowDepth * 2))); // double-loaded rows
+  if (rows < 1) rows = 1;
+
+  var groupId = 'autofill_' + uid();
+  var features = [];
+  var hcPlaced = 0;
+
+  for (var r = 0; r < rows; r++) {
+    var rowY = r * rowDepth * 2 + stallLength; // offset from bottom
+
+    for (var i = 0; i <= spacesPerRow; i++) {
+      var localX = i * effectiveSpacing;
+      // Top row (facing up)
+      var bot1 = rotatePoint(localX, rowY - stallLength, angle - 90 + 90);
+      var top1 = rotatePoint(localX, rowY, angle - 90 + 90);
+      var p1 = localToGeo(sw.lat, sw.lng, bot1.x, bot1.y);
+      var p2 = localToGeo(sw.lat, sw.lng, top1.x, top1.y);
+
+      var isHandicap = hcPlaced < handicapCount && i < handicapCount;
+      var color = isHandicap ? '#58a6ff' : '#ffffff';
+      var type = isHandicap ? 'handicap' : 'standard';
+      if (isHandicap) hcPlaced++;
+
+      features.push(makeTemplateFeature([[p1.lon, p1.lat], [p2.lon, p2.lat]], type, color, groupId));
+
+      // Bottom row (facing down) if we have room
+      if (rowY + stallLength <= heightM) {
+        var bot2 = rotatePoint(localX, rowY, angle - 90 + 90);
+        var top2 = rotatePoint(localX, rowY + stallLength, angle - 90 + 90);
+        var p3 = localToGeo(sw.lat, sw.lng, bot2.x, bot2.y);
+        var p4 = localToGeo(sw.lat, sw.lng, top2.x, top2.y);
+        features.push(makeTemplateFeature([[p3.lon, p3.lat], [p4.lon, p4.lat]], 'standard', '#ffffff', groupId));
+      }
+    }
+  }
+
+  return { features: features, groupId: groupId, spacesPerRow: spacesPerRow, rows: rows, total: spacesPerRow * rows * 2 };
+}
+
+/* ═══════════════════════════════════════════════════════════════════
+   TEMPLATE PLACEMENT MODE
+═══════════════════════════════════════════════════════════════════ */
+function enterPlacementMode(templateType, config) {
+  exitPlacementMode();
+
+  // Cancel any active draw tool
+  if (currentDrawHandler) { currentDrawHandler.disable(); currentDrawHandler = null; }
+  activeTool = 'pan';
+  document.querySelectorAll('.tool-btn').forEach(function(btn) { btn.classList.remove('active'); });
+
+  document.getElementById('map').style.cursor = 'crosshair';
+
+  var handler = function(e) {
+    commitPlacement(e.latlng, templateType, config);
+  };
+  map.once('click', handler);
+  placementMode = { type: templateType, config: config, handler: handler };
+  showToast('Click on the map to place ' + templateType.replace('_', ' '));
+}
+
+function commitPlacement(latlng, templateType, config) {
+  if (!activeLotId) {
+    showToast('Create or select a lot first', 'error');
+    exitPlacementMode();
+    return;
+  }
+
+  var result;
+  switch (templateType) {
+    case 'parking_row':
+      result = generateParkingRow(latlng.lat, latlng.lng,
+        parseInt(config.angle), parseInt(config.count),
+        parseFloat(config.spacing), parseFloat(config.length));
+      break;
+    case 'handicap':
+      result = generateHandicapSpace(latlng.lat, latlng.lng, parseInt(config.angle));
+      break;
+    case 'crosswalk':
+      result = generateCrosswalk(latlng.lat, latlng.lng,
+        parseInt(config.angle), parseFloat(config.width), parseFloat(config.length));
+      break;
+    case 'arrow':
+      result = generateArrow(latlng.lat, latlng.lng,
+        parseInt(config.angle), config.arrowType);
+      break;
+    default:
+      exitPlacementMode();
+      return;
+  }
+
+  // Add features to map
+  result.features.forEach(function(gj) {
+    restoreFeature(gj);
+  });
+
+  pushUndo({ type: 'add_group', groupId: result.groupId });
+  saveCurrentLot();
+  updateDashboard();
+  showToast(templateType.replace('_', ' ') + ' placed (' + result.features.length + ' features)');
+  exitPlacementMode();
+}
+
+function exitPlacementMode() {
+  if (placementMode) {
+    map.off('click', placementMode.handler);
+    placementMode = null;
+  }
+  document.getElementById('map').style.cursor = '';
+}
+
+/* ═══════════════════════════════════════════════════════════════════
+   TEMPLATE UI HANDLERS
+═══════════════════════════════════════════════════════════════════ */
+document.getElementById('templateGrid').addEventListener('click', function(e) {
+  var btn = e.target.closest('.template-btn');
+  if (!btn) return;
+  var tplType = btn.dataset.template;
+
+  // Toggle active state
+  document.querySelectorAll('.template-btn').forEach(function(b) { b.classList.remove('active'); });
+  document.querySelectorAll('.template-config, .autofill-config').forEach(function(c) { c.classList.remove('visible'); });
+
+  btn.classList.add('active');
+
+  var configMap = {
+    parking_row: 'tplParkingRow',
+    handicap: 'tplHandicap',
+    crosswalk: 'tplCrosswalk',
+    arrow: 'tplArrow',
+    autofill: 'autofillConfig'
+  };
+
+  var configId = configMap[tplType];
+  if (configId) {
+    document.getElementById(configId).classList.add('visible');
+  }
+});
+
+// Auto-fill button in template grid
+document.querySelector('[data-template="autofill"]').addEventListener('click', function() {
+  document.querySelectorAll('.template-btn').forEach(function(b) { b.classList.remove('active'); });
+  document.querySelectorAll('.template-config').forEach(function(c) { c.classList.remove('visible'); });
+  this.classList.add('active');
+  document.getElementById('autofillConfig').classList.add('visible');
+  updateAutofillPreview();
+});
+
+// Parking row preview update
+function updateRowPreview() {
+  var count = parseInt(document.getElementById('tplRowCount').value) || 10;
+  var spacing = parseFloat(document.getElementById('tplRowSpacing').value) || 2.7;
+  var width = (count * spacing).toFixed(1);
+  document.getElementById('tplRowPreview').textContent = count + ' spaces, ~' + width + 'm wide';
+}
+['tplRowCount', 'tplRowSpacing'].forEach(function(id) {
+  document.getElementById(id).addEventListener('input', updateRowPreview);
+});
+
+// Place buttons
+document.getElementById('tplRowPlace').addEventListener('click', function() {
+  enterPlacementMode('parking_row', {
+    count: document.getElementById('tplRowCount').value,
+    angle: document.getElementById('tplRowAngle').value,
+    spacing: document.getElementById('tplRowSpacing').value,
+    length: document.getElementById('tplRowLength').value
+  });
+});
+
+document.getElementById('tplHandicapPlace').addEventListener('click', function() {
+  enterPlacementMode('handicap', {
+    angle: document.getElementById('tplHandicapAngle').value
+  });
+});
+
+document.getElementById('tplCrosswalkPlace').addEventListener('click', function() {
+  enterPlacementMode('crosswalk', {
+    angle: document.getElementById('tplCrosswalkAngle').value,
+    width: document.getElementById('tplCrosswalkWidth').value,
+    length: document.getElementById('tplCrosswalkLength').value
+  });
+});
+
+document.getElementById('tplArrowPlace').addEventListener('click', function() {
+  enterPlacementMode('arrow', {
+    angle: document.getElementById('tplArrowAngle').value,
+    arrowType: document.getElementById('tplArrowType').value
+  });
+});
+
+// Auto-fill
+function updateAutofillPreview() {
+  // Check if there's a selected rectangle
+  var hasRect = false;
+  drawnItems.eachLayer(function(l) {
+    if (l.featureProps && l.featureProps.geometryType === 'rectangle' &&
+        l.featureProps.id === selectedFeatureId) {
+      hasRect = true;
+    }
+  });
+
+  if (hasRect) {
+    var spacing = parseFloat(document.getElementById('autofillSpacing').value) || 2.7;
+    // Rough estimate
+    document.getElementById('autofillPreview').textContent = 'Ready — select a rectangle and click Generate';
+  } else {
+    document.getElementById('autofillPreview').textContent = 'Draw & select a rectangle on the map first';
+  }
+}
+
+document.getElementById('autofillGenerate').addEventListener('click', function() {
+  if (!activeLotId) { showToast('Create or select a lot first', 'error'); return; }
+
+  // Find selected rectangle
+  var rectLayer = null;
+  drawnItems.eachLayer(function(l) {
+    if (l.featureProps && l.featureProps.geometryType === 'rectangle' && l.featureProps.id === selectedFeatureId) {
+      rectLayer = l;
+    }
+  });
+
+  if (!rectLayer) {
+    // Try to find any rectangle
+    drawnItems.eachLayer(function(l) {
+      if (!rectLayer && l.featureProps && l.featureProps.geometryType === 'rectangle') {
+        rectLayer = l;
+      }
+    });
+  }
+
+  if (!rectLayer) {
+    showToast('Draw a rectangle first, then click Generate', 'error');
+    return;
+  }
+
+  var bounds = rectLayer.getBounds();
+  var angle = parseInt(document.getElementById('autofillAngle').value) || 90;
+  var spacing = parseFloat(document.getElementById('autofillSpacing').value) || 2.7;
+  var handicapCount = parseInt(document.getElementById('autofillHandicap').value) || 0;
+
+  var result = autoFillBounds(bounds, angle, spacing, handicapCount);
+
+  result.features.forEach(function(gj) {
+    restoreFeature(gj);
+  });
+
+  pushUndo({ type: 'add_group', groupId: result.groupId });
+  saveCurrentLot();
+  updateDashboard();
+  showToast('Auto-filled: ~' + result.total + ' spaces in ' + result.rows + ' row(s)');
+});
+
+/* ═══════════════════════════════════════════════════════════════════
+   MEASUREMENT TOOL
+═══════════════════════════════════════════════════════════════════ */
+function activateMeasure() {
+  clearMeasure();
+  document.getElementById('map').style.cursor = 'crosshair';
+}
+
+function addMeasurePoint(latlng) {
+  measurePoints.push(latlng);
+
+  // Add a small circle marker
+  var marker = L.circleMarker(latlng, {
+    radius: 4, color: '#3fb950', fillColor: '#3fb950', fillOpacity: 1, weight: 2
+  }).addTo(map);
+  measureLayers.push(marker);
+
+  if (measurePoints.length >= 2) {
+    var prev = measurePoints[measurePoints.length - 2];
+    var curr = measurePoints[measurePoints.length - 1];
+
+    // Draw dashed line
+    var line = L.polyline([prev, curr], {
+      color: '#3fb950', weight: 2, dashArray: '6, 6', opacity: 0.8
+    }).addTo(map);
+    measureLayers.push(line);
+
+    // Calculate distance
+    var dist = distanceM(prev.lat, prev.lng, curr.lat, curr.lng);
+    var distFt = dist * 3.28084;
+    var label = dist < 100
+      ? dist.toFixed(1) + ' m / ' + distFt.toFixed(1) + ' ft'
+      : dist.toFixed(0) + ' m / ' + distFt.toFixed(0) + ' ft';
+
+    // Add label at midpoint
+    var midLat = (prev.lat + curr.lat) / 2;
+    var midLng = (prev.lng + curr.lng) / 2;
+    var tooltip = L.marker([midLat, midLng], {
+      icon: L.divIcon({
+        className: 'measure-label',
+        html: label,
+        iconSize: null
+      })
+    }).addTo(map);
+    measureLayers.push(tooltip);
+
+    // Also show total if more than 2 points
+    if (measurePoints.length > 2) {
+      var totalDist = 0;
+      for (var i = 1; i < measurePoints.length; i++) {
+        totalDist += distanceM(measurePoints[i-1].lat, measurePoints[i-1].lng, measurePoints[i].lat, measurePoints[i].lng);
+      }
+      showToast('Segment: ' + dist.toFixed(1) + 'm — Total: ' + totalDist.toFixed(1) + 'm');
+    }
+  }
+}
+
+function clearMeasure() {
+  measurePoints = [];
+  measureLayers.forEach(function(l) { map.removeLayer(l); });
+  measureLayers = [];
+}
+
+/* ═══════════════════════════════════════════════════════════════════
+   HELP MODAL
+═══════════════════════════════════════════════════════════════════ */
+function showHelp() {
+  document.getElementById('helpOverlay').classList.add('visible');
+}
+
+function hideHelp() {
+  document.getElementById('helpOverlay').classList.remove('visible');
+}
+
+document.getElementById('helpBtn').addEventListener('click', showHelp);
+document.getElementById('helpClose').addEventListener('click', hideHelp);
+document.getElementById('helpOverlay').addEventListener('click', function(e) {
+  if (e.target === this) hideHelp();
+});
+
+// Auto-show on first visit
+if (!localStorage.getItem('strype_onboarded')) {
+  setTimeout(showHelp, 800);
+  localStorage.setItem('strype_onboarded', '1');
+}
 
 /* ═══════════════════════════════════════════════════════════════════
    EXPORT — GeoJSON
@@ -1562,12 +3113,19 @@ document.addEventListener('keydown', function(e) {
     case 'r': setActiveTool('rectangle'); break;
     case 'p': setActiveTool('polygon'); break;
     case 'm': setActiveTool('marker'); break;
+    case 'd': setActiveTool('measure'); break;
     case 'x': setActiveTool('eraser'); break;
     case 'v': case 'escape': setActiveTool('pan'); break;
+    case '?':
+      showHelp();
+      break;
     case 'delete': case 'backspace':
       if (selectedFeatureId) {
         drawnItems.eachLayer(function(layer) {
           if (layer.featureProps && layer.featureProps.id === selectedFeatureId) {
+            var gj = layer.toGeoJSON();
+            gj.properties = Object.assign({}, layer.featureProps);
+            pushUndo({ type: 'delete_feature', featureId: layer.featureProps.id, geojson: gj });
             drawnItems.removeLayer(layer);
             selectedFeatureId = null;
             showEmptyProperties();
@@ -1576,6 +3134,18 @@ document.addEventListener('keydown', function(e) {
             showToast('Feature deleted');
           }
         });
+      }
+      break;
+    case 'z':
+      if (e.ctrlKey || e.metaKey) {
+        e.preventDefault();
+        if (e.shiftKey) { redo(); } else { undo(); }
+      }
+      break;
+    case 'y':
+      if (e.ctrlKey || e.metaKey) {
+        e.preventDefault();
+        redo();
       }
       break;
     case 's':
@@ -1592,7 +3162,11 @@ document.addEventListener('keydown', function(e) {
    MAP CLICK — deselect
 ═══════════════════════════════════════════════════════════════════ */
 function initMapClickHandler() {
-  map.on('click', function() {
+  map.on('click', function(e) {
+    if (activeTool === 'measure') {
+      addMeasurePoint(e.latlng);
+      return;
+    }
     if (activeTool === 'pan' && selectedFeatureId) {
       selectedFeatureId = null;
       drawnItems.eachLayer(function(l) { styleLayer(l); });
@@ -1604,14 +3178,15 @@ function initMapClickHandler() {
 /* ═══════════════════════════════════════════════════════════════════
    INIT
 ═══════════════════════════════════════════════════════════════════ */
-function init() {
-  loadState();
+async function init() {
+  await loadState();
   initMap();
   initMapClickHandler();
   renderLotList();
   renderJobsList();
   updateJobLotSelect();
   updateDashboard();
+  updateAuthUI();
 
   // Restore active lot
   if (activeLotId) {
@@ -1635,8 +3210,22 @@ function init() {
   document.getElementById('jobDate').value = yyyy + '-' + mm + '-' + dd;
 }
 
-// Make hideModal globally accessible for inline onclick
+// Make functions globally accessible for inline onclick
 window.hideModal = hideModal;
+window.openAuthModal = openAuthModal;
+window.closeAuthModal = closeAuthModal;
+window.switchAuthTab = switchAuthTab;
+window.handleAuth = handleAuth;
+window.handleLogout = handleLogout;
+window.showForgotPassword = showForgotPassword;
+window.handleForgotPassword = handleForgotPassword;
+window.showUpgradePrompt = showUpgradePrompt;
+window.startCheckout = startCheckout;
+window.openSettingsModal = openSettingsModal;
+window.updateSettingsName = updateSettingsName;
+window.updateSettingsPassword = updateSettingsPassword;
+window.confirmDeleteAccount = confirmDeleteAccount;
+window.importDxfSvg = importDxfSvg;
 
 init();
 
