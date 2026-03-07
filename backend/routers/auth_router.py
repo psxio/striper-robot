@@ -4,7 +4,7 @@ import logging
 
 from fastapi import APIRouter, Depends, HTTPException, Request
 
-from ..auth import hash_password, verify_password, create_access_token, get_current_user
+from ..auth import hash_password, verify_password, create_access_token, get_current_user, block_token
 from ..config import settings
 from ..models.schemas import (
     RegisterRequest,
@@ -34,6 +34,14 @@ async def register(request: Request, body: RegisterRequest):
     user = await user_store.create_user(body.email, password_hash, body.name)
     token = create_access_token(user["id"])
     logger.info("User registered: %s", body.email)
+
+    # Send welcome email (best effort, don't block registration)
+    try:
+        from ..services.email_service import send_welcome_email
+        await send_welcome_email(body.email, body.name)
+    except Exception:
+        logger.warning("Failed to send welcome email to %s", body.email)
+
     return AuthResponse(token=token, user=user_to_response(user))
 
 
@@ -63,6 +71,18 @@ async def me(user: dict = Depends(get_current_user)):
     return user_to_response(user)
 
 
+@router.post("/logout")
+async def logout(user: dict = Depends(get_current_user)):
+    """Invalidate the current access token."""
+    jti = user.get("_token_jti")
+    exp = user.get("_token_exp")
+    if jti and exp:
+        from datetime import datetime, timezone
+        expires_at = datetime.fromtimestamp(exp, tz=timezone.utc).isoformat()
+        await block_token(jti, user["id"], expires_at)
+    return {"ok": True}
+
+
 @router.post("/forgot-password")
 @limiter.limit("5/minute")
 async def forgot_password(request: Request, body: ForgotPasswordRequest):
@@ -71,9 +91,12 @@ async def forgot_password(request: Request, body: ForgotPasswordRequest):
     result = {"ok": True}
     if user:
         token = await user_store.create_reset_token(user["id"])
-        # In dev mode, include token in response for testing
-        env = getattr(settings, "ENV", None) or "dev"
-        if env == "dev":
+        # Send reset email
+        from ..services.email_service import send_password_reset_email
+        frontend_url = settings.FRONTEND_URL or str(request.base_url).rstrip("/")
+        await send_password_reset_email(body.email, token, frontend_url)
+        # In dev mode, also include token in response for testing
+        if settings.ENV == "dev":
             result["token"] = token
     return result
 

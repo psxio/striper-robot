@@ -28,6 +28,10 @@ class Settings:
         # Admin
         self.ADMIN_EMAIL: str = os.environ.get("ADMIN_EMAIL", "")
 
+        # Email (SendGrid)
+        self.SENDGRID_API_KEY: str = os.environ.get("SENDGRID_API_KEY", "")
+        self.FROM_EMAIL: str = os.environ.get("FROM_EMAIL", "")
+
         # Plan limits
         self.PLAN_LIMITS: dict = {
             "free": {"max_lots": 1, "max_jobs": 5},
@@ -36,13 +40,25 @@ class Settings:
 
 
     def validate(self):
-        """Warn about insecure defaults at startup."""
+        """Validate configuration at startup. Raises in production for insecure defaults."""
         import logging
         log = logging.getLogger("strype")
-        if self.SECRET_KEY == "dev-secret-key-change-in-production" and self.ENV != "dev":
-            log.warning("SECRET_KEY is using the default value — set a secure key for production")
-        if self.CORS_ORIGINS.strip() == "*" and self.ENV != "dev":
-            log.warning("CORS_ORIGINS is set to wildcard '*' — restrict in production")
+        if self.ENV != "dev":
+            if self.SECRET_KEY == "dev-secret-key-change-in-production":
+                raise RuntimeError(
+                    "FATAL: SECRET_KEY is using the default value. "
+                    "Set a secure random key via the SECRET_KEY environment variable."
+                )
+            if self.CORS_ORIGINS.strip() == "*":
+                raise RuntimeError(
+                    "FATAL: CORS_ORIGINS is set to wildcard '*' in production. "
+                    "Set specific origins via the CORS_ORIGINS environment variable."
+                )
+        else:
+            if self.SECRET_KEY == "dev-secret-key-change-in-production":
+                log.warning("SECRET_KEY is using the default value — set a secure key for production")
+            if self.CORS_ORIGINS.strip() == "*":
+                log.warning("CORS_ORIGINS is set to wildcard '*' — restrict in production")
         if not self.STRIPE_WEBHOOK_SECRET and self.STRIPE_SECRET_KEY:
             log.warning("STRIPE_WEBHOOK_SECRET is not set — webhook verification will fail")
 

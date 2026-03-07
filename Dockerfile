@@ -5,6 +5,10 @@ WORKDIR /app
 COPY backend/requirements.txt ./backend/
 RUN pip install --no-cache-dir -r backend/requirements.txt
 
+# Install striper_pathgen for DXF/SVG import/export
+COPY striper_pathgen/ ./striper_pathgen/
+RUN pip install --no-cache-dir -e ./striper_pathgen/
+
 COPY backend/ ./backend/
 COPY site/ ./site/
 
@@ -15,7 +19,13 @@ RUN addgroup --system appgroup && \
 
 USER appuser
 
-HEALTHCHECK --interval=30s --timeout=5s --start-period=10s --retries=3 \
-    CMD python -c "import urllib.request; urllib.request.urlopen('http://localhost:${PORT:-8000}/api/health')"
+# NOTE: Mount a persistent volume at /app/backend/data to preserve the database.
+# Example: docker run -v strype_data:/app/backend/data ...
+# Without a volume, ALL DATA IS LOST on container restart.
 
-CMD sh -c "uvicorn backend.main:app --host 0.0.0.0 --port ${PORT:-8000}"
+HEALTHCHECK --interval=30s --timeout=5s --start-period=10s --retries=3 \
+    CMD python -c "import urllib.request; urllib.request.urlopen('http://localhost:8000/api/health')"
+
+EXPOSE 8000
+
+CMD ["sh", "-c", "uvicorn backend.main:app --host 0.0.0.0 --port ${PORT:-8000} --timeout-graceful-shutdown 30"]

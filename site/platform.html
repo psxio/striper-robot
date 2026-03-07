@@ -733,7 +733,9 @@ const api = {
 
             if (resp.status === 401) {
                 this.removeToken();
+                localStorage.removeItem('strype_user');
                 updateAuthUI();
+                showToast('Session expired. Please log in again.', 'error');
                 return null;
             }
 
@@ -752,8 +754,8 @@ const api = {
 
             return resp.json();
         } catch (e) {
-            if (e.message && !e.message.startsWith('HTTP')) {
-                console.warn('API unavailable, using localStorage fallback');
+            if (e.message && !e.message.startsWith('HTTP') && !e.message.startsWith('Forbidden')) {
+                showToast('Network error — working offline', 'error');
                 return null;
             }
             throw e;
@@ -862,7 +864,9 @@ function showUserMenu() {
     menu.innerHTML =
         '<div style="padding:8px 16px; border-bottom:1px solid var(--border); font-size:13px; color:var(--text-2);">' + (userData.email || '') + planBadge + '</div>' +
         '<button onclick="openSettingsModal()" style="display:block; width:100%; text-align:left; padding:10px 16px; border:none; background:none; cursor:pointer; font-size:14px; color:var(--text);">Settings</button>' +
-        (userData.plan !== 'pro' ? '<button onclick="showUpgradePrompt()" style="display:block; width:100%; text-align:left; padding:10px 16px; border:none; background:none; cursor:pointer; font-size:14px; color:#3fb950;">Upgrade to Pro</button>' : '') +
+        (userData.plan !== 'pro'
+            ? '<button onclick="showUpgradePrompt()" style="display:block; width:100%; text-align:left; padding:10px 16px; border:none; background:none; cursor:pointer; font-size:14px; color:#3fb950;">Upgrade to Pro</button>'
+            : '<button onclick="openBillingPortal()" style="display:block; width:100%; text-align:left; padding:10px 16px; border:none; background:none; cursor:pointer; font-size:14px; color:var(--text);">Manage Billing</button>') +
         '<button onclick="handleLogout()" style="display:block; width:100%; text-align:left; padding:10px 16px; border:none; background:none; cursor:pointer; font-size:14px; color:var(--text);">Log out</button>';
     document.body.appendChild(menu);
 
@@ -873,7 +877,11 @@ function showUserMenu() {
     }, 0);
 }
 
-function handleLogout() {
+async function handleLogout() {
+    // Revoke token on server before clearing locally
+    if (api.isLoggedIn()) {
+        try { await api.post('/api/auth/logout'); } catch (e) { /* best effort */ }
+    }
     api.removeToken();
     localStorage.removeItem('strype_user');
     var userMenu = document.getElementById('userMenu');
@@ -966,10 +974,23 @@ async function startCheckout() {
             window.location.href = result.url;
         }
     } catch (err) {
-        alert(err.message || 'Billing not available');
+        showToast(err.message || 'Billing not available', 'error');
     }
     var modal = document.getElementById('upgradeModal');
     if (modal) modal.remove();
+}
+
+async function openBillingPortal() {
+    var userMenu = document.getElementById('userMenu');
+    if (userMenu) userMenu.remove();
+    try {
+        var result = await api.get('/api/billing/portal');
+        if (result && result.url) {
+            window.location.href = result.url;
+        }
+    } catch (err) {
+        showToast(err.message || 'Billing portal not available', 'error');
+    }
 }
 
 // --- Settings Modal ---

@@ -11,7 +11,7 @@ async def get_stats() -> dict:
         cursor = await db.execute("SELECT COUNT(*) FROM users")
         stats["users"] = (await cursor.fetchone())[0]
 
-        cursor = await db.execute("SELECT COUNT(*) FROM lots")
+        cursor = await db.execute("SELECT COUNT(*) FROM lots WHERE deleted_at IS NULL")
         stats["lots"] = (await cursor.fetchone())[0]
 
         cursor = await db.execute("SELECT COUNT(*) FROM jobs")
@@ -42,7 +42,7 @@ async def list_users(page: int = 1, limit: int = 50) -> tuple[list[dict], int]:
                       COUNT(DISTINCT l.id) as lot_count,
                       COUNT(DISTINCT j.id) as job_count
                FROM users u
-               LEFT JOIN lots l ON l.user_id = u.id
+               LEFT JOIN lots l ON l.user_id = u.id AND l.deleted_at IS NULL
                LEFT JOIN jobs j ON j.user_id = u.id
                GROUP BY u.id
                ORDER BY u.created_at DESC

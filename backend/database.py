@@ -108,6 +108,22 @@ async def init_db():
             )
         """)
 
+        await db.execute("""
+            CREATE TABLE IF NOT EXISTS token_blocklist (
+                jti TEXT PRIMARY KEY,
+                user_id TEXT NOT NULL,
+                expires_at TEXT NOT NULL,
+                created_at TEXT NOT NULL
+            )
+        """)
+
+        await db.execute("""
+            CREATE TABLE IF NOT EXISTS webhook_events (
+                event_id TEXT PRIMARY KEY,
+                processed_at TEXT NOT NULL
+            )
+        """)
+
         await db.execute("CREATE INDEX IF NOT EXISTS idx_lots_user ON lots(user_id)")
         await db.execute("CREATE INDEX IF NOT EXISTS idx_jobs_user ON jobs(user_id)")
         await db.execute("CREATE INDEX IF NOT EXISTS idx_jobs_lot ON jobs(lot_id)")
@@ -116,9 +132,12 @@ async def init_db():
         await db.execute("CREATE INDEX IF NOT EXISTS idx_subs_stripe ON subscriptions(stripe_subscription_id)")
         await db.execute("CREATE INDEX IF NOT EXISTS idx_resets_token ON password_resets(token_hash)")
 
-        # Cleanup expired password reset tokens
+        await db.execute("CREATE INDEX IF NOT EXISTS idx_blocklist_expires ON token_blocklist(expires_at)")
+
+        # Cleanup expired password reset tokens and blocklist entries
         now = datetime.now(timezone.utc).isoformat()
         await db.execute("DELETE FROM password_resets WHERE expires_at < ?", (now,))
+        await db.execute("DELETE FROM token_blocklist WHERE expires_at < ?", (now,))
 
         # Add soft-delete column to lots (idempotent)
         try:

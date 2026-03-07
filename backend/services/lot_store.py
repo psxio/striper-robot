@@ -161,14 +161,24 @@ async def update_lot(user_id: str, lot_id: str, data: LotUpdate) -> Optional[dic
 
 
 async def delete_lot(user_id: str, lot_id: str) -> bool:
-    """Soft-delete a lot. Returns True if it existed and was deleted."""
+    """Soft-delete a lot and cascade-delete its jobs. Returns True if it existed."""
+    now = _now()
     async for db in get_db():
         cursor = await db.execute(
             "UPDATE lots SET deleted_at = ? WHERE id = ? AND user_id = ? AND deleted_at IS NULL",
-            (_now(), lot_id, user_id),
+            (now, lot_id, user_id),
+        )
+        if cursor.rowcount == 0:
+            return False
+        # Hard-delete jobs for this lot (lot is soft-deleted, jobs have no value)
+        await db.execute("DELETE FROM jobs WHERE lot_id = ? AND user_id = ?", (lot_id, user_id))
+        # Clear active_lot_id if it pointed to this lot
+        await db.execute(
+            "UPDATE users SET active_lot_id = NULL WHERE id = ? AND active_lot_id = ?",
+            (user_id, lot_id),
         )
         await db.commit()
-        return cursor.rowcount > 0
+        return True
 
 
 async def duplicate_lot(user_id: str, lot_id: str) -> Optional[dict]:

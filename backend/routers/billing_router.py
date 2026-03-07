@@ -1,19 +1,17 @@
 """Billing routes: Stripe Checkout, webhook, and customer portal."""
 
 import logging
-from urllib.parse import urlparse
+from datetime import datetime, timezone
 
 from fastapi import APIRouter, Depends, HTTPException, Request
 
 from ..auth import get_current_user
 from ..config import settings
+from ..database import get_db
 from ..services import billing_store, user_store
 
 router = APIRouter(prefix="/api/billing", tags=["billing"])
 logger = logging.getLogger("strype.billing")
-
-# Webhook idempotency: track processed event IDs (capped at 10k)
-_processed_events: set[str] = set()
 
 
 def _stripe_configured() -> bool:
@@ -32,6 +30,26 @@ def _get_safe_origin(request: Request) -> str:
     return origin or "http://localhost:8000"
 
 
+async def _is_event_processed(event_id: str) -> bool:
+    """Check if a webhook event has already been processed (DB-based idempotency)."""
+    async for db in get_db():
+        cursor = await db.execute(
+            "SELECT 1 FROM webhook_events WHERE event_id = ?", (event_id,)
+        )
+        return await cursor.fetchone() is not None
+
+
+async def _mark_event_processed(event_id: str) -> None:
+    """Record a webhook event as processed."""
+    now = datetime.now(timezone.utc).isoformat()
+    async for db in get_db():
+        await db.execute(
+            "INSERT OR IGNORE INTO webhook_events (event_id, processed_at) VALUES (?, ?)",
+            (event_id, now),
+        )
+        await db.commit()
+
+
 @router.post("/create-checkout")
 async def create_checkout(request: Request, user: dict = Depends(get_current_user)):
     """Create a Stripe Checkout session for Pro plan upgrade."""
@@ -41,19 +59,22 @@ async def create_checkout(request: Request, user: dict = Depends(get_current_use
     import stripe
     stripe.api_key = settings.STRIPE_SECRET_KEY
 
-    # Get or create Stripe customer
+    # Get or create Stripe customer (check existing first to prevent race condition)
     customer_id = user.get("stripe_customer_id")
+    if not customer_id:
+        # Re-read from DB to handle concurrent requests
+        fresh_user = await user_store.get_user_by_id(user["id"])
+        customer_id = fresh_user.get("stripe_customer_id") if fresh_user else None
+
     if not customer_id:
         customer = stripe.Customer.create(
             email=user["email"],
             metadata={"user_id": user["id"]},
         )
         customer_id = customer.id
-        await user_store.update_profile(user["id"], email=None)
-        from ..database import get_db
         async for db in get_db():
             await db.execute(
-                "UPDATE users SET stripe_customer_id = ? WHERE id = ?",
+                "UPDATE users SET stripe_customer_id = ? WHERE id = ? AND stripe_customer_id IS NULL",
                 (customer_id, user["id"]),
             )
             await db.commit()
@@ -92,18 +113,19 @@ async def stripe_webhook(request: Request):
         event = stripe.Webhook.construct_event(
             payload, sig, settings.STRIPE_WEBHOOK_SECRET
         )
-    except (ValueError, stripe.error.SignatureVerificationError):
+    except (ValueError, stripe.error.SignatureVerificationError) as e:
+        logger.warning("Webhook signature verification failed: %s", e)
         raise HTTPException(status_code=400, detail="Invalid webhook signature")
 
-    # Idempotency check
+    # DB-based idempotency check
     event_id = event.get("id", "")
-    if event_id in _processed_events:
+    if event_id and await _is_event_processed(event_id):
         return {"ok": True}
-    if len(_processed_events) >= 10000:
-        _processed_events.clear()
-    _processed_events.add(event_id)
 
-    if event["type"] == "checkout.session.completed":
+    event_type = event["type"]
+    logger.info("Processing webhook event: %s (%s)", event_type, event_id)
+
+    if event_type == "checkout.session.completed":
         session = event["data"]["object"]
         user_id = session.get("metadata", {}).get("user_id")
         if user_id and session.get("subscription"):
@@ -115,12 +137,52 @@ async def stripe_webhook(request: Request):
                 status="active",
             )
 
-    elif event["type"] == "customer.subscription.deleted":
+    elif event_type == "customer.subscription.deleted":
         subscription = event["data"]["object"]
         await billing_store.update_subscription_status(
             stripe_subscription_id=subscription["id"],
             status="cancelled",
         )
+
+    elif event_type == "customer.subscription.updated":
+        subscription = event["data"]["object"]
+        status = subscription.get("status", "active")
+        # Map Stripe statuses to our statuses
+        if status in ("past_due", "unpaid"):
+            await billing_store.update_subscription_status(
+                stripe_subscription_id=subscription["id"],
+                status="past_due",
+            )
+        elif status == "active":
+            await billing_store.update_subscription_status(
+                stripe_subscription_id=subscription["id"],
+                status="active",
+                plan="pro",
+            )
+
+    elif event_type == "invoice.payment_failed":
+        invoice = event["data"]["object"]
+        sub_id = invoice.get("subscription")
+        if sub_id:
+            await billing_store.update_subscription_status(
+                stripe_subscription_id=sub_id,
+                status="past_due",
+            )
+            logger.warning("Payment failed for subscription %s", sub_id)
+
+    elif event_type == "invoice.paid":
+        invoice = event["data"]["object"]
+        sub_id = invoice.get("subscription")
+        if sub_id:
+            await billing_store.update_subscription_status(
+                stripe_subscription_id=sub_id,
+                status="active",
+                plan="pro",
+            )
+
+    # Mark event as processed
+    if event_id:
+        await _mark_event_processed(event_id)
 
     return {"ok": True}
 
