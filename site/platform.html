@@ -1836,7 +1836,7 @@ function renameLot(lotId) {
 
   showModal(
     '<h3>Rename Lot</h3>' +
-    '<div class="modal-field"><label>Lot Name</label><input type="text" id="renameLotInput" value="' + lot.name.replace(/"/g, '&quot;') + '"></div>' +
+    '<div class="modal-field"><label>Lot Name</label><input type="text" id="renameLotInput" value="' + escapeHtml(lot.name).replace(/"/g, '&quot;') + '"></div>' +
     '<div class="modal-actions"><button class="modal-btn cancel" onclick="hideModal()">Cancel</button><button class="modal-btn primary" id="renameLotConfirm">Rename</button></div>'
   );
 
@@ -1947,7 +1947,7 @@ function deleteLot(lotId) {
 
   showModal(
     '<h3>Delete Lot</h3>' +
-    '<p style="color:var(--text-2);font-size:.875rem;margin-bottom:16px">Are you sure you want to delete <strong>"' + lot.name + '"</strong>? This cannot be undone.</p>' +
+    '<p style="color:var(--text-2);font-size:.875rem;margin-bottom:16px">Are you sure you want to delete <strong>"' + escapeHtml(lot.name) + '"</strong>? This cannot be undone.</p>' +
     '<div class="modal-actions"><button class="modal-btn cancel" onclick="hideModal()">Cancel</button><button class="modal-btn danger" id="deleteLotConfirm">Delete</button></div>'
   );
 
