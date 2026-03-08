@@ -105,6 +105,8 @@ async def update_profile(
     user_id: str,
     name: Optional[str] = None,
     email: Optional[str] = None,
+    company_name: Optional[str] = None,
+    phone: Optional[str] = None,
 ) -> Optional[dict]:
     """Update user profile fields."""
     fields: list[str] = []
@@ -116,6 +118,12 @@ async def update_profile(
     if email is not None:
         fields.append("email = ?")
         values.append(email)
+    if company_name is not None:
+        fields.append("company_name = ?")
+        values.append(company_name)
+    if phone is not None:
+        fields.append("phone = ?")
+        values.append(phone)
 
     if not fields:
         return await get_user_by_id(user_id)
@@ -165,6 +173,58 @@ async def create_reset_token(user_id: str) -> str:
     return token
 
 
+# --- Login Attempt Lockout ---
+
+_MAX_ATTEMPTS = 5
+_LOCKOUT_MINUTES = 15
+
+
+async def check_login_lockout(email: str) -> Optional[str]:
+    """Check if an email is locked out. Returns locked_until ISO string if locked, else None."""
+    now = datetime.now(timezone.utc).isoformat()
+    async for db in get_db():
+        cursor = await db.execute(
+            "SELECT locked_until FROM login_attempts WHERE email = ? AND locked_until > ?",
+            (email, now),
+        )
+        row = await cursor.fetchone()
+        return row["locked_until"] if row else None
+
+
+async def record_failed_login(email: str) -> None:
+    """Record a failed login attempt. Locks the account after MAX_ATTEMPTS failures."""
+    now = _now()
+    async for db in get_db():
+        cursor = await db.execute(
+            "SELECT attempts FROM login_attempts WHERE email = ?", (email,)
+        )
+        row = await cursor.fetchone()
+        attempts = (row["attempts"] + 1) if row else 1
+        locked_until = None
+        if attempts >= _MAX_ATTEMPTS:
+            locked_until = (
+                datetime.now(timezone.utc) + timedelta(minutes=_LOCKOUT_MINUTES)
+            ).isoformat()
+        if row:
+            await db.execute(
+                "UPDATE login_attempts SET attempts = ?, locked_until = ?, updated_at = ? WHERE email = ?",
+                (attempts, locked_until, now, email),
+            )
+        else:
+            await db.execute(
+                "INSERT INTO login_attempts (email, attempts, locked_until, updated_at) VALUES (?, ?, ?, ?)",
+                (email, attempts, locked_until, now),
+            )
+        await db.commit()
+
+
+async def clear_login_attempts(email: str) -> None:
+    """Clear login attempts after a successful login."""
+    async for db in get_db():
+        await db.execute("DELETE FROM login_attempts WHERE email = ?", (email,))
+        await db.commit()
+
+
 async def validate_reset_token(token: str) -> Optional[str]:
     """Validate a reset token and return the user_id if valid. Deletes the token."""
     token_hash = _hash_token(token)
@@ -182,5 +242,93 @@ async def validate_reset_token(token: str) -> Optional[str]:
         user_id = row["user_id"]
         # Delete the used token
         await db.execute("DELETE FROM password_resets WHERE id = ?", (row["id"],))
+        await db.commit()
+        return user_id
+
+
+# --- Refresh Tokens ---
+
+async def create_refresh_token(user_id: str, expire_days: int = 7) -> str:
+    """Create a refresh token for a user. Returns the raw token."""
+    token = str(uuid.uuid4())
+    token_hash = _hash_token(token)
+    token_id = str(uuid.uuid4())
+    now = _now()
+    expires_at = (datetime.now(timezone.utc) + timedelta(days=expire_days)).isoformat()
+
+    async for db in get_db():
+        await db.execute(
+            """INSERT INTO refresh_tokens (id, user_id, token_hash, expires_at, created_at)
+               VALUES (?, ?, ?, ?, ?)""",
+            (token_id, user_id, token_hash, expires_at, now),
+        )
+        await db.commit()
+
+    return token
+
+
+async def validate_refresh_token(token: str) -> Optional[str]:
+    """Validate a refresh token and return the user_id if valid. Deletes the used token."""
+    token_hash = _hash_token(token)
+    now = datetime.now(timezone.utc).isoformat()
+
+    async for db in get_db():
+        cursor = await db.execute(
+            "SELECT * FROM refresh_tokens WHERE token_hash = ? AND expires_at > ?",
+            (token_hash, now),
+        )
+        row = await cursor.fetchone()
+        if not row:
+            return None
+
+        user_id = row["user_id"]
+        # Delete the used token (rotation — caller should issue a new one)
+        await db.execute("DELETE FROM refresh_tokens WHERE id = ?", (row["id"],))
+        await db.commit()
+        return user_id
+
+
+async def delete_user_refresh_tokens(user_id: str) -> None:
+    """Delete all refresh tokens for a user (e.g. on logout)."""
+    async for db in get_db():
+        await db.execute("DELETE FROM refresh_tokens WHERE user_id = ?", (user_id,))
+        await db.commit()
+
+
+# --- Email Verification ---
+
+async def create_verification_token(user_id: str) -> str:
+    """Generate an email verification token and store it on the user. Returns the raw token."""
+    token = str(uuid.uuid4())
+    expires_at = (datetime.now(timezone.utc) + timedelta(hours=24)).isoformat()
+
+    async for db in get_db():
+        await db.execute(
+            "UPDATE users SET verification_token = ?, verification_expires_at = ?, updated_at = ? WHERE id = ?",
+            (token, expires_at, _now(), user_id),
+        )
+        await db.commit()
+
+    return token
+
+
+async def verify_email_token(token: str) -> Optional[str]:
+    """Validate a verification token and mark the user as verified. Returns user_id or None."""
+    now = datetime.now(timezone.utc).isoformat()
+
+    async for db in get_db():
+        cursor = await db.execute(
+            "SELECT id FROM users WHERE verification_token = ? AND verification_expires_at > ?",
+            (token, now),
+        )
+        row = await cursor.fetchone()
+        if not row:
+            return None
+
+        user_id = row["id"]
+        await db.execute(
+            "UPDATE users SET email_verified = 1, verification_token = NULL, verification_expires_at = NULL, updated_at = ? WHERE id = ?",
+            (_now(), user_id),
+        )
         await db.commit()
         return user_id

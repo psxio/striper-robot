@@ -19,6 +19,10 @@ def _row_to_dict(row) -> dict:
         "lotId": d["lot_id"],
         "date": d["date"],
         "status": d["status"],
+        "time_preference": d.get("time_preference", "morning"),
+        "started_at": d.get("started_at"),
+        "completed_at": d.get("completed_at"),
+        "robot_id": d.get("robot_id"),
         "created": d["created_at"],
         "modified": d["updated_at"],
     }
@@ -59,7 +63,7 @@ async def count_jobs(user_id: str) -> int:
         return (await cursor.fetchone())[0]
 
 
-async def create_job_atomic(user_id: str, lot_id: str, date: str, max_jobs: int) -> Optional[dict]:
+async def create_job_atomic(user_id: str, lot_id: str, date: str, max_jobs: int, time_preference: str = "morning") -> Optional[dict]:
     """Create a job atomically with plan limit check. Returns None if over limit."""
     job_id = str(uuid.uuid4())
     now = _now()
@@ -74,9 +78,9 @@ async def create_job_atomic(user_id: str, lot_id: str, date: str, max_jobs: int)
                 await db.execute("ROLLBACK")
                 return None
             await db.execute(
-                """INSERT INTO jobs (id, user_id, lot_id, date, status, created_at, updated_at)
-                   VALUES (?, ?, ?, ?, 'pending', ?, ?)""",
-                (job_id, user_id, lot_id, date, now, now),
+                """INSERT INTO jobs (id, user_id, lot_id, date, status, time_preference, created_at, updated_at)
+                   VALUES (?, ?, ?, ?, 'pending', ?, ?, ?)""",
+                (job_id, user_id, lot_id, date, time_preference, now, now),
             )
             await db.execute("COMMIT")
         except Exception:
@@ -87,20 +91,27 @@ async def create_job_atomic(user_id: str, lot_id: str, date: str, max_jobs: int)
         return _row_to_dict(row)
 
 
-async def create_job(user_id: str, lot_id: str, date: str) -> dict:
+async def create_job(user_id: str, lot_id: str, date: str, time_preference: str = "morning") -> dict:
     """Create a new job and return its dict representation."""
     job_id = str(uuid.uuid4())
     now = _now()
     async for db in get_db():
         await db.execute(
-            """INSERT INTO jobs (id, user_id, lot_id, date, status, created_at, updated_at)
-               VALUES (?, ?, ?, ?, 'pending', ?, ?)""",
-            (job_id, user_id, lot_id, date, now, now),
+            """INSERT INTO jobs (id, user_id, lot_id, date, status, time_preference, created_at, updated_at)
+               VALUES (?, ?, ?, ?, 'pending', ?, ?, ?)""",
+            (job_id, user_id, lot_id, date, time_preference, now, now),
         )
         await db.commit()
         cursor = await db.execute("SELECT * FROM jobs WHERE id = ?", (job_id,))
         row = await cursor.fetchone()
         return _row_to_dict(row)
+
+
+_VALID_TRANSITIONS = {
+    "pending": {"in_progress", "completed"},
+    "in_progress": {"completed"},
+    "completed": set(),
+}
 
 
 async def update_job(
@@ -109,7 +120,8 @@ async def update_job(
     status: Optional[str] = None,
     date: Optional[str] = None,
 ) -> Optional[dict]:
-    """Update non-None fields of a job. Returns None if not found."""
+    """Update non-None fields of a job. Returns None if not found.
+    Returns False (not None) if the status transition is invalid."""
     # Check existence and ownership
     async for db in get_db():
         cursor = await db.execute(
@@ -122,10 +134,21 @@ async def update_job(
 
     fields: list[str] = []
     values: list[object] = []
+    now = _now()
 
     if status is not None:
+        current_status = existing["status"]
+        allowed = _VALID_TRANSITIONS.get(current_status, set())
+        if status != current_status and status not in allowed:
+            return False  # Invalid transition
         fields.append("status = ?")
         values.append(status)
+        if status == "in_progress" and current_status == "pending":
+            fields.append("started_at = ?")
+            values.append(now)
+        elif status == "completed" and current_status != "completed":
+            fields.append("completed_at = ?")
+            values.append(now)
     if date is not None:
         fields.append("date = ?")
         values.append(date)
@@ -134,7 +157,7 @@ async def update_job(
         return _row_to_dict(existing)
 
     fields.append("updated_at = ?")
-    values.append(_now())
+    values.append(now)
     values.append(job_id)
     values.append(user_id)
 

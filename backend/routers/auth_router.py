@@ -1,8 +1,9 @@
-"""Authentication routes: register, login, current user."""
+"""Authentication routes: register, login, current user, refresh, email verification."""
 
 import logging
 
-from fastapi import APIRouter, Depends, HTTPException, Request
+from fastapi import APIRouter, Depends, HTTPException, Request, Response
+from pydantic import BaseModel
 
 from ..auth import hash_password, verify_password, create_access_token, get_current_user, block_token
 from ..config import settings
@@ -23,6 +24,10 @@ router = APIRouter(prefix="/api/auth", tags=["auth"])
 logger = logging.getLogger("strype.auth")
 
 
+class VerifyEmailRequest(BaseModel):
+    token: str
+
+
 @router.post("/register", response_model=AuthResponse, status_code=201)
 @limiter.limit("3/minute")
 async def register(request: Request, body: RegisterRequest):
@@ -35,12 +40,22 @@ async def register(request: Request, body: RegisterRequest):
     token = create_access_token(user["id"])
     logger.info("User registered: %s", body.email)
 
-    # Send welcome email (best effort, don't block registration)
+    # Generate email verification token
+    verification_token = await user_store.create_verification_token(user["id"])
+
+    # Send welcome + verification email (best effort)
     try:
         from ..services.email_service import send_welcome_email
         await send_welcome_email(body.email, body.name)
     except Exception:
         logger.warning("Failed to send welcome email to %s", body.email)
+
+    try:
+        from ..services.email_service import send_verification_email
+        frontend_url = settings.FRONTEND_URL or "http://localhost:8000"
+        await send_verification_email(body.email, verification_token, frontend_url)
+    except Exception:
+        logger.warning("Failed to send verification email to %s", body.email)
 
     return AuthResponse(token=token, user=user_to_response(user))
 
@@ -48,12 +63,21 @@ async def register(request: Request, body: RegisterRequest):
 @router.post("/login", response_model=AuthResponse)
 @limiter.limit("5/minute")
 async def login(request: Request, body: LoginRequest):
+    # Check lockout before anything else
+    locked_until = await user_store.check_login_lockout(body.email)
+    if locked_until:
+        raise HTTPException(status_code=429, detail="Too many failed attempts. Try again later.")
+
     user = await user_store.get_user_by_email(body.email)
     if not user:
         raise HTTPException(status_code=401, detail="Invalid credentials")
 
     if not verify_password(body.password, user["password_hash"]):
+        await user_store.record_failed_login(body.email)
         raise HTTPException(status_code=401, detail="Invalid credentials")
+
+    # Successful login — clear any failed attempts
+    await user_store.clear_login_attempts(body.email)
 
     # Auto-assign admin if ADMIN_EMAIL matches
     if settings.ADMIN_EMAIL and user["email"] == settings.ADMIN_EMAIL and not user.get("is_admin"):
@@ -63,7 +87,25 @@ async def login(request: Request, body: LoginRequest):
 
     token = create_access_token(user["id"])
     logger.info("User logged in: %s", body.email)
-    return AuthResponse(token=token, user=user_to_response(user))
+
+    # Issue refresh token as httpOnly cookie
+    refresh_token = await user_store.create_refresh_token(
+        user["id"], expire_days=settings.REFRESH_TOKEN_EXPIRE_DAYS
+    )
+    auth_resp = AuthResponse(token=token, user=user_to_response(user))
+    response = Response(
+        content=auth_resp.model_dump_json(),
+        media_type="application/json",
+    )
+    response.set_cookie(
+        "refresh_token",
+        refresh_token,
+        httponly=True,
+        samesite="strict",
+        max_age=settings.REFRESH_TOKEN_EXPIRE_DAYS * 86400,
+        secure=settings.ENV != "dev",
+    )
+    return response
 
 
 @router.get("/me", response_model=UserResponse)
@@ -73,14 +115,20 @@ async def me(user: dict = Depends(get_current_user)):
 
 @router.post("/logout")
 async def logout(user: dict = Depends(get_current_user)):
-    """Invalidate the current access token."""
+    """Invalidate the current access token and all refresh tokens."""
     jti = user.get("_token_jti")
     exp = user.get("_token_exp")
     if jti and exp:
         from datetime import datetime, timezone
         expires_at = datetime.fromtimestamp(exp, tz=timezone.utc).isoformat()
         await block_token(jti, user["id"], expires_at)
-    return {"ok": True}
+
+    # Also revoke all refresh tokens for this user
+    await user_store.delete_user_refresh_tokens(user["id"])
+
+    response = Response(content='{"ok":true}', media_type="application/json")
+    response.delete_cookie("refresh_token")
+    return response
 
 
 @router.post("/forgot-password")
@@ -123,3 +171,70 @@ async def change_password(
     new_hash = hash_password(body.new_password)
     await user_store.update_password(user["id"], new_hash)
     return {"ok": True}
+
+
+@router.post("/refresh")
+async def refresh_token(request: Request):
+    """Issue a new access token using a valid refresh token cookie. Rotates the refresh token."""
+    token = request.cookies.get("refresh_token")
+    if not token:
+        raise HTTPException(status_code=401, detail="No refresh token")
+
+    user_id = await user_store.validate_refresh_token(token)
+    if not user_id:
+        raise HTTPException(status_code=401, detail="Invalid or expired refresh token")
+
+    user = await user_store.get_user_by_id(user_id)
+    if not user:
+        raise HTTPException(status_code=401, detail="User not found")
+
+    new_access = create_access_token(user_id)
+    new_refresh = await user_store.create_refresh_token(
+        user_id, expire_days=settings.REFRESH_TOKEN_EXPIRE_DAYS
+    )
+
+    response = Response(
+        content='{"token":"' + new_access + '"}',
+        media_type="application/json",
+    )
+    response.set_cookie(
+        "refresh_token",
+        new_refresh,
+        httponly=True,
+        samesite="strict",
+        max_age=settings.REFRESH_TOKEN_EXPIRE_DAYS * 86400,
+        secure=settings.ENV != "dev",
+    )
+    return response
+
+
+@router.post("/verify-email")
+async def verify_email(body: VerifyEmailRequest):
+    """Verify a user's email address using the verification token."""
+    user_id = await user_store.verify_email_token(body.token)
+    if not user_id:
+        raise HTTPException(status_code=400, detail="Invalid or expired verification token")
+    logger.info("Email verified for user %s", user_id)
+    return {"ok": True}
+
+
+@router.post("/resend-verification")
+@limiter.limit("3/minute")
+async def resend_verification(request: Request, user: dict = Depends(get_current_user)):
+    """Resend the email verification link. Rate-limited."""
+    if user.get("email_verified"):
+        raise HTTPException(status_code=400, detail="Email already verified")
+
+    token = await user_store.create_verification_token(user["id"])
+
+    try:
+        from ..services.email_service import send_verification_email
+        frontend_url = settings.FRONTEND_URL or str(request.base_url).rstrip("/")
+        await send_verification_email(user["email"], token, frontend_url)
+    except Exception:
+        logger.warning("Failed to send verification email to %s", user["email"])
+
+    result = {"ok": True}
+    if settings.ENV == "dev":
+        result["token"] = token
+    return result

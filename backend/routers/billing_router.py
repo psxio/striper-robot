@@ -8,6 +8,7 @@ from fastapi import APIRouter, Depends, HTTPException, Request
 from ..auth import get_current_user
 from ..config import settings
 from ..database import get_db
+from ..models.schemas import ChangePlanRequest
 from ..services import billing_store, user_store
 
 router = APIRouter(prefix="/api/billing", tags=["billing"])
@@ -50,19 +51,20 @@ async def _mark_event_processed(event_id: str) -> None:
         await db.commit()
 
 
-@router.post("/create-checkout")
-async def create_checkout(request: Request, user: dict = Depends(get_current_user)):
-    """Create a Stripe Checkout session for Pro plan upgrade."""
-    if not _stripe_configured():
-        raise HTTPException(status_code=501, detail="Stripe not configured")
+def _price_for_plan(plan: str) -> str:
+    """Get the Stripe price ID for a given plan."""
+    if plan == "robot":
+        return settings.STRIPE_ROBOT_PRICE_ID or settings.STRIPE_PRICE_ID
+    return settings.STRIPE_PRICE_ID
 
+
+async def _get_or_create_customer(user: dict) -> str:
+    """Get or create Stripe customer ID for a user."""
     import stripe
     stripe.api_key = settings.STRIPE_SECRET_KEY
 
-    # Get or create Stripe customer (check existing first to prevent race condition)
     customer_id = user.get("stripe_customer_id")
     if not customer_id:
-        # Re-read from DB to handle concurrent requests
         fresh_user = await user_store.get_user_by_id(user["id"])
         customer_id = fresh_user.get("stripe_customer_id") if fresh_user else None
 
@@ -79,21 +81,48 @@ async def create_checkout(request: Request, user: dict = Depends(get_current_use
             )
             await db.commit()
 
+    return customer_id
+
+
+@router.post("/create-checkout")
+async def create_checkout(request: Request, user: dict = Depends(get_current_user)):
+    """Create a Stripe Checkout session for Pro or Robot plan upgrade."""
+    if not _stripe_configured():
+        raise HTTPException(status_code=501, detail="Stripe not configured")
+
+    import stripe
+    stripe.api_key = settings.STRIPE_SECRET_KEY
+
+    # Determine plan from query params or default to pro
+    from urllib.parse import parse_qs
+    plan = "pro"
+    body_bytes = await request.body()
+    if body_bytes:
+        import json
+        try:
+            body_json = json.loads(body_bytes)
+            plan = body_json.get("plan", "pro")
+        except (json.JSONDecodeError, AttributeError):
+            pass
+
+    price_id = _price_for_plan(plan)
+    customer_id = await _get_or_create_customer(user)
+
     origin = _get_safe_origin(request)
     try:
         session = stripe.checkout.Session.create(
             customer=customer_id,
             payment_method_types=["card"],
-            line_items=[{"price": settings.STRIPE_PRICE_ID, "quantity": 1}],
+            line_items=[{"price": price_id, "quantity": 1}],
             mode="subscription",
             success_url=f"{origin}/platform.html?billing=success",
             cancel_url=f"{origin}/platform.html?billing=cancel",
-            metadata={"user_id": user["id"]},
+            metadata={"user_id": user["id"], "plan": plan},
         )
     except stripe.error.StripeError as e:
         logger.error("Stripe checkout error: %s", e)
         raise HTTPException(status_code=502, detail="Payment service unavailable")
-    logger.info("Checkout session created for user %s", user["id"])
+    logger.info("Checkout session created for user %s (plan=%s)", user["id"], plan)
     return {"url": session.url}
 
 
@@ -128,12 +157,13 @@ async def stripe_webhook(request: Request):
     if event_type == "checkout.session.completed":
         session = event["data"]["object"]
         user_id = session.get("metadata", {}).get("user_id")
+        plan = session.get("metadata", {}).get("plan", "pro")
         if user_id and session.get("subscription"):
             await billing_store.create_subscription(
                 user_id=user_id,
                 stripe_customer_id=session["customer"],
                 stripe_subscription_id=session["subscription"],
-                plan="pro",
+                plan=plan,
                 status="active",
             )
 
@@ -210,3 +240,41 @@ async def billing_portal(request: Request, user: dict = Depends(get_current_user
         logger.error("Stripe portal error: %s", e)
         raise HTTPException(status_code=502, detail="Payment service unavailable")
     return {"url": session.url}
+
+
+@router.post("/change-plan")
+async def change_plan(
+    body: ChangePlanRequest, request: Request, user: dict = Depends(get_current_user)
+):
+    """Change subscription plan with proration."""
+    current_plan = user.get("plan", "free")
+    if body.plan == current_plan:
+        raise HTTPException(status_code=400, detail="Already on this plan")
+
+    # Free plan doesn't need Stripe
+    if body.plan == "free":
+        await billing_store.set_user_plan(user["id"], "free")
+        return {"ok": True, "plan": "free"}
+
+    # For paid plans, update via Stripe if configured
+    if _stripe_configured() and user.get("stripe_customer_id"):
+        sub = await billing_store.get_subscription_by_user(user["id"])
+        if sub and sub.get("stripe_subscription_id"):
+            try:
+                import stripe
+                stripe.api_key = settings.STRIPE_SECRET_KEY
+                stripe.Subscription.modify(
+                    sub["stripe_subscription_id"],
+                    items=[{
+                        "id": sub["stripe_subscription_id"],
+                        "price": _price_for_plan(body.plan),
+                    }],
+                    proration_behavior="create_prorations",
+                )
+            except Exception as e:
+                logger.error("Stripe plan change error: %s", e)
+                raise HTTPException(status_code=502, detail="Payment service unavailable")
+
+    await billing_store.set_user_plan(user["id"], body.plan)
+    logger.info("User %s changed plan from %s to %s", user["id"], current_plan, body.plan)
+    return {"ok": True, "plan": body.plan}

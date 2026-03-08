@@ -47,7 +47,8 @@ async def create_job(body: JobCreate, user: dict = Depends(get_current_user)):
     plan = user.get("plan") or "free"
     limits = settings.PLAN_LIMITS.get(plan, settings.PLAN_LIMITS["free"])
     job = await job_store.create_job_atomic(
-        user["id"], body.lotId, body.date, limits["max_jobs"]
+        user["id"], body.lotId, body.date, limits["max_jobs"],
+        time_preference=body.time_preference or "morning",
     )
     if not job:
         raise HTTPException(
@@ -65,6 +66,8 @@ async def update_job(
     job = await job_store.update_job(
         user["id"], job_id, status=body.status, date=body.date
     )
+    if job is False:
+        raise HTTPException(status_code=400, detail="Invalid status transition")
     if not job:
         raise HTTPException(status_code=404, detail="Job not found")
     return _to_response(job)

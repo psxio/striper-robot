@@ -32,10 +32,34 @@ class Settings:
         self.SENDGRID_API_KEY: str = os.environ.get("SENDGRID_API_KEY", "")
         self.FROM_EMAIL: str = os.environ.get("FROM_EMAIL", "")
 
+        # Stripe Robot plan
+        self.STRIPE_ROBOT_PRICE_ID: str = os.environ.get("STRIPE_ROBOT_PRICE_ID", "")
+
+        # Shipping (EasyPost)
+        self.EASYPOST_API_KEY: str = os.environ.get("EASYPOST_API_KEY", "")
+        self.SHIP_FROM_ADDRESS: dict = {
+            "name": "Strype Robotics",
+            "street1": os.environ.get("SHIP_FROM_STREET", ""),
+            "city": os.environ.get("SHIP_FROM_CITY", ""),
+            "state": os.environ.get("SHIP_FROM_STATE", ""),
+            "zip": os.environ.get("SHIP_FROM_ZIP", ""),
+            "country": "US",
+        }
+
+        # Token refresh
+        self.REFRESH_TOKEN_EXPIRE_DAYS: int = int(
+            os.environ.get("REFRESH_TOKEN_EXPIRE_DAYS", "7")
+        )
+
+        # Robot deposit (0 = no deposit)
+        self.ROBOT_DEPOSIT: float = float(os.environ.get("ROBOT_DEPOSIT", "0"))
+
         # Plan limits
         self.PLAN_LIMITS: dict = {
-            "free": {"max_lots": 1, "max_jobs": 5},
-            "pro": {"max_lots": 999, "max_jobs": 999},
+            "free": {"max_lots": 1, "max_jobs": 5, "robots": 0},
+            "pro": {"max_lots": 999, "max_jobs": 999, "robots": 0},
+            "robot": {"max_lots": 999, "max_jobs": 999, "robots": 1},
+            "enterprise": {"max_lots": 999, "max_jobs": 999, "robots": 10},
         }
 
 

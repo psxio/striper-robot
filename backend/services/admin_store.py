@@ -1,6 +1,12 @@
 """Admin persistence layer for platform management."""
 
+from datetime import datetime, timezone
+
 from ..database import get_db
+
+
+def _now() -> str:
+    return datetime.now(timezone.utc).isoformat()
 
 
 async def get_stats() -> dict:
@@ -25,6 +31,18 @@ async def get_stats() -> dict:
         )
         rows = await cursor.fetchall()
         stats["users_by_plan"] = {row["plan"]: row["count"] for row in rows}
+
+        # Robot fleet stats
+        cursor = await db.execute("SELECT COUNT(*) FROM robots")
+        stats["robot_count"] = (await cursor.fetchone())[0]
+
+        cursor = await db.execute("SELECT COUNT(*) FROM robots WHERE status = 'available'")
+        stats["robots_available"] = (await cursor.fetchone())[0]
+
+        cursor = await db.execute(
+            "SELECT COUNT(*) FROM robot_assignments WHERE status NOT IN ('returned')"
+        )
+        stats["active_assignments"] = (await cursor.fetchone())[0]
 
         return stats
 
@@ -78,3 +96,28 @@ async def set_admin(user_id: str, is_admin: bool = True) -> bool:
         )
         await db.commit()
         return cursor.rowcount > 0
+
+
+async def log_audit(admin_email: str, action: str, target: str = "", detail: str = "") -> None:
+    """Record an admin action in the audit log."""
+    async for db in get_db():
+        await db.execute(
+            "INSERT INTO audit_logs (admin_email, action, target, detail, created_at) VALUES (?, ?, ?, ?, ?)",
+            (admin_email, action, target, detail, _now()),
+        )
+        await db.commit()
+
+
+async def list_audit_logs(page: int = 1, limit: int = 50) -> tuple[list[dict], int]:
+    """List audit log entries, paginated (newest first)."""
+    async for db in get_db():
+        cursor = await db.execute("SELECT COUNT(*) FROM audit_logs")
+        total = (await cursor.fetchone())[0]
+
+        offset = (page - 1) * limit
+        cursor = await db.execute(
+            "SELECT * FROM audit_logs ORDER BY created_at DESC LIMIT ? OFFSET ?",
+            (limit, offset),
+        )
+        rows = await cursor.fetchall()
+        return [dict(row) for row in rows], total

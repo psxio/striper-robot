@@ -48,6 +48,8 @@
         .badge-free { background: rgba(139,148,158,0.2); color: var(--text2); }
         .badge-pro { background: rgba(63,185,80,0.2); color: var(--green); }
         .badge-admin { background: rgba(210,153,34,0.2); color: var(--yellow); }
+        .badge-robot { background: rgba(88,166,255,0.2); color: var(--blue); }
+        .badge-enterprise { background: rgba(240,136,62,0.2); color: #f0883e; }
         .btn {
             padding: 6px 14px; border-radius: 6px; cursor: pointer;
             font-size: 13px; font-weight: 500; border: 1px solid var(--border);
@@ -87,7 +89,10 @@
         <div class="tabs">
             <div class="tab active" onclick="switchTab('stats')">Stats</div>
             <div class="tab" onclick="switchTab('users')">Users</div>
+            <div class="tab" onclick="switchTab('robots')">Robots</div>
+            <div class="tab" onclick="switchTab('assignments')">Assignments</div>
             <div class="tab" onclick="switchTab('waitlist')">Waitlist</div>
+            <div class="tab" onclick="switchTab('audit')">Audit Log</div>
         </div>
 
         <!-- Stats Panel -->
@@ -113,11 +118,55 @@
             </div>
             <table>
                 <thead>
-                    <tr><th>Email</th><th>Source</th><th>Date</th></tr>
+                    <tr><th>Email</th><th>Source</th><th>Date</th><th>Actions</th></tr>
                 </thead>
                 <tbody id="waitlistBody"></tbody>
             </table>
             <div class="pagination" id="waitlistPagination"></div>
+        </div>
+
+        <!-- Robots Panel -->
+        <div id="panel-robots" class="panel">
+            <div style="margin-bottom:12px;text-align:right;">
+                <button class="btn btn-sm" onclick="showAddRobotForm()">+ Add Robot</button>
+            </div>
+            <div id="addRobotForm" style="display:none;margin-bottom:16px;padding:16px;background:var(--card);border:1px solid var(--border);border-radius:var(--radius);">
+                <div style="display:flex;gap:8px;align-items:end;flex-wrap:wrap;">
+                    <label style="font-size:12px;color:var(--text2);">Serial<br><input id="robotSerial" style="background:var(--bg);color:var(--text);border:1px solid var(--border);border-radius:6px;padding:6px 10px;font-size:13px;" placeholder="STR-001"></label>
+                    <label style="font-size:12px;color:var(--text2);">HW Version<br><input id="robotHwVersion" value="v1" style="background:var(--bg);color:var(--text);border:1px solid var(--border);border-radius:6px;padding:6px 10px;font-size:13px;width:80px;"></label>
+                    <button class="btn" onclick="addRobot()">Create</button>
+                    <button class="btn" onclick="document.getElementById('addRobotForm').style.display='none'">Cancel</button>
+                </div>
+            </div>
+            <table>
+                <thead>
+                    <tr><th>Serial</th><th>Status</th><th>HW</th><th>Firmware</th><th>Last Seen</th><th>Actions</th></tr>
+                </thead>
+                <tbody id="robotsBody"></tbody>
+            </table>
+            <div class="pagination" id="robotsPagination"></div>
+        </div>
+
+        <!-- Assignments Panel -->
+        <div id="panel-assignments" class="panel">
+            <table>
+                <thead>
+                    <tr><th>Robot</th><th>User</th><th>Status</th><th>Tracking</th><th>Shipped</th><th>Actions</th></tr>
+                </thead>
+                <tbody id="assignmentsBody"></tbody>
+            </table>
+            <div class="pagination" id="assignmentsPagination"></div>
+        </div>
+
+        <!-- Audit Log Panel -->
+        <div id="panel-audit" class="panel">
+            <table>
+                <thead>
+                    <tr><th>Admin</th><th>Action</th><th>Target</th><th>Detail</th><th>Date</th></tr>
+                </thead>
+                <tbody id="auditBody"></tbody>
+            </table>
+            <div class="pagination" id="auditPagination"></div>
         </div>
     </div>
 
@@ -146,26 +195,38 @@
 
     function switchTab(name) {
         document.querySelectorAll('.tab').forEach(function(t, i) {
-            t.classList.toggle('active', ['stats','users','waitlist'][i] === name);
+            t.classList.toggle('active', ['stats','users','robots','assignments','waitlist','audit'][i] === name);
         });
         document.querySelectorAll('.panel').forEach(function(p) {
             p.classList.toggle('active', p.id === 'panel-' + name);
         });
         if (name === 'stats') loadStats();
         if (name === 'users') loadUsers(1);
+        if (name === 'robots') loadRobots(1);
+        if (name === 'assignments') loadAssignments(1);
         if (name === 'waitlist') loadWaitlist(1);
+        if (name === 'audit') loadAudit(1);
     }
 
     function loadStats() {
         api('GET', '/admin/stats').then(function(data) {
             var grid = document.getElementById('statsGrid');
+            var proCount = data.users_by_plan.pro || 0;
+            var robotCount = data.users_by_plan.robot || 0;
+            var mrr = proCount * 49 + robotCount * 299;
             grid.innerHTML = [
                 card(data.users, 'Total Users'),
                 card(data.lots, 'Total Lots'),
                 card(data.jobs, 'Total Jobs'),
                 card(data.waitlist, 'Waitlist'),
                 card(data.users_by_plan.free || 0, 'Free Users'),
-                card(data.users_by_plan.pro || 0, 'Pro Users'),
+                card(proCount, 'Pro Users'),
+                card(robotCount, 'Robot Users'),
+                card(data.users_by_plan.enterprise || 0, 'Enterprise'),
+                card(data.robot_count || 0, 'Total Robots'),
+                card(data.robots_available || 0, 'Available'),
+                card(data.active_assignments || 0, 'Active Assignments'),
+                card('$' + mrr, 'Est. MRR'),
             ].join('');
         });
     }
@@ -193,7 +254,10 @@
                         '<select onchange="changePlan(\'' + u.id + '\', this.value)">' +
                             '<option value="free"' + (u.plan==='free'?' selected':'') + '>Free</option>' +
                             '<option value="pro"' + (u.plan==='pro'?' selected':'') + '>Pro</option>' +
+                            '<option value="robot"' + (u.plan==='robot'?' selected':'') + '>Robot</option>' +
+                            '<option value="enterprise"' + (u.plan==='enterprise'?' selected':'') + '>Enterprise</option>' +
                         '</select>' +
+                        (u.is_admin ? '' : ' <button class="btn btn-sm btn-danger" onclick="deleteUser(\'' + u.id + '\', \'' + escapeHtml(u.email).replace(/'/g, "\\'") + '\')">Delete</button>') +
                     '</td></tr>';
             }).join('');
             renderPagination('usersPagination', data, loadUsers);
@@ -206,7 +270,7 @@
             if (!data.items.length) { tbody.innerHTML = '<tr><td colspan="3" class="empty">No entries</td></tr>'; return; }
             tbody.innerHTML = data.items.map(function(w) {
                 var date = new Date(w.created_at).toLocaleDateString();
-                return '<tr><td>' + escapeHtml(w.email) + '</td><td>' + escapeHtml(w.source) + '</td><td>' + date + '</td></tr>';
+                return '<tr><td>' + escapeHtml(w.email) + '</td><td>' + escapeHtml(w.source) + '</td><td>' + date + '</td><td><button class="btn btn-sm btn-danger" onclick="deleteWaitlistEntry(' + w.id + ')">Delete</button></td></tr>';
             }).join('');
             renderPagination('waitlistPagination', data, loadWaitlist);
         });
@@ -228,6 +292,34 @@
         });
     }
 
+    function loadAudit(page) {
+        api('GET', '/admin/audit-log?page=' + page + '&limit=20').then(function(data) {
+            var tbody = document.getElementById('auditBody');
+            if (!data.items.length) { tbody.innerHTML = '<tr><td colspan="5" class="empty">No audit entries</td></tr>'; return; }
+            tbody.innerHTML = data.items.map(function(a) {
+                var date = new Date(a.created_at).toLocaleString();
+                return '<tr><td>' + escapeHtml(a.admin_email) + '</td><td>' + escapeHtml(a.action) + '</td><td>' + escapeHtml(a.target || '-') + '</td><td>' + escapeHtml(a.detail || '-') + '</td><td>' + date + '</td></tr>';
+            }).join('');
+            renderPagination('auditPagination', data, loadAudit);
+        });
+    }
+
+    function deleteUser(userId, email) {
+        if (!confirm('Delete user ' + email + '? This cannot be undone.')) return;
+        api('DELETE', '/admin/users/' + userId).then(function() {
+            loadUsers(1);
+            loadStats();
+        });
+    }
+
+    function deleteWaitlistEntry(entryId) {
+        if (!confirm('Remove this waitlist entry?')) return;
+        api('DELETE', '/admin/waitlist/' + entryId).then(function() {
+            loadWaitlist(1);
+            loadStats();
+        });
+    }
+
     function exportWaitlistCSV() {
         fetch(API_BASE + '/admin/waitlist?format=csv&limit=10000', {
             headers: { 'Authorization': 'Bearer ' + token },
@@ -236,6 +328,123 @@
             a.href = URL.createObjectURL(blob);
             a.download = 'waitlist.csv';
             a.click();
+        });
+    }
+
+    // --- Robot Fleet Management ---
+    function showAddRobotForm() {
+        document.getElementById('addRobotForm').style.display = 'block';
+    }
+
+    function addRobot() {
+        var serial = document.getElementById('robotSerial').value.trim();
+        var hwVersion = document.getElementById('robotHwVersion').value.trim() || 'v1';
+        if (!serial) return;
+        api('POST', '/admin/robots', { serial_number: serial, hardware_version: hwVersion }).then(function() {
+            document.getElementById('addRobotForm').style.display = 'none';
+            document.getElementById('robotSerial').value = '';
+            loadRobots(1);
+        }).catch(function(e) { alert('Failed to create robot'); });
+    }
+
+    function loadRobots(page) {
+        api('GET', '/admin/robots?page=' + page + '&limit=20').then(function(data) {
+            var tbody = document.getElementById('robotsBody');
+            if (!data.items.length) { tbody.innerHTML = '<tr><td colspan="6" class="empty">No robots</td></tr>'; return; }
+            tbody.innerHTML = data.items.map(function(r) {
+                var statusClass = r.status === 'available' ? 'badge-pro' : r.status === 'retired' ? 'badge-free' : 'badge-admin';
+                var lastSeen = r.last_seen_at ? new Date(r.last_seen_at).toLocaleString() : 'Never';
+                return '<tr>' +
+                    '<td>' + escapeHtml(r.serial_number) + '</td>' +
+                    '<td><span class="badge ' + statusClass + '">' + r.status + '</span></td>' +
+                    '<td>' + escapeHtml(r.hardware_version || '') + '</td>' +
+                    '<td>' + escapeHtml(r.firmware_version || '-') + '</td>' +
+                    '<td>' + lastSeen + '</td>' +
+                    '<td class="actions">' +
+                        '<select onchange="updateRobotStatus(\'' + r.id + '\', this.value)">' +
+                            '<option value="">Change...</option>' +
+                            '<option value="available">Available</option>' +
+                            '<option value="maintenance">Maintenance</option>' +
+                            '<option value="retired">Retired</option>' +
+                        '</select> ' +
+                        (r.status === 'available' ? '<button class="btn btn-sm" onclick="showAssignModal(\'' + r.id + '\')">Assign</button>' : '') +
+                    '</td></tr>';
+            }).join('');
+            renderPagination('robotsPagination', data, loadRobots);
+        });
+    }
+
+    function updateRobotStatus(robotId, status) {
+        if (!status) return;
+        api('PUT', '/admin/robots/' + robotId, { status: status }).then(function() {
+            loadRobots(1);
+        });
+    }
+
+    function showAssignModal(robotId) {
+        // Fetch users to populate dropdown
+        api('GET', '/admin/users?limit=200').then(function(data) {
+            var options = data.items.map(function(u) {
+                return '<option value="' + u.id + '">' + escapeHtml(u.email) + ' (' + u.plan + ')</option>';
+            }).join('');
+            var html = '<div style="position:fixed;top:0;left:0;width:100%;height:100%;background:rgba(0,0,0,.5);z-index:9999;display:flex;align-items:center;justify-content:center" id="assignModal">' +
+                '<div style="background:var(--card);border:1px solid var(--border);border-radius:var(--radius);padding:24px;max-width:400px;width:90%">' +
+                '<h3 style="margin-bottom:12px">Assign Robot</h3>' +
+                '<select id="assignUserId" style="width:100%;margin-bottom:12px">' + options + '</select>' +
+                '<div style="display:flex;gap:8px;justify-content:flex-end">' +
+                '<button class="btn" onclick="document.getElementById(\'assignModal\').remove()">Cancel</button>' +
+                '<button class="btn" style="background:var(--green);color:var(--bg);border-color:var(--green)" onclick="confirmAssign(\'' + robotId + '\')">Assign</button>' +
+                '</div></div></div>';
+            document.body.insertAdjacentHTML('beforeend', html);
+        });
+    }
+
+    function confirmAssign(robotId) {
+        var userId = document.getElementById('assignUserId').value;
+        api('POST', '/admin/robots/assign', { robot_id: robotId, user_id: userId }).then(function() {
+            var modal = document.getElementById('assignModal');
+            if (modal) modal.remove();
+            loadRobots(1);
+            loadAssignments(1);
+        }).catch(function(e) { alert('Assignment failed'); });
+    }
+
+    function loadAssignments(page) {
+        api('GET', '/admin/assignments?page=' + page + '&limit=20').then(function(data) {
+            var tbody = document.getElementById('assignmentsBody');
+            if (!data.items.length) { tbody.innerHTML = '<tr><td colspan="6" class="empty">No assignments</td></tr>'; return; }
+            tbody.innerHTML = data.items.map(function(a) {
+                var shipped = a.shipped_at ? new Date(a.shipped_at).toLocaleDateString() : '-';
+                return '<tr>' +
+                    '<td>' + escapeHtml(a.serial_number || a.robot_id) + '</td>' +
+                    '<td>' + escapeHtml(a.user_email || a.user_id) + '</td>' +
+                    '<td><span class="badge badge-admin">' + a.status + '</span></td>' +
+                    '<td>' + escapeHtml(a.tracking_number || '-') + '</td>' +
+                    '<td>' + shipped + '</td>' +
+                    '<td class="actions">' +
+                        '<select onchange="updateAssignment(\'' + a.id + '\', this.value)">' +
+                            '<option value="">Update...</option>' +
+                            '<option value="shipped">Mark Shipped</option>' +
+                            '<option value="active">Mark Delivered</option>' +
+                            '<option value="returning">Initiate Return</option>' +
+                            '<option value="returned">Mark Returned</option>' +
+                        '</select>' +
+                    '</td></tr>';
+            }).join('');
+            renderPagination('assignmentsPagination', data, loadAssignments);
+        });
+    }
+
+    function updateAssignment(assignmentId, status) {
+        if (!status) return;
+        var body = { status: status };
+        if (status === 'shipped') {
+            var tracking = prompt('Enter tracking number:');
+            if (tracking) body.tracking_number = tracking;
+        }
+        api('PUT', '/admin/robots/assignments/' + assignmentId, body).then(function() {
+            loadAssignments(1);
+            loadRobots(1);
         });
     }
 

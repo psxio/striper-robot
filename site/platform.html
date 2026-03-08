@@ -152,6 +152,7 @@ select{-webkit-appearance:none;appearance:none;background-image:url("data:image/
 .job-item:hover{border-color:var(--text-3)}
 .job-status{width:8px;height:8px;border-radius:50%;flex-shrink:0}
 .job-status.pending{background:var(--yellow)}
+.job-status.in_progress{background:var(--blue)}
 .job-status.completed{background:var(--green)}
 .job-info{flex:1;min-width:0}
 .job-lot-name{font-size:.8125rem;font-weight:600;color:var(--text)}
@@ -305,6 +306,11 @@ select{-webkit-appearance:none;appearance:none;background-image:url("data:image/
 </style>
 </head>
 <body>
+<div id="pageLoader" style="position:fixed;inset:0;background:var(--bg);z-index:99999;display:flex;align-items:center;justify-content:center;flex-direction:column;gap:16px;transition:opacity .3s">
+  <div style="width:36px;height:36px;border:3px solid var(--border);border-top-color:var(--green);border-radius:50%;animation:spin .8s linear infinite"></div>
+  <span style="font-family:var(--font-display);font-size:1rem;color:var(--text-2)">Loading Strype...</span>
+</div>
+<style>@keyframes spin{to{transform:rotate(360deg)}}</style>
 <div class="app">
 
 <!-- ═══════════════════════════════════════════════ TOP BAR ═══════════════════════════════════════════════ -->
@@ -361,6 +367,14 @@ select{-webkit-appearance:none;appearance:none;background-image:url("data:image/
   <!-- ═══ SIDEBAR ═══ -->
   <aside class="sidebar" id="sidebar">
     <div class="sidebar-drag-handle" id="sidebarDrag"></div>
+    <!-- Robot Status Card (visible for robot/enterprise plan users) -->
+    <div id="robotStatusCard" style="display:none; padding:12px 14px; border-bottom:1px solid var(--border); background:rgba(63,185,80,.05);">
+      <div style="display:flex;align-items:center;gap:8px;margin-bottom:6px">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="var(--green)" stroke-width="2"><rect x="2" y="8" width="20" height="12" rx="2"/><circle cx="8" cy="14" r="2"/><circle cx="16" cy="14" r="2"/><path d="M9 4h6"/><path d="M12 4v4"/></svg>
+        <span style="font-size:.8125rem;font-weight:600;color:var(--green)">My Robot</span>
+      </div>
+      <div id="robotStatusInfo" style="font-size:.75rem;color:var(--text-2)">Loading...</div>
+    </div>
     <div class="sidebar-tabs">
       <button class="sidebar-tab active" data-tab="design">Design</button>
       <button class="sidebar-tab" data-tab="jobs">Jobs</button>
@@ -521,7 +535,33 @@ select{-webkit-appearance:none;appearance:none;background-image:url("data:image/
           <div class="add-job-form">
             <select id="jobLotSelect"><option value="">Select a lot...</option></select>
             <input type="date" id="jobDate">
+            <select id="jobTimePref">
+              <option value="morning">Morning</option>
+              <option value="afternoon">Afternoon</option>
+              <option value="evening">Evening</option>
+            </select>
             <button class="add-job-btn" id="addJobBtn">Schedule Job</button>
+          </div>
+          <!-- Recurring Schedules -->
+          <div class="panel-header" style="margin-top:16px">
+            <span class="panel-title">Recurring Schedules</span>
+          </div>
+          <div id="schedulesList" style="font-size:.8125rem;color:var(--text-2);padding:4px 0">No schedules</div>
+          <div class="add-job-form" id="scheduleForm" style="display:none">
+            <select id="scheduleLotSelect"><option value="">Select a lot...</option></select>
+            <select id="scheduleFreq">
+              <option value="weekly">Weekly</option>
+              <option value="biweekly">Biweekly</option>
+              <option value="monthly">Monthly</option>
+            </select>
+            <select id="scheduleDay">
+              <option value="0">Monday</option><option value="1">Tuesday</option><option value="2">Wednesday</option>
+              <option value="3">Thursday</option><option value="4">Friday</option><option value="5">Saturday</option><option value="6">Sunday</option>
+            </select>
+            <select id="scheduleTime">
+              <option value="morning">Morning</option><option value="afternoon">Afternoon</option><option value="evening">Evening</option>
+            </select>
+            <button class="add-job-btn" id="addScheduleBtn">Create Schedule</button>
           </div>
         </div>
       </div>
@@ -737,6 +777,11 @@ const api = {
                 updateAuthUI();
                 showToast('Session expired. Please log in again.', 'error');
                 return null;
+            }
+
+            if (resp.status === 429) {
+                var errData429 = await resp.json().catch(function() { return {}; });
+                throw new Error(errData429.detail || 'Too many requests. Please try again later.');
             }
 
             if (resp.status === 403) {
@@ -1007,9 +1052,11 @@ function openSettingsModal() {
             '<button onclick="document.getElementById(\'settingsModal\').remove()" style="position:absolute; top:12px; right:16px; background:none; border:none; font-size:20px; cursor:pointer; color:var(--text-2);">&times;</button>' +
             '<h3 style="font-size:18px; margin-bottom:20px;">Account Settings</h3>' +
             '<div id="settingsMsg" style="display:none; padding:8px 12px; border-radius:6px; margin-bottom:12px; font-size:13px;"></div>' +
+            '<label style="display:block; font-size:13px; color:var(--text-2); margin-bottom:4px;">Email</label>' +
+            '<input type="email" id="settingsEmail" value="' + escapeHtml(userData.email || '') + '" style="width:100%; padding:10px 12px; border:1px solid var(--border); border-radius:8px; font-size:14px; box-sizing:border-box; background:var(--bg); color:var(--text); margin-bottom:12px;">' +
             '<label style="display:block; font-size:13px; color:var(--text-2); margin-bottom:4px;">Name</label>' +
-            '<input type="text" id="settingsName" value="' + (userData.name || '') + '" style="width:100%; padding:10px 12px; border:1px solid var(--border); border-radius:8px; font-size:14px; box-sizing:border-box; background:var(--bg); color:var(--text); margin-bottom:12px;">' +
-            '<button onclick="updateSettingsName()" style="width:100%; padding:10px; background:var(--blue); color:white; border:none; border-radius:8px; font-size:14px; font-weight:600; cursor:pointer; margin-bottom:20px;">Update Name</button>' +
+            '<input type="text" id="settingsName" value="' + escapeHtml(userData.name || '') + '" style="width:100%; padding:10px 12px; border:1px solid var(--border); border-radius:8px; font-size:14px; box-sizing:border-box; background:var(--bg); color:var(--text); margin-bottom:12px;">' +
+            '<button onclick="updateSettingsProfile()" style="width:100%; padding:10px; background:var(--blue); color:white; border:none; border-radius:8px; font-size:14px; font-weight:600; cursor:pointer; margin-bottom:20px;">Save Profile</button>' +
             '<hr style="border:none; border-top:1px solid var(--border); margin-bottom:16px;">' +
             '<label style="display:block; font-size:13px; color:var(--text-2); margin-bottom:4px;">Current Password</label>' +
             '<input type="password" id="settingsOldPass" style="width:100%; padding:10px 12px; border:1px solid var(--border); border-radius:8px; font-size:14px; box-sizing:border-box; background:var(--bg); color:var(--text); margin-bottom:8px;">' +
@@ -1023,13 +1070,14 @@ function openSettingsModal() {
     modal.addEventListener('click', function(e) { if (e.target === modal) modal.remove(); });
 }
 
-async function updateSettingsName() {
+async function updateSettingsProfile() {
     var msgEl = document.getElementById('settingsMsg');
     try {
         var name = document.getElementById('settingsName').value;
-        var result = await api.put('/api/user/profile', { name: name });
+        var email = document.getElementById('settingsEmail').value;
+        var result = await api.put('/api/user/profile', { name: name, email: email });
         if (result) localStorage.setItem('strype_user', JSON.stringify(result));
-        msgEl.textContent = 'Name updated!';
+        msgEl.textContent = 'Profile updated!';
         msgEl.style.display = 'block';
         msgEl.style.background = 'rgba(63,185,80,.1)';
         msgEl.style.color = '#3fb950';
@@ -2126,9 +2174,11 @@ function renderJobsList() {
     var lotName = lot ? escapeHtml(lot.name) : 'Deleted Lot';
     var dateStr = new Date(job.date + 'T00:00:00').toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric', year: 'numeric' });
     var isPast = new Date(job.date) < new Date(new Date().toDateString());
+    var timePref = job.time_preference ? ' (' + job.time_preference + ')' : '';
+    var statusLabel = job.status === 'in_progress' ? ' — In Progress' : '';
     return '<div class="job-item">' +
       '<div class="job-status ' + job.status + '"></div>' +
-      '<div class="job-info"><div class="job-lot-name">' + lotName + '</div><div class="job-date">' + dateStr + (isPast && job.status === 'pending' ? ' (overdue)' : '') + '</div></div>' +
+      '<div class="job-info"><div class="job-lot-name">' + lotName + statusLabel + '</div><div class="job-date">' + dateStr + timePref + (isPast && job.status === 'pending' ? ' (overdue)' : '') + '</div></div>' +
       '<div class="job-actions">' +
         (job.status === 'pending' ?
           '<button class="job-action-btn" data-complete-job="' + job.id + '" title="Mark complete"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg></button>' : '') +
@@ -2203,11 +2253,13 @@ document.getElementById('addJobBtn').addEventListener('click', async function() 
   if (!date) { showToast('Select a date', 'error'); return; }
 
   await withLoading(btn, async function() {
+    var timePref = document.getElementById('jobTimePref').value || 'morning';
     var newJob = {
       id: uid(),
       lotId: lotId,
       date: date,
       status: 'pending',
+      time_preference: timePref,
       created: new Date().toISOString()
     };
 
@@ -2217,7 +2269,7 @@ document.getElementById('addJobBtn').addEventListener('click', async function() 
         var result = await api.post('/api/jobs', {
           lotId: lotId,
           date: date,
-          status: 'pending'
+          time_preference: timePref
         });
         if (result && result.id) {
           newJob.id = result.id;
@@ -3337,7 +3389,105 @@ async function init() {
   var mm = String(today.getMonth() + 1).padStart(2, '0');
   var yyyy = today.getFullYear();
   document.getElementById('jobDate').value = yyyy + '-' + mm + '-' + dd;
+
+  // Load robot status for robot/enterprise users
+  if (api.isLoggedIn() && currentUser && (currentUser.plan === 'robot' || currentUser.plan === 'enterprise')) {
+    loadRobotStatus();
+    document.getElementById('robotStatusCard').style.display = 'block';
+  }
+
+  // Load recurring schedules for pro+ users
+  if (api.isLoggedIn() && currentUser && currentUser.plan !== 'free') {
+    loadSchedules();
+    document.getElementById('scheduleForm').style.display = 'flex';
+    updateScheduleLotSelect();
+  }
+
+  // Remove page loader
+  var loader = document.getElementById('pageLoader');
+  if (loader) { loader.style.opacity = '0'; setTimeout(function() { loader.remove(); }, 300); }
 }
+
+// --- Robot Status ---
+async function loadRobotStatus() {
+  try {
+    var data = await api.get('/api/robots/status');
+    var el = document.getElementById('robotStatusInfo');
+    if (data.status === 'no_robot') {
+      el.innerHTML = 'No robot assigned yet. Contact support.';
+    } else {
+      var statusColors = { preparing: 'var(--yellow)', shipped: 'var(--blue)', active: 'var(--green)', returning: 'var(--orange)' };
+      var color = statusColors[data.status] || 'var(--text-2)';
+      el.innerHTML = '<div style="display:flex;align-items:center;gap:6px"><span style="width:8px;height:8px;border-radius:50%;background:' + color + ';display:inline-block"></span>' +
+        '<strong>' + escapeHtml(data.serial_number || 'Robot') + '</strong> — ' + escapeHtml(data.status) + '</div>' +
+        (data.tracking_number ? '<div style="margin-top:4px">Tracking: ' + escapeHtml(data.tracking_number) + '</div>' : '');
+    }
+  } catch(e) {
+    document.getElementById('robotStatusInfo').innerHTML = 'Unable to load robot status.';
+  }
+}
+
+// --- Recurring Schedules ---
+function updateScheduleLotSelect() {
+  var select = document.getElementById('scheduleLotSelect');
+  select.innerHTML = '<option value="">Select a lot...</option>' +
+    lots.map(function(lot) {
+      return '<option value="' + lot.id + '">' + escapeHtml(lot.name) + '</option>';
+    }).join('');
+}
+
+async function loadSchedules() {
+  try {
+    var data = await api.get('/api/schedules');
+    var container = document.getElementById('schedulesList');
+    if (!data.items || !data.items.length) {
+      container.innerHTML = '<div style="padding:8px 0;color:var(--text-3);font-size:.75rem">No recurring schedules</div>';
+      return;
+    }
+    container.innerHTML = data.items.map(function(s) {
+      var lot = lots.find(function(l) { return l.id === s.lot_id; });
+      var lotName = lot ? escapeHtml(lot.name) : 'Unknown Lot';
+      return '<div class="job-item">' +
+        '<div class="job-status" style="background:var(--blue)"></div>' +
+        '<div class="job-info"><div class="job-lot-name">' + lotName + '</div>' +
+        '<div class="job-date">' + s.frequency + ' — ' + s.time_preference + ' — next: ' + s.next_run + '</div></div>' +
+        '<div class="job-actions"><button class="job-action-btn" onclick="deleteSchedule(\'' + s.id + '\')" title="Remove"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg></button></div>' +
+        '</div>';
+    }).join('');
+  } catch(e) {
+    document.getElementById('schedulesList').innerHTML = '<div style="color:var(--text-3)">Failed to load schedules</div>';
+  }
+}
+
+async function deleteSchedule(scheduleId) {
+  try {
+    await api.del('/api/schedules/' + scheduleId);
+    showToast('Schedule removed');
+    loadSchedules();
+  } catch(e) {
+    showToast('Failed to remove schedule', 'error');
+  }
+}
+
+document.getElementById('addScheduleBtn').addEventListener('click', async function() {
+  var btn = this;
+  var lotId = document.getElementById('scheduleLotSelect').value;
+  var freq = document.getElementById('scheduleFreq').value;
+  var dayOfWeek = parseInt(document.getElementById('scheduleDay').value);
+  var timePref = document.getElementById('scheduleTime').value;
+  if (!lotId) { showToast('Select a lot first', 'error'); return; }
+  await withLoading(btn, async function() {
+    try {
+      var body = { lot_id: lotId, frequency: freq, day_of_week: dayOfWeek, time_preference: timePref };
+      if (freq === 'monthly') { body.day_of_month = 1; delete body.day_of_week; }
+      await api.post('/api/schedules', body);
+      showToast('Schedule created');
+      loadSchedules();
+    } catch(e) {
+      showToast(e.message || 'Failed to create schedule', 'error');
+    }
+  });
+});
 
 // Make functions globally accessible for inline onclick
 window.hideModal = hideModal;
@@ -3351,9 +3501,10 @@ window.handleForgotPassword = handleForgotPassword;
 window.showUpgradePrompt = showUpgradePrompt;
 window.startCheckout = startCheckout;
 window.openSettingsModal = openSettingsModal;
-window.updateSettingsName = updateSettingsName;
+window.updateSettingsProfile = updateSettingsProfile;
 window.updateSettingsPassword = updateSettingsPassword;
 window.confirmDeleteAccount = confirmDeleteAccount;
+window.deleteSchedule = deleteSchedule;
 window.importDxfSvg = importDxfSvg;
 
 init();

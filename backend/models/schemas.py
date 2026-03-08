@@ -80,6 +80,8 @@ class ChangePasswordRequest(BaseModel):
 class UpdateProfileRequest(BaseModel):
     name: Optional[str] = Field(default=None, max_length=100)
     email: Optional[EmailStr] = None
+    company_name: Optional[str] = Field(default=None, max_length=200)
+    phone: Optional[str] = Field(default=None, max_length=30)
 
 
 class DeleteAccountRequest(BaseModel):
@@ -129,6 +131,7 @@ class PaginatedLotResponse(BaseModel):
 class JobCreate(BaseModel):
     lotId: str
     date: str
+    time_preference: Optional[Literal["morning", "afternoon", "evening"]] = "morning"
 
     @field_validator('date')
     @classmethod
@@ -141,7 +144,7 @@ class JobCreate(BaseModel):
 
 
 class JobUpdate(BaseModel):
-    status: Optional[Literal["pending", "completed"]] = None
+    status: Optional[Literal["pending", "in_progress", "completed"]] = None
     date: Optional[str] = None
 
     @field_validator('date')
@@ -160,6 +163,10 @@ class JobResponse(BaseModel):
     lotId: str
     date: str
     status: str
+    time_preference: Optional[str] = "morning"
+    started_at: Optional[str] = None
+    completed_at: Optional[str] = None
+    robot_id: Optional[str] = None
     created: str
     modified: str
 
@@ -180,6 +187,150 @@ class WaitlistRequest(BaseModel):
 
 # --- User Preferences ---
 
+class MapState(BaseModel):
+    lat: float = Field(ge=-90, le=90)
+    lng: float = Field(ge=-180, le=180)
+    zoom: int = Field(ge=0, le=22)
+
+
 class UserPreferencesUpdate(BaseModel):
     active_lot_id: Optional[str] = None
-    map_state: Optional[dict] = None  # {lat, lng, zoom}
+    map_state: Optional[MapState] = None
+
+
+# --- Robots ---
+
+class RobotCreate(BaseModel):
+    serial_number: str = Field(max_length=100)
+    hardware_version: str = Field(default="v1", max_length=20)
+    firmware_version: Optional[str] = Field(default=None, max_length=50)
+    notes: str = Field(default="", max_length=1000)
+
+
+class RobotUpdate(BaseModel):
+    status: Optional[Literal["available", "assigned", "shipped", "maintenance", "retired"]] = None
+    firmware_version: Optional[str] = Field(default=None, max_length=50)
+    notes: Optional[str] = Field(default=None, max_length=1000)
+
+
+class RobotResponse(BaseModel):
+    id: str
+    serial_number: str
+    status: str
+    hardware_version: str
+    firmware_version: Optional[str] = None
+    last_seen_at: Optional[str] = None
+    last_battery_pct: Optional[int] = None
+    last_state: Optional[str] = None
+    notes: str
+    created_at: str
+    updated_at: str
+
+
+class AssignRobotRequest(BaseModel):
+    robot_id: str
+    user_id: str
+
+
+class AssignmentUpdate(BaseModel):
+    status: Optional[Literal["preparing", "shipped", "active", "returning", "returned"]] = None
+    tracking_number: Optional[str] = Field(default=None, max_length=200)
+    return_tracking: Optional[str] = Field(default=None, max_length=200)
+
+
+class AssignmentResponse(BaseModel):
+    id: str
+    robot_id: str
+    user_id: str
+    status: str
+    tracking_number: Optional[str] = None
+    shipped_at: Optional[str] = None
+    delivered_at: Optional[str] = None
+    return_tracking: Optional[str] = None
+    returned_at: Optional[str] = None
+    label_url: Optional[str] = None
+    return_label_url: Optional[str] = None
+    created_at: str
+    updated_at: str
+    # Joined fields
+    serial_number: Optional[str] = None
+    user_email: Optional[str] = None
+
+
+# --- Recurring Schedules ---
+
+class ScheduleCreate(BaseModel):
+    lot_id: str
+    frequency: Literal["weekly", "biweekly", "monthly"]
+    day_of_week: Optional[int] = Field(default=None, ge=0, le=6)
+    day_of_month: Optional[int] = Field(default=None, ge=1, le=28)
+    time_preference: Literal["morning", "afternoon", "evening"] = "morning"
+
+
+class ScheduleUpdate(BaseModel):
+    frequency: Optional[Literal["weekly", "biweekly", "monthly"]] = None
+    day_of_week: Optional[int] = Field(default=None, ge=0, le=6)
+    day_of_month: Optional[int] = Field(default=None, ge=1, le=28)
+    time_preference: Optional[Literal["morning", "afternoon", "evening"]] = None
+    active: Optional[bool] = None
+
+
+class ScheduleResponse(BaseModel):
+    id: str
+    lot_id: str
+    frequency: str
+    day_of_week: Optional[int] = None
+    day_of_month: Optional[int] = None
+    time_preference: str
+    active: bool
+    next_run: str
+    created_at: str
+    updated_at: str
+
+
+# --- Cost Estimates ---
+
+class EstimateRequest(BaseModel):
+    features: list[Any] = Field(default=[])
+
+
+class EstimateResponse(BaseModel):
+    total_line_length_ft: float
+    paint_gallons: float
+    estimated_runtime_min: int
+    estimated_cost: float
+
+
+# --- Admin ---
+
+class SetPlanRequest(BaseModel):
+    plan: Literal["free", "pro", "robot", "enterprise"]
+
+
+# --- Telemetry ---
+
+class TelemetryHeartbeat(BaseModel):
+    battery_pct: Optional[int] = Field(default=None, ge=0, le=100)
+    lat: Optional[float] = None
+    lng: Optional[float] = None
+    state: Optional[Literal["idle", "mowing", "error", "charging"]] = None
+    paint_level_pct: Optional[int] = Field(default=None, ge=0, le=100)
+    error_code: Optional[str] = None
+    rssi: Optional[int] = None
+
+
+class TelemetryResponse(BaseModel):
+    battery_pct: Optional[int] = None
+    lat: Optional[float] = None
+    lng: Optional[float] = None
+    state: Optional[str] = None
+    paint_level_pct: Optional[int] = None
+    error_code: Optional[str] = None
+    rssi: Optional[int] = None
+    created_at: str
+
+
+# --- Billing ---
+
+class ChangePlanRequest(BaseModel):
+    plan: Literal["free", "pro", "robot", "enterprise"]
