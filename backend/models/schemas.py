@@ -313,7 +313,7 @@ class TelemetryHeartbeat(BaseModel):
     battery_pct: Optional[int] = Field(default=None, ge=0, le=100)
     lat: Optional[float] = None
     lng: Optional[float] = None
-    state: Optional[Literal["idle", "mowing", "error", "charging"]] = None
+    state: Optional[Literal["idle", "mowing", "painting", "transit", "error", "charging"]] = None
     paint_level_pct: Optional[int] = Field(default=None, ge=0, le=100)
     error_code: Optional[str] = None
     rssi: Optional[int] = None

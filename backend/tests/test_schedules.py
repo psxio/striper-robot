@@ -184,6 +184,26 @@ async def test_delete_schedule(pro_client, pro_lot_id):
     assert list_resp.json()["items"] == []
 
 
+@pytest.mark.asyncio
+async def test_delete_lot_deactivates_recurring_schedules(pro_client, pro_lot_id):
+    """Deleting a lot should deactivate its schedules so the scheduler cannot recreate jobs."""
+    create_resp = await pro_client.post("/api/schedules", json={
+        "lot_id": pro_lot_id,
+        "frequency": "weekly",
+        "day_of_week": 4,
+        "time_preference": "morning",
+    })
+    assert create_resp.status_code == 201
+
+    delete_resp = await pro_client.delete(f"/api/lots/{pro_lot_id}")
+    assert delete_resp.status_code == 200
+
+    list_resp = await pro_client.get("/api/schedules")
+    assert list_resp.status_code == 200
+    assert list_resp.json()["total"] == 0
+    assert list_resp.json()["items"] == []
+
+
 # -- 9. Invalid frequency --
 
 @pytest.mark.asyncio

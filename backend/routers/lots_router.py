@@ -5,6 +5,7 @@ import logging
 import os
 import tempfile
 import uuid
+from importlib import import_module
 
 from fastapi import APIRouter, Depends, HTTPException, Query, UploadFile, File
 from fastapi.responses import Response
@@ -20,6 +21,23 @@ router = APIRouter(prefix="/api/lots", tags=["lots"])
 logger = logging.getLogger("strype.lots")
 
 MAX_IMPORT_SIZE = 5 * 1024 * 1024  # 5 MB
+
+
+def _load_pathgen_module(module_name: str):
+    """Import striper_pathgen modules in either installed or repo-local layout."""
+    candidates = (
+        f"striper_pathgen.{module_name}",
+        f"striper_pathgen.striper_pathgen.{module_name}",
+    )
+    last_exc = None
+    for candidate in candidates:
+        try:
+            return import_module(candidate)
+        except ModuleNotFoundError as exc:
+            if exc.name != candidate:
+                raise
+            last_exc = exc
+    raise last_exc or ModuleNotFoundError(module_name)
 
 
 def _to_response(lot: dict) -> LotResponse:
@@ -135,11 +153,9 @@ async def import_file(
         os.close(tmp_fd)
 
         if ext == ".dxf":
-            from striper_pathgen.dxf_importer import import_dxf
-            paths = import_dxf(tmp_path)
+            paths = _load_pathgen_module("dxf_importer").import_dxf(tmp_path)
         else:
-            from striper_pathgen.svg_importer import import_svg
-            paths = import_svg(tmp_path)
+            paths = _load_pathgen_module("svg_importer").import_svg(tmp_path)
     except Exception as e:
         raise HTTPException(status_code=400, detail=f"Failed to parse file: {e}")
     finally:
@@ -152,7 +168,7 @@ async def import_file(
         raise HTTPException(status_code=400, detail="No paths found in file")
 
     # Convert local coordinates to GeoJSON features using lot center as datum
-    from striper_pathgen.coordinate_transform import CoordinateTransformer
+    CoordinateTransformer = _load_pathgen_module("coordinate_transform").CoordinateTransformer
     transformer = CoordinateTransformer(
         datum_lat=lot["center"]["lat"],
         datum_lon=lot["center"]["lng"],
@@ -223,8 +239,12 @@ async def export_lot(
         raise HTTPException(status_code=400, detail="Lot has no features to export")
 
     # Convert lot features to PaintJob
-    from striper_pathgen.models import PaintPath, PaintSegment, PaintJob, GeoPoint, Point2D
-    from striper_pathgen.coordinate_transform import CoordinateTransformer
+    models = _load_pathgen_module("models")
+    PaintPath = models.PaintPath
+    PaintSegment = models.PaintSegment
+    PaintJob = models.PaintJob
+    GeoPoint = models.GeoPoint
+    CoordinateTransformer = _load_pathgen_module("coordinate_transform").CoordinateTransformer
 
     datum_lat = lot["center"]["lat"]
     datum_lng = lot["center"]["lng"]
@@ -261,7 +281,7 @@ async def export_lot(
 
     # Export
     if body.format == "waypoints":
-        from striper_pathgen.mission_planner import export_waypoints
+        export_waypoints = _load_pathgen_module("mission_planner").export_waypoints
         content = export_waypoints(job, datum_lat=datum_lat, datum_lon=datum_lng)
         return Response(
             content=content,
@@ -269,7 +289,7 @@ async def export_lot(
             headers={"Content-Disposition": f'attachment; filename="{lot["name"]}.waypoints"'},
         )
     elif body.format == "geojson":
-        from striper_pathgen.job_exporter import export_geojson
+        export_geojson = _load_pathgen_module("job_exporter").export_geojson
         geojson = export_geojson(job)
         return Response(
             content=json.dumps(geojson, indent=2),
@@ -277,7 +297,7 @@ async def export_lot(
             headers={"Content-Disposition": f'attachment; filename="{lot["name"]}.geojson"'},
         )
     else:  # kml
-        from striper_pathgen.job_exporter import export_kml
+        export_kml = _load_pathgen_module("job_exporter").export_kml
         content = export_kml(job)
         return Response(
             content=content,

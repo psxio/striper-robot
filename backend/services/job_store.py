@@ -14,7 +14,7 @@ def _now() -> str:
 def _row_to_dict(row) -> dict:
     """Convert a DB row to a frontend-shaped dict."""
     d = dict(row)
-    return {
+    job = {
         "id": d["id"],
         "lotId": d["lot_id"],
         "date": d["date"],
@@ -26,6 +26,9 @@ def _row_to_dict(row) -> dict:
         "created": d["created_at"],
         "modified": d["updated_at"],
     }
+    if d.get("lot_name") is not None:
+        job["lot_name"] = d["lot_name"]
+    return job
 
 
 async def list_jobs(user_id: str, page: int = 1, limit: int = 50, status: str | None = None, lot_id: str | None = None) -> tuple[list[dict], int]:
@@ -61,6 +64,32 @@ async def count_jobs(user_id: str) -> int:
             "SELECT COUNT(*) FROM jobs WHERE user_id = ?", (user_id,)
         )
         return (await cursor.fetchone())[0]
+
+
+async def get_priority_job(user_id: str) -> Optional[dict]:
+    """Return the active job, or the next pending job, for a user."""
+    async for db in get_db():
+        cursor = await db.execute(
+            """
+            SELECT j.*, l.name AS lot_name
+            FROM jobs j
+            LEFT JOIN lots l ON l.id = j.lot_id AND l.user_id = j.user_id
+            WHERE j.user_id = ? AND j.status IN ('in_progress', 'pending')
+            ORDER BY
+                CASE j.status
+                    WHEN 'in_progress' THEN 0
+                    ELSE 1
+                END,
+                CASE
+                    WHEN j.status = 'pending' THEN j.date
+                    ELSE j.updated_at
+                END ASC
+            LIMIT 1
+            """,
+            (user_id,),
+        )
+        row = await cursor.fetchone()
+        return _row_to_dict(row) if row else None
 
 
 async def create_job_atomic(user_id: str, lot_id: str, date: str, max_jobs: int, time_preference: str = "morning") -> Optional[dict]:

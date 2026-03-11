@@ -734,6 +734,7 @@ let activeTool = 'pan';
 let selectedFeatureId = null;
 let map, drawnItems, currentDrawHandler;
 let streetLayer, satelliteLayer, currentMapStyle = 'street';
+let robotStatusRefreshTimer = null;
 
 // Undo/Redo stacks
 var undoStack = [];
@@ -2175,12 +2176,20 @@ function renderJobsList() {
     var dateStr = new Date(job.date + 'T00:00:00').toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric', year: 'numeric' });
     var isPast = new Date(job.date) < new Date(new Date().toDateString());
     var timePref = job.time_preference ? ' (' + job.time_preference + ')' : '';
-    var statusLabel = job.status === 'in_progress' ? ' — In Progress' : '';
+    var statusLabels = {
+      pending: '',
+      in_progress: ' — In Progress',
+      completed: ' — Completed'
+    };
+    var statusLabel = statusLabels[job.status] || '';
     return '<div class="job-item">' +
       '<div class="job-status ' + job.status + '"></div>' +
       '<div class="job-info"><div class="job-lot-name">' + lotName + statusLabel + '</div><div class="job-date">' + dateStr + timePref + (isPast && job.status === 'pending' ? ' (overdue)' : '') + '</div></div>' +
       '<div class="job-actions">' +
+        '<button class="job-action-btn" data-export-job="' + job.id + '" title="Export mission"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg></button>' +
         (job.status === 'pending' ?
+          '<button class="job-action-btn" data-start-job="' + job.id + '" title="Start job"><svg viewBox="0 0 24 24" fill="currentColor"><polygon points="8,5 19,12 8,19"></polygon></svg></button>' : '') +
+        (job.status === 'in_progress' ?
           '<button class="job-action-btn" data-complete-job="' + job.id + '" title="Mark complete"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg></button>' : '') +
         '<button class="job-action-btn" data-delete-job="' + job.id + '" title="Delete job"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg></button>' +
       '</div>' +
@@ -2188,7 +2197,55 @@ function renderJobsList() {
   }).join('');
 }
 
+function mergeJobUpdate(updatedJob) {
+  if (!updatedJob || !updatedJob.id) return;
+  jobs = jobs.map(function(job) {
+    return job.id === updatedJob.id ? Object.assign({}, job, updatedJob) : job;
+  });
+}
+
+function refreshRobotStatusIfVisible() {
+  var card = document.getElementById('robotStatusCard');
+  if (card && card.style.display !== 'none') {
+    loadRobotStatus();
+  }
+}
+
 document.getElementById('jobsList').addEventListener('click', async function(e) {
+  var exportBtn = e.target.closest('[data-export-job]');
+  if (exportBtn) {
+    var exportJobId = exportBtn.dataset.exportJob;
+    var exportJob = jobs.find(function(j) { return j.id === exportJobId; });
+    if (exportJob) {
+      exportWaypointsForLot(exportJob.lotId, exportJob.date ? '-' + exportJob.date : '');
+    }
+    return;
+  }
+
+  var startBtn = e.target.closest('[data-start-job]');
+  if (startBtn) {
+    var startJobId = startBtn.dataset.startJob;
+    var startJob = jobs.find(function(j) { return j.id === startJobId; });
+    if (startJob) {
+      startJob.status = 'in_progress';
+      if (api.isLoggedIn()) {
+        try {
+          var started = await api.patch('/api/jobs/' + startJobId, { status: 'in_progress' });
+          mergeJobUpdate(started);
+        } catch (err) {
+          console.warn('Failed to start job via API:', err);
+        }
+      }
+
+      saveJobs();
+      renderJobsList();
+      updateDashboard();
+      refreshRobotStatusIfVisible();
+      showToast('Job started');
+    }
+    return;
+  }
+
   var completeBtn = e.target.closest('[data-complete-job]');
   if (completeBtn) {
     var jobId = completeBtn.dataset.completeJob;
@@ -2199,7 +2256,8 @@ document.getElementById('jobsList').addEventListener('click', async function(e) 
       // Sync to API
       if (api.isLoggedIn()) {
         try {
-          await api.patch('/api/jobs/' + jobId, { status: 'completed' });
+          var completed = await api.patch('/api/jobs/' + jobId, { status: 'completed' });
+          mergeJobUpdate(completed);
         } catch (e) {
           console.warn('Failed to update job via API:', e);
         }
@@ -2208,6 +2266,7 @@ document.getElementById('jobsList').addEventListener('click', async function(e) 
       saveJobs();
       renderJobsList();
       updateDashboard();
+      refreshRobotStatusIfVisible();
       showToast('Job marked complete');
     }
     return;
@@ -2238,6 +2297,7 @@ document.getElementById('jobsList').addEventListener('click', async function(e) 
       saveJobs();
       renderJobsList();
       updateDashboard();
+      refreshRobotStatusIfVisible();
       hideModal();
       showToast('Job removed');
     });
@@ -2284,6 +2344,7 @@ document.getElementById('addJobBtn').addEventListener('click', async function() 
     saveJobs();
     renderJobsList();
     updateDashboard();
+    refreshRobotStatusIfVisible();
     document.getElementById('jobDate').value = '';
     showToast('Job scheduled');
   });
@@ -3008,13 +3069,26 @@ if (!localStorage.getItem('strype_onboarded')) {
 /* ═══════════════════════════════════════════════════════════════════
    EXPORT — GeoJSON
 ═══════════════════════════════════════════════════════════════════ */
-document.getElementById('exportGeojson').addEventListener('click', function() {
-  closeExportDropdown();
-  if (!activeLotId) { showToast('No lot selected', 'error'); return; }
+function sanitizeFilename(name) {
+  return name.replace(/[^a-zA-Z0-9_-]/g, '_');
+}
 
-  var lot = lots.find(function(l) { return l.id === activeLotId; });
-  if (!lot || !lot.features || !lot.features.length) { showToast('No features to export', 'error'); return; }
+function getLotForExport(lotId) {
+  if (!lotId) {
+    showToast('No lot selected', 'error');
+    return null;
+  }
+  var lot = lots.find(function(l) { return l.id === lotId; });
+  if (!lot || !lot.features || !lot.features.length) {
+    showToast('No features to export', 'error');
+    return null;
+  }
+  return lot;
+}
 
+function exportGeojsonForLot(lotId, filenameSuffix) {
+  var lot = getLotForExport(lotId);
+  if (!lot) return;
   var fc = {
     type: 'FeatureCollection',
     features: lot.features.map(function(f) {
@@ -3032,8 +3106,13 @@ document.getElementById('exportGeojson').addEventListener('click', function() {
     })
   };
 
-  downloadFile(lot.name.replace(/[^a-zA-Z0-9_-]/g, '_') + '.geojson', JSON.stringify(fc, null, 2), 'application/geo+json');
+  downloadFile(sanitizeFilename(lot.name) + (filenameSuffix || '') + '.geojson', JSON.stringify(fc, null, 2), 'application/geo+json');
   showToast('GeoJSON exported: ' + lot.features.length + ' features');
+}
+
+document.getElementById('exportGeojson').addEventListener('click', function() {
+  closeExportDropdown();
+  exportGeojsonForLot(activeLotId);
 });
 
 /* ═══════════════════════════════════════════════════════════════════
@@ -3139,13 +3218,9 @@ function waypointLine(seq, frame, cmd, p1, p2, p3, p4, lat, lng, alt) {
     lat.toFixed(8) + '\t' + lng.toFixed(8) + '\t' + alt.toFixed(6) + '\t1';
 }
 
-document.getElementById('exportWaypoints').addEventListener('click', function() {
-  closeExportDropdown();
-  if (!activeLotId) { showToast('No lot selected', 'error'); return; }
-
-  var lot = lots.find(function(l) { return l.id === activeLotId; });
-  if (!lot || !lot.features || !lot.features.length) { showToast('No features to export', 'error'); return; }
-
+function exportWaypointsForLot(lotId, filenameSuffix) {
+  var lot = getLotForExport(lotId);
+  if (!lot) return;
   var lines = ['QGC WPL 110'];
   var seq = 0;
 
@@ -3199,21 +3274,23 @@ document.getElementById('exportWaypoints').addEventListener('click', function() 
   });
 
   var content = lines.join('\n') + '\n';
-  downloadFile(lot.name.replace(/[^a-zA-Z0-9_-]/g, '_') + '.waypoints', content, 'text/plain');
+  downloadFile(sanitizeFilename(lot.name) + (filenameSuffix || '') + '.waypoints', content, 'text/plain');
   showToast('Waypoints exported: ' + seq + ' commands for ' + lot.features.length + ' features');
+}
+
+document.getElementById('exportWaypoints').addEventListener('click', function() {
+  closeExportDropdown();
+  exportWaypointsForLot(activeLotId);
 });
 
 /* ═══════════════════════════════════════════════════════════════════
    EXPORT — KML (via backend)
 ═══════════════════════════════════════════════════════════════════ */
-document.getElementById('exportKml').addEventListener('click', async function() {
-  closeExportDropdown();
-  if (!activeLotId) { showToast('No lot selected', 'error'); return; }
-  var lot = lots.find(function(l) { return l.id === activeLotId; });
-  if (!lot || !lot.features || !lot.features.length) { showToast('No features to export', 'error'); return; }
-
+async function exportKmlForLot(lotId, filenameSuffix) {
+  var lot = getLotForExport(lotId);
+  if (!lot) return;
   try {
-    var resp = await fetch('/api/lots/' + activeLotId + '/export', {
+    var resp = await fetch('/api/lots/' + lotId + '/export', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + localStorage.getItem('strype_token') },
       body: JSON.stringify({ format: 'kml' })
@@ -3223,13 +3300,18 @@ document.getElementById('exportKml').addEventListener('click', async function() 
     var url = URL.createObjectURL(blob);
     var a = document.createElement('a');
     a.href = url;
-    a.download = lot.name.replace(/[^a-zA-Z0-9_-]/g, '_') + '.kml';
+    a.download = sanitizeFilename(lot.name) + (filenameSuffix || '') + '.kml';
     a.click();
     URL.revokeObjectURL(url);
     showToast('KML exported successfully');
   } catch (e) {
     showToast('KML export failed: ' + e.message, 'error');
   }
+}
+
+document.getElementById('exportKml').addEventListener('click', async function() {
+  closeExportDropdown();
+  await exportKmlForLot(activeLotId);
 });
 
 /* ═══════════════════════════════════════════════════════════════════
@@ -3394,6 +3476,8 @@ async function init() {
   if (api.isLoggedIn() && currentUser && (currentUser.plan === 'robot' || currentUser.plan === 'enterprise')) {
     loadRobotStatus();
     document.getElementById('robotStatusCard').style.display = 'block';
+    if (robotStatusRefreshTimer) clearInterval(robotStatusRefreshTimer);
+    robotStatusRefreshTimer = setInterval(loadRobotStatus, 30000);
   }
 
   // Load recurring schedules for pro+ users
@@ -3417,10 +3501,28 @@ async function loadRobotStatus() {
       el.innerHTML = 'No robot assigned yet. Contact support.';
     } else {
       var statusColors = { preparing: 'var(--yellow)', shipped: 'var(--blue)', active: 'var(--green)', returning: 'var(--orange)' };
+      var connectivityColors = { online: 'var(--green)', offline: 'var(--red)', unknown: 'var(--text-3)' };
       var color = statusColors[data.status] || 'var(--text-2)';
+      var connectivityColor = connectivityColors[data.connectivity] || 'var(--text-3)';
+      var metrics = [];
+      if (typeof data.battery_pct === 'number') metrics.push('Battery ' + data.battery_pct + '%');
+      if (typeof data.paint_level_pct === 'number') metrics.push('Paint ' + data.paint_level_pct + '%');
+      if (data.last_state) metrics.push('State ' + escapeHtml(data.last_state));
+      if (data.last_seen_at) metrics.push('Seen ' + new Date(data.last_seen_at).toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' }));
+      var jobText = '';
+      if (data.current_job) {
+        var jobLot = lots.find(function(l) { return l.id === data.current_job.lotId; });
+        var jobLotName = data.current_job.lot_name || (jobLot ? jobLot.name : 'Scheduled lot');
+        var jobDate = new Date(data.current_job.date + 'T00:00:00').toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+        jobText = '<div style="margin-top:6px;color:var(--text-2)">Current job: <strong style="color:var(--text)">' + escapeHtml(jobLotName) + '</strong> — ' + escapeHtml(data.current_job.status) + ' — ' + jobDate + '</div>';
+      }
       el.innerHTML = '<div style="display:flex;align-items:center;gap:6px"><span style="width:8px;height:8px;border-radius:50%;background:' + color + ';display:inline-block"></span>' +
         '<strong>' + escapeHtml(data.serial_number || 'Robot') + '</strong> — ' + escapeHtml(data.status) + '</div>' +
-        (data.tracking_number ? '<div style="margin-top:4px">Tracking: ' + escapeHtml(data.tracking_number) + '</div>' : '');
+        '<div style="margin-top:4px;display:flex;align-items:center;gap:6px;color:var(--text-2)"><span style="width:7px;height:7px;border-radius:50%;background:' + connectivityColor + ';display:inline-block"></span>Connection: ' + escapeHtml(data.connectivity || 'unknown') + '</div>' +
+        (metrics.length ? '<div style="margin-top:4px;color:var(--text-2)">' + metrics.join(' • ') + '</div>' : '<div style="margin-top:4px;color:var(--text-3)">Waiting for first robot heartbeat</div>') +
+        jobText +
+        (data.tracking_number ? '<div style="margin-top:4px">Tracking: ' + escapeHtml(data.tracking_number) + '</div>' : '') +
+        (data.error_code ? '<div style="margin-top:4px;color:var(--red)">Error: ' + escapeHtml(data.error_code) + '</div>' : '');
     }
   } catch(e) {
     document.getElementById('robotStatusInfo').innerHTML = 'Unable to load robot status.';

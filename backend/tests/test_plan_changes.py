@@ -65,11 +65,10 @@ async def test_csrf_cookie_set_on_first_response(client):
 
 @pytest.mark.asyncio
 async def test_csrf_mismatch_returns_403(client):
-    """Mismatched CSRF cookie and header on a mutating request returns 403."""
+    """Mismatched CSRF header is rejected for refresh-cookie auth."""
     resp = await client.post(
-        "/api/waitlist",
-        json={"email": "csrf@example.com", "source": "test"},
-        cookies={"csrf_token": "abc"},
+        "/api/auth/refresh",
+        cookies={"refresh_token": "fake-refresh-token", "csrf_token": "abc"},
         headers={"X-CSRF-Token": "xyz"},
     )
     assert resp.status_code == 403
@@ -77,16 +76,37 @@ async def test_csrf_mismatch_returns_403(client):
 
 
 @pytest.mark.asyncio
+async def test_csrf_missing_header_returns_403(client):
+    """Refresh-cookie auth without the CSRF header should be rejected."""
+    resp = await client.post(
+        "/api/auth/refresh",
+        cookies={"refresh_token": "fake-refresh-token", "csrf_token": "abc"},
+    )
+    assert resp.status_code == 403
+    assert "CSRF" in resp.json()["detail"]
+
+
+@pytest.mark.asyncio
 async def test_csrf_matching_values_passes(client):
-    """Matching CSRF cookie and header allows the request through."""
+    """Matching CSRF values allow refresh requests past the middleware."""
     token = "matching-csrf-token-value"
+    resp = await client.post(
+        "/api/auth/refresh",
+        cookies={"refresh_token": "fake-refresh-token", "csrf_token": token},
+        headers={"X-CSRF-Token": token},
+    )
+    # The refresh token is fake, so the endpoint rejects it after CSRF passes.
+    assert resp.status_code == 401
+
+
+@pytest.mark.asyncio
+async def test_csrf_cookie_without_refresh_cookie_is_ignored(client):
+    """A plain CSRF cookie alone should not block unrelated public POST endpoints."""
     resp = await client.post(
         "/api/waitlist",
         json={"email": "csrf-ok@example.com", "source": "test"},
-        cookies={"csrf_token": token},
-        headers={"X-CSRF-Token": token},
+        cookies={"csrf_token": "abc"},
     )
-    # Should not be blocked by CSRF -- 201 means the waitlist entry was created
     assert resp.status_code == 201
 
 

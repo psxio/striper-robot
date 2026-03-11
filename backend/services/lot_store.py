@@ -172,6 +172,11 @@ async def delete_lot(user_id: str, lot_id: str) -> bool:
             return False
         # Hard-delete jobs for this lot (lot is soft-deleted, jobs have no value)
         await db.execute("DELETE FROM jobs WHERE lot_id = ? AND user_id = ?", (lot_id, user_id))
+        # Deactivate recurring schedules so the scheduler cannot recreate jobs for a deleted lot.
+        await db.execute(
+            "UPDATE recurring_schedules SET active = 0, updated_at = ? WHERE lot_id = ? AND user_id = ? AND active = 1",
+            (now, lot_id, user_id),
+        )
         # Clear active_lot_id if it pointed to this lot
         await db.execute(
             "UPDATE users SET active_lot_id = NULL WHERE id = ? AND active_lot_id = ?",

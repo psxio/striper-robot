@@ -58,6 +58,39 @@ def _price_for_plan(plan: str) -> str:
     return settings.STRIPE_PRICE_ID
 
 
+def _plan_for_price_id(price_id: str | None) -> str | None:
+    """Map a Stripe price ID back to an internal plan name."""
+    if not price_id:
+        return None
+    if settings.STRIPE_ROBOT_PRICE_ID and price_id == settings.STRIPE_ROBOT_PRICE_ID:
+        return "robot"
+    if settings.STRIPE_PRICE_ID and price_id == settings.STRIPE_PRICE_ID:
+        return "pro"
+    return None
+
+
+def _extract_subscription_plan(subscription: dict) -> str | None:
+    """Infer the current plan from a Stripe subscription payload."""
+    items = (subscription.get("items") or {}).get("data") or []
+    for item in items:
+        price = item.get("price") or {}
+        plan = _plan_for_price_id(price.get("id"))
+        if plan:
+            return plan
+    return None
+
+
+def _extract_invoice_plan(invoice: dict) -> str | None:
+    """Infer the current plan from a Stripe invoice payload."""
+    lines = (invoice.get("lines") or {}).get("data") or []
+    for line in lines:
+        price = line.get("price") or {}
+        plan = _plan_for_price_id(price.get("id"))
+        if plan:
+            return plan
+    return None
+
+
 async def _get_or_create_customer(user: dict) -> str:
     """Get or create Stripe customer ID for a user."""
     import stripe
@@ -177,6 +210,7 @@ async def stripe_webhook(request: Request):
     elif event_type == "customer.subscription.updated":
         subscription = event["data"]["object"]
         status = subscription.get("status", "active")
+        plan = _extract_subscription_plan(subscription)
         # Map Stripe statuses to our statuses
         if status in ("past_due", "unpaid"):
             await billing_store.update_subscription_status(
@@ -187,7 +221,7 @@ async def stripe_webhook(request: Request):
             await billing_store.update_subscription_status(
                 stripe_subscription_id=subscription["id"],
                 status="active",
-                plan="pro",
+                plan=plan,
             )
 
     elif event_type == "invoice.payment_failed":
@@ -204,10 +238,11 @@ async def stripe_webhook(request: Request):
         invoice = event["data"]["object"]
         sub_id = invoice.get("subscription")
         if sub_id:
+            plan = _extract_invoice_plan(invoice)
             await billing_store.update_subscription_status(
                 stripe_subscription_id=sub_id,
                 status="active",
-                plan="pro",
+                plan=plan,
             )
 
     # Mark event as processed
@@ -253,7 +288,24 @@ async def change_plan(
 
     # Free plan doesn't need Stripe
     if body.plan == "free":
-        await billing_store.set_user_plan(user["id"], "free")
+        if _stripe_configured() and user.get("stripe_customer_id"):
+            sub = await billing_store.get_subscription_by_user(user["id"])
+            if sub and sub.get("stripe_subscription_id"):
+                try:
+                    import stripe
+                    stripe.api_key = settings.STRIPE_SECRET_KEY
+                    stripe.Subscription.delete(sub["stripe_subscription_id"])
+                except stripe.error.StripeError as e:
+                    logger.error("Stripe cancellation error: %s", e)
+                    raise HTTPException(status_code=502, detail="Payment service unavailable")
+                await billing_store.update_subscription_status(
+                    stripe_subscription_id=sub["stripe_subscription_id"],
+                    status="cancelled",
+                )
+            else:
+                await billing_store.set_user_plan(user["id"], "free")
+        else:
+            await billing_store.set_user_plan(user["id"], "free")
         return {"ok": True, "plan": "free"}
 
     # For paid plans, update via Stripe if configured
@@ -263,16 +315,22 @@ async def change_plan(
             try:
                 import stripe
                 stripe.api_key = settings.STRIPE_SECRET_KEY
+                stripe_sub = stripe.Subscription.retrieve(sub["stripe_subscription_id"])
+                sub_items = stripe_sub["items"]["data"]
+                if not sub_items:
+                    raise HTTPException(status_code=400, detail="No Stripe subscription items found")
                 stripe.Subscription.modify(
                     sub["stripe_subscription_id"],
                     items=[{
-                        "id": sub["stripe_subscription_id"],
+                        "id": sub_items[0]["id"],
                         "price": _price_for_plan(body.plan),
                     }],
                     proration_behavior="create_prorations",
                 )
             except Exception as e:
                 logger.error("Stripe plan change error: %s", e)
+                if isinstance(e, HTTPException):
+                    raise
                 raise HTTPException(status_code=502, detail="Payment service unavailable")
 
     await billing_store.set_user_plan(user["id"], body.plan)

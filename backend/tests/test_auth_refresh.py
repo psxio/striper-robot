@@ -23,6 +23,11 @@ async def _register_and_login(client, email="refresh@example.com", password="tes
     return resp, access_token, refresh_cookie
 
 
+def _csrf_headers(client) -> dict:
+    token = client.cookies.get("csrf_token")
+    return {"X-CSRF-Token": token} if token else {}
+
+
 # --- Refresh Token Tests ---
 
 @pytest.mark.asyncio
@@ -40,7 +45,7 @@ async def test_refresh_issues_new_access_token(client):
 
     # Call refresh with the cookie
     client.cookies.set("refresh_token", refresh_cookie)
-    refresh_resp = await client.post("/api/auth/refresh")
+    refresh_resp = await client.post("/api/auth/refresh", headers=_csrf_headers(client))
     assert refresh_resp.status_code == 200
 
     new_token = refresh_resp.json()["token"]
@@ -61,7 +66,7 @@ async def test_refresh_rotates_token(client):
 
     # Use the refresh token
     client.cookies.set("refresh_token", old_refresh)
-    refresh_resp = await client.post("/api/auth/refresh")
+    refresh_resp = await client.post("/api/auth/refresh", headers=_csrf_headers(client))
     assert refresh_resp.status_code == 200
 
     # Extract the rotated (new) refresh cookie
@@ -71,7 +76,7 @@ async def test_refresh_rotates_token(client):
 
     # Old token should now be invalid
     client.cookies.set("refresh_token", old_refresh)
-    resp2 = await client.post("/api/auth/refresh")
+    resp2 = await client.post("/api/auth/refresh", headers=_csrf_headers(client))
     assert resp2.status_code == 401
 
 
@@ -79,14 +84,16 @@ async def test_refresh_rotates_token(client):
 async def test_refresh_with_invalid_token_returns_401(client):
     """An invalid/expired refresh token should return 401."""
     client.cookies.set("refresh_token", "totally-bogus-token-value")
-    resp = await client.post("/api/auth/refresh")
+    client.cookies.set("csrf_token", "refresh-csrf")
+    resp = await client.post("/api/auth/refresh", headers={"X-CSRF-Token": "refresh-csrf"})
     assert resp.status_code == 401
 
 
 @pytest.mark.asyncio
 async def test_refresh_without_cookie_returns_401(client):
     """POST /api/auth/refresh with no refresh_token cookie should return 401."""
-    resp = await client.post("/api/auth/refresh")
+    client.cookies.set("csrf_token", "refresh-csrf")
+    resp = await client.post("/api/auth/refresh", headers={"X-CSRF-Token": "refresh-csrf"})
     assert resp.status_code == 401
     assert "no refresh token" in resp.json()["detail"].lower()
 
@@ -104,8 +111,19 @@ async def test_logout_invalidates_refresh_token(client):
     # Try to refresh with the old cookie — should fail
     client.headers.pop("Authorization", None)
     client.cookies.set("refresh_token", refresh_cookie)
-    resp = await client.post("/api/auth/refresh")
+    resp = await client.post("/api/auth/refresh", headers=_csrf_headers(client))
     assert resp.status_code == 401
+
+
+@pytest.mark.asyncio
+async def test_refresh_requires_csrf_header_when_cookie_present(client):
+    """Cookie-authenticated refresh requests must include the matching CSRF header."""
+    _resp, _access, refresh_cookie = await _register_and_login(client)
+    client.cookies.set("refresh_token", refresh_cookie)
+
+    resp = await client.post("/api/auth/refresh")
+    assert resp.status_code == 403
+    assert "csrf" in resp.json()["detail"].lower()
 
 
 # --- Email Verification Tests ---

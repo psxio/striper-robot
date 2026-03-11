@@ -86,18 +86,19 @@ app.add_middleware(
 
 @app.middleware("http")
 async def csrf_protection(request: Request, call_next):
-    """CSRF double-submit cookie validation for cookie-based (non-Bearer) mutating requests."""
-    if request.method in ("POST", "PUT", "PATCH", "DELETE"):
-        # Bearer-token requests are inherently CSRF-safe — skip
-        if "Authorization" not in request.headers:
-            csrf_cookie = request.cookies.get("csrf_token")
-            csrf_header = request.headers.get("X-CSRF-Token")
-            # Only enforce if both exist (i.e., a cookie-based session)
-            if csrf_cookie and csrf_header and csrf_cookie != csrf_header:
-                return JSONResponse(
-                    status_code=403,
-                    content={"detail": "CSRF validation failed"},
-                )
+    """CSRF double-submit validation for refresh-cookie auth."""
+    if (
+        request.method in ("POST", "PUT", "PATCH", "DELETE")
+        and request.url.path == "/api/auth/refresh"
+        and "Authorization" not in request.headers
+    ):
+        csrf_cookie = request.cookies.get("csrf_token")
+        csrf_header = request.headers.get("X-CSRF-Token")
+        if csrf_cookie and csrf_header != csrf_cookie:
+            return JSONResponse(
+                status_code=403,
+                content={"detail": "CSRF validation failed"},
+            )
 
     response = await call_next(request)
 

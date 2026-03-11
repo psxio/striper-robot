@@ -2,6 +2,8 @@
 
 import pytest
 
+from backend.database import get_db
+
 
 async def _create_robot(admin_client, serial="STR-001", hw="v1"):
     """Helper: create a robot via admin endpoint, return response dict."""
@@ -21,6 +23,13 @@ async def _register_user(client, email="robot_user@example.com"):
     })
     data = resp.json()
     return data["user"]["id"], data["token"]
+
+
+async def _set_robot_api_key(robot_id: str, api_key: str = "robot-status-key") -> None:
+    """Attach an API key to a robot for telemetry tests."""
+    async for db in get_db():
+        await db.execute("UPDATE robots SET api_key = ? WHERE id = ?", (api_key, robot_id))
+        await db.commit()
 
 
 # ---- Admin: Robot CRUD ----
@@ -172,6 +181,60 @@ async def test_admin_cannot_double_assign(admin_client, client):
     })
     assert resp.status_code == 400
     assert "already assigned" in resp.json()["detail"].lower()
+
+
+@pytest.mark.asyncio
+async def test_admin_cannot_assign_second_active_robot_to_same_user(admin_client, client):
+    """A user cannot hold two active robot assignments at the same time."""
+    resp1 = await _create_robot(admin_client, serial="STR-USR-A")
+    resp2 = await _create_robot(admin_client, serial="STR-USR-B")
+    robot1_id = resp1.json()["id"]
+    robot2_id = resp2.json()["id"]
+
+    user_id, _ = await _register_user(client, email="one-robot@example.com")
+
+    first = await admin_client.post("/api/admin/robots/assign", json={
+        "robot_id": robot1_id,
+        "user_id": user_id,
+    })
+    assert first.status_code == 201
+
+    second = await admin_client.post("/api/admin/robots/assign", json={
+        "robot_id": robot2_id,
+        "user_id": user_id,
+    })
+    assert second.status_code == 400
+    assert "active robot assignment" in second.json()["detail"].lower()
+
+
+@pytest.mark.asyncio
+async def test_admin_can_assign_new_robot_after_previous_returned(admin_client, client):
+    """Returning a robot frees the user to receive another robot later."""
+    resp1 = await _create_robot(admin_client, serial="STR-REASSIGN-A")
+    resp2 = await _create_robot(admin_client, serial="STR-REASSIGN-B")
+    robot1_id = resp1.json()["id"]
+    robot2_id = resp2.json()["id"]
+    user_id, _ = await _register_user(client, email="reassign@example.com")
+
+    first = await admin_client.post("/api/admin/robots/assign", json={
+        "robot_id": robot1_id,
+        "user_id": user_id,
+    })
+    assert first.status_code == 201
+    assignment_id = first.json()["id"]
+
+    returned = await admin_client.put(
+        f"/api/admin/robots/assignments/{assignment_id}",
+        json={"status": "returned"},
+    )
+    assert returned.status_code == 200
+
+    second = await admin_client.post("/api/admin/robots/assign", json={
+        "robot_id": robot2_id,
+        "user_id": user_id,
+    })
+    assert second.status_code == 201
+    assert second.json()["robot_id"] == robot2_id
 
 
 @pytest.mark.asyncio
@@ -377,6 +440,78 @@ async def test_user_robot_status_with_robot(admin_client, client):
     assert data["status"] == "preparing"
     assert data["robot_id"] == robot_id
     assert data["serial_number"] == "STR-STAT01"
+    assert data["connectivity"] == "unknown"
+    assert data["current_job"] is None
+
+
+@pytest.mark.asyncio
+async def test_user_robot_status_includes_telemetry_and_priority_job(admin_client, client):
+    """Robot status should include latest telemetry and the active or next job."""
+    from backend.services.billing_store import set_user_plan
+
+    resp = await _create_robot(admin_client, serial="STR-OPS01")
+    robot_id = resp.json()["id"]
+    await _set_robot_api_key(robot_id, "robot-ops-key")
+
+    user_id, user_token = await _register_user(client, email="robot-ops@example.com")
+    await set_user_plan(user_id, "pro")
+
+    assign_resp = await admin_client.post("/api/admin/robots/assign", json={
+        "robot_id": robot_id,
+        "user_id": user_id,
+    })
+    assignment_id = assign_resp.json()["id"]
+    await admin_client.put(
+        f"/api/admin/robots/assignments/{assignment_id}",
+        json={"status": "active"},
+    )
+
+    client.headers["Authorization"] = f"Bearer {user_token}"
+    lot_resp = await client.post("/api/lots", json={
+        "name": "Telemetry Lot",
+        "center": {"lat": 40.0, "lng": -74.0},
+        "features": [],
+    })
+    lot_id = lot_resp.json()["id"]
+
+    await client.post("/api/jobs", json={
+        "lotId": lot_id,
+        "date": "2026-04-20",
+    })
+    in_progress_resp = await client.post("/api/jobs", json={
+        "lotId": lot_id,
+        "date": "2026-04-21",
+        "time_preference": "afternoon",
+    })
+    in_progress_id = in_progress_resp.json()["id"]
+    await client.patch(f"/api/jobs/{in_progress_id}", json={"status": "in_progress"})
+
+    await client.post(
+        "/api/telemetry/heartbeat",
+        json={
+            "battery_pct": 72,
+            "lat": 33.749,
+            "lng": -84.388,
+            "state": "painting",
+            "paint_level_pct": 55,
+            "error_code": None,
+            "rssi": -61,
+        },
+        headers={"X-Robot-Key": "robot-ops-key"},
+    )
+
+    status_resp = await client.get("/api/robots/status")
+    assert status_resp.status_code == 200
+    data = status_resp.json()
+    assert data["status"] == "active"
+    assert data["connectivity"] == "online"
+    assert data["battery_pct"] == 72
+    assert data["paint_level_pct"] == 55
+    assert data["last_state"] == "painting"
+    assert data["location"] == {"lat": 33.749, "lng": -84.388}
+    assert data["current_job"]["id"] == in_progress_id
+    assert data["current_job"]["status"] == "in_progress"
+    assert data["current_job"]["lot_name"] == "Telemetry Lot"
 
 
 # ---- Authorization Checks ----

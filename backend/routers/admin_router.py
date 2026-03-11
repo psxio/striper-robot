@@ -176,19 +176,16 @@ async def robot_history(robot_id: str, admin: dict = Depends(get_admin_user)):
 @router.post("/robots/assign", status_code=201)
 async def assign_robot(body: AssignRobotRequest, admin: dict = Depends(get_admin_user)):
     """Assign a robot to a user."""
-    robot = await robot_store.get_robot(body.robot_id)
-    if not robot:
-        raise HTTPException(status_code=404, detail="Robot not found")
-    if robot["status"] == "retired":
-        raise HTTPException(status_code=400, detail="Cannot assign a retired robot")
-    if robot["status"] == "assigned":
-        raise HTTPException(status_code=400, detail="Robot is already assigned")
-
     user = await user_store.get_user_by_id(body.user_id)
     if not user:
         raise HTTPException(status_code=404, detail="User not found")
 
-    assignment = await robot_store.assign_robot(body.robot_id, body.user_id)
+    try:
+        assignment = await robot_store.assign_robot(body.robot_id, body.user_id)
+    except robot_store.RobotAssignmentConflict as exc:
+        raise HTTPException(status_code=400, detail=str(exc))
+    if not assignment:
+        raise HTTPException(status_code=404, detail="Robot not found")
     await admin_store.log_audit(
         admin["email"], "assign_robot", body.robot_id, f"user={body.user_id}"
     )

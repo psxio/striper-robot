@@ -11,6 +11,10 @@ def _now() -> str:
     return datetime.now(timezone.utc).isoformat()
 
 
+class RobotAssignmentConflict(ValueError):
+    """Raised when a robot assignment would violate active-assignment rules."""
+
+
 async def create_robot(
     serial_number: str,
     hardware_version: str = "v1",
@@ -106,29 +110,62 @@ async def update_robot(
 
 
 async def assign_robot(robot_id: str, user_id: str) -> Optional[dict]:
-    """Create a new assignment (status='preparing') and set robot status to 'assigned'.
+    """Create a new active assignment atomically.
 
-    Returns the assignment dict, or None if robot not found.
+    A robot may only have one non-returned assignment at a time, and each user may
+    only have one active robot assignment at a time.
     """
-    robot = await get_robot(robot_id)
-    if robot is None:
-        return None
-
     assignment_id = str(uuid.uuid4())
     now = _now()
 
     async for db in get_db():
-        await db.execute(
-            """INSERT INTO robot_assignments
-               (id, robot_id, user_id, status, created_at, updated_at)
-               VALUES (?, ?, ?, 'preparing', ?, ?)""",
-            (assignment_id, robot_id, user_id, now, now),
-        )
-        await db.execute(
-            "UPDATE robots SET status = 'assigned', updated_at = ? WHERE id = ?",
-            (now, robot_id),
-        )
-        await db.commit()
+        await db.execute("BEGIN IMMEDIATE")
+        try:
+            cursor = await db.execute("SELECT * FROM robots WHERE id = ?", (robot_id,))
+            robot = await cursor.fetchone()
+            if robot is None:
+                await db.execute("ROLLBACK")
+                return None
+
+            if robot["status"] == "retired":
+                raise RobotAssignmentConflict("Cannot assign a retired robot")
+
+            cursor = await db.execute(
+                """SELECT id FROM robot_assignments
+                   WHERE robot_id = ? AND status != 'returned'
+                   LIMIT 1""",
+                (robot_id,),
+            )
+            if await cursor.fetchone():
+                raise RobotAssignmentConflict("Robot is already assigned")
+
+            cursor = await db.execute(
+                """SELECT id FROM robot_assignments
+                   WHERE user_id = ? AND status != 'returned'
+                   LIMIT 1""",
+                (user_id,),
+            )
+            if await cursor.fetchone():
+                raise RobotAssignmentConflict("User already has an active robot assignment")
+
+            await db.execute(
+                """INSERT INTO robot_assignments
+                   (id, robot_id, user_id, status, created_at, updated_at)
+                   VALUES (?, ?, ?, 'preparing', ?, ?)""",
+                (assignment_id, robot_id, user_id, now, now),
+            )
+            await db.execute(
+                "UPDATE robots SET status = 'assigned', updated_at = ? WHERE id = ?",
+                (now, robot_id),
+            )
+            await db.execute("COMMIT")
+        except RobotAssignmentConflict:
+            await db.execute("ROLLBACK")
+            raise
+        except Exception:
+            await db.execute("ROLLBACK")
+            raise
+
         cursor = await db.execute(
             "SELECT * FROM robot_assignments WHERE id = ?", (assignment_id,)
         )
@@ -151,6 +188,21 @@ async def get_user_robot(user_id: str) -> Optional[dict]:
                ORDER BY ra.created_at DESC
                LIMIT 1""",
             (user_id,),
+        )
+        row = await cursor.fetchone()
+        return dict(row) if row else None
+
+
+async def get_latest_robot_telemetry(robot_id: str) -> Optional[dict]:
+    """Get the latest telemetry row for a robot."""
+    async for db in get_db():
+        cursor = await db.execute(
+            """SELECT battery_pct, lat, lng, state, paint_level_pct, error_code, rssi, created_at
+               FROM robot_telemetry
+               WHERE robot_id = ?
+               ORDER BY created_at DESC
+               LIMIT 1""",
+            (robot_id,),
         )
         row = await cursor.fetchone()
         return dict(row) if row else None
