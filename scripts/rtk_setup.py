@@ -184,8 +184,9 @@ def print_ardurover_params():
     print()
     print("  These params are already set in striper.param:")
     print()
-    print("  GPS_TYPE       = 24    (UnicoreNMEA, single UM980)")
-    print("  GPS_GNSS_MODE  = 0     (auto - all constellations)")
+    print("  GPS_TYPE       = 25    (UnicoreMovingBaselineNMEA, dual-antenna UM982)")
+    print("  GPS_TYPE2      = 25    (second antenna for heading)")
+    print("  GPS_GNSS_MODE  = 127   (all constellations: GPS+GLONASS+BeiDou+Galileo+QZSS)")
     print("  SERIAL3_PROTOCOL = 5   (GPS)")
     print("  SERIAL3_BAUD    = 115  (115200)")
     print()
@@ -197,7 +198,7 @@ def print_ardurover_params():
     print("  For standalone NTRIP (no laptop in field):")
     print("  - Use a Raspberry Pi or ESP32 with NTRIP client")
     print("  - Connect to Pixhawk SERIAL4 for RTCM3 injection")
-    print("  - Or use UM980's built-in NTRIP client (requires WiFi/cellular)")
+    print("  - Or use UM982's built-in NTRIP client (requires WiFi/cellular)")
     print()
 
 

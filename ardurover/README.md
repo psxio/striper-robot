@@ -22,7 +22,7 @@
 | Firmware | ArduRover 4.5+ | -- |
 | Drive type | Differential (skid steer), FRAME_TYPE=2 | -- |
 | Motors | Hoverboard BLDC x2 (FOC firmware) | UART on Serial2 |
-| GPS | Unicore UM980 triple-band RTK (8mm) | UART on Serial3 |
+| GPS | Unicore UM982 dual-antenna RTK (8mm) | UART on Serial3 |
 | Paint valve | 12V solenoid (normally closed) | Relay 1 on AUX5 (pin 54) |
 | Paint pump | 12V diaphragm pump | Relay 2 on AUX6 (pin 55) |
 | RC system | FlySky FS-i6X + FS-iA6B receiver | iBus/PPM on RC IN port |
@@ -61,7 +61,7 @@ ardurover/
 |                                                           |
 |  TELEM1 (Serial1) -----> SiK telemetry radio             |
 |  TELEM2 (Serial2) -----> Hoverboard FOC UART (TX/RX/GND)|
-|  GPS1   (Serial3) -----> UM980 RTK GPS module            |
+|  GPS1   (Serial3) -----> UM982 RTK GPS module            |
 |  GPS2   (Serial4) -----> (unused / future RTK input)     |
 |  RC IN  ---------------> FlySky FS-iA6B (iBus or PPM)   |
 |  POWER1 ---------------> 5V power module from DC-DC      |
@@ -74,22 +74,22 @@ ardurover/
 +----------------------------------------------------------+
 ```
 
-### GPS Wiring (UM980 to Pixhawk GPS1 Port)
+### GPS Wiring (UM982 to Pixhawk GPS1 Port)
 
-The UM980 connects to the GPS1 port using a JST-GH 6-pin connector.
+The UM982 connects to the GPS1 port using a JST-GH 6-pin connector.
 
-| UM980 Pin | Pixhawk GPS1 Pin | Notes |
+| UM982 Pin | Pixhawk GPS1 Pin | Notes |
 |---|---|---|
-| VCC (3.3V or 5V) | VCC (5V) | Check your UM980 breakout board voltage |
+| VCC (3.3V or 5V) | VCC (5V) | Check your UM982 breakout board voltage |
 | GND | GND | Common ground |
-| TX | RX (Serial3 RX) | UM980 transmits to Pixhawk |
-| RX | TX (Serial3 TX) | Pixhawk transmits to UM980 |
+| TX | RX (Serial3 RX) | UM982 transmits to Pixhawk |
+| RX | TX (Serial3 TX) | Pixhawk transmits to UM982 |
 
 Mount the GPS antenna on top of the robot, as high as practical, with a clear
 sky view. Keep it away from motors, the solenoid, and large metal surfaces.
 Use a ground plane under the antenna if possible.
 
-For RTK operation, the UM980 needs RTCM3 correction data from a base station.
+For RTK operation, the UM982 needs RTCM3 correction data from a base station.
 
 **Quickest method: Mission Planner NTRIP (free via RTK2Go)**
 
@@ -109,14 +109,14 @@ For RTK operation, the UM980 needs RTCM3 correction data from a base station.
 7. Once "RTK Fixed" shows, GPS accuracy is 1-2cm
 
 **Other options:**
-- **Own base station**: A second UM980 at a known location, transmitting
+- **Own base station**: A second UM982 at a known location, transmitting
   RTCM3 corrections via a telemetry radio.
 - **Commercial service** (PointPerfect, Polaris): $30-50/month subscription,
   works anywhere with cellular coverage.
 
-### UM980 Configuration
+### UM982 Configuration
 
-The UM980 should output NMEA at 115200 baud. Use a serial terminal or the
+The UM982 should output NMEA at 115200 baud. Use a serial terminal or the
 Unicore configuration tool to send these commands:
 
 ```
@@ -127,7 +127,7 @@ $command,config com1 115200
 $command,saveconfig
 ```
 
-ArduPilot's GPS driver (GPS_TYPE=24, UnicoreNMEA) gives the best performance.
+ArduPilot's GPS driver (GPS_TYPE=25, UnicoreMovingBaselineNMEA) gives the best performance.
 Use GPS_TYPE=1 (AUTO) if you are unsure or using a different GPS module.
 
 ### Hoverboard Motor UART Wiring
@@ -267,7 +267,7 @@ was engaged.
          |
          +---> DC-DC 36V to 5V ---+--> Pixhawk POWER1 port (via power module)
          |                        +--> FS-iA6B receiver (via Pixhawk RC port)
-         |                        +--> UM980 GPS module
+         |                        +--> UM982 GPS module
          |                        +--> SiK telemetry radio
          |
          +---> Pixhawk power module (voltage + current sensing)
@@ -311,7 +311,7 @@ was engaged.
    python3 Tools/scripts/uploader.py build/Pixhawk6C/bin/ardurover.apj
    ```
 
-**Firmware version requirement:** Use ArduRover 4.5.0 or later for full UM980
+**Firmware version requirement:** Use ArduRover 4.5.0 or later for full UM982
 support, Lua scripting improvements, and relay function parameters.
 
 ---
@@ -338,7 +338,7 @@ support, Lua scripting improvements, and relay function parameters.
 
 7. Reconnect and verify critical parameters:
    - `FRAME_TYPE` = 2
-   - `GPS_TYPE` = 24
+   - `GPS_TYPE` = 25
    - `SCR_ENABLE` = 1
    - `SPRAY_ENABLE` = 1
    - `RELAY1_PIN` = 54
@@ -516,7 +516,7 @@ calibrations are done through Mission Planner.
 - Take the robot outside with a clear sky view (no overhead structures)
 - Power on and wait for GPS lock
 - In Mission Planner, check the HUD and status bar:
-  - Satellite count: should be 20+ with the UM980 triple-band
+  - Satellite count: should be 20+ with the UM982 dual-antenna
   - Fix type: wait for "RTK Fixed" (green) if base station is running
   - HDOP: should be below 1.0 for RTK, below 2.0 for standalone
 - Verify the GPS position on the map matches the robot's actual location
@@ -750,7 +750,7 @@ If you have line coordinates from a survey or CAD drawing:
 
 | Message | Cause | Fix |
 |---|---|---|
-| "PreArm: GPS not healthy" | No GPS fix | Wait for satellites; check UM980 wiring; verify SERIAL3_PROTOCOL=5 |
+| "PreArm: GPS not healthy" | No GPS fix | Wait for satellites; check UM982 wiring; verify SERIAL3_PROTOCOL=5 |
 | "PreArm: Need 3D Fix" | Only 2D fix | Move to open sky; wait longer for convergence |
 | "PreArm: GPS hdop too high" | Poor satellite geometry | Move away from buildings; wait for more satellites |
 | "PreArm: Compass not calibrated" | No compass cal | Run compass calibration outdoors |
@@ -795,12 +795,12 @@ If you have line coordinates from a survey or CAD drawing:
 
 ### GPS Shows "No Fix" or Never Reaches RTK
 
-- Verify RTCM3 corrections are being sent to the UM980
+- Verify RTCM3 corrections are being sent to the UM982
   (check NTRIP status in Mission Planner)
-- Verify UM980 baud rate matches `SERIAL3_BAUD` (115200)
+- Verify UM982 baud rate matches `SERIAL3_BAUD` (115200)
 - Check antenna cable and connector (damaged cables cause signal loss)
-- The UM980 needs 30-60 seconds to converge to RTK Fixed after corrections
-  start flowing. Triple-band converges faster than single-band.
+- The UM982 needs 30-60 seconds to converge to RTK Fixed after corrections
+  start flowing. Dual-antenna converges faster than single-band.
 - Verify `GPS_GNSS_MODE=127` (all constellations enabled)
 - Check base station distance: best results within 10km
 
@@ -873,7 +873,8 @@ Before each striping session:
 | RELAY1_PIN | 54 | Paint solenoid on AUX5 |
 | RELAY2_PIN | 55 | Pump on AUX6 |
 | FENCE_ENABLE | 1 | Geofencing active |
-| GPS_TYPE | 24 | Unicore UM980 (UnicoreNMEA) |
+| GPS_TYPE | 25 | Unicore UM982 (UnicoreMovingBaselineNMEA) |
+| GPS_TYPE2 | 25 | Second antenna for heading |
 | SCR_ENABLE | 1 | Lua scripting enabled |
 | BRD_SAFETY_DEFLT | 0 | Hardware safety switch disabled |
 | BATT_LOW_VOLT | 33.0 | Low battery warning (10S pack) |
@@ -889,6 +890,6 @@ Before each striping session:
 - Pixhawk 6C documentation: https://docs.holybro.com/autopilot/pixhawk-6c/overview
 - Mission Planner download: https://ardupilot.org/planner/
 - FlySky FS-i6X: https://www.flysky-cn.com/fsi6x
-- Unicore UM980 datasheet: https://en.unicorecomm.com/products/detail/24
+- Unicore UM982 datasheet: https://en.unicorecomm.com/products/detail/24
 - Hoverboard FOC firmware: https://github.com/EFeru/hoverboard-firmware-hack-FOC
 - ArduPilot forums (Rover): https://discuss.ardupilot.org/c/rover/

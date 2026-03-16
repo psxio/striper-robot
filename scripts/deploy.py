@@ -25,19 +25,19 @@ LUA_DIR = os.path.join(PROJECT_ROOT, "ardurover", "lua")
 
 REQUIRED_LUA_SCRIPTS = [
     "motor_bridge.lua",
-    "paint_control.lua",
-    "paint_speed_sync.lua",
+    "paint_unified.lua",
     "fence_check.lua",
     "obstacle_avoid.lua",
+    "rangefinder_bridge.lua",
 ]
 
 # Key params that must exist (param_name, expected_value or None for any)
 REQUIRED_PARAMS = [
     ("FRAME_TYPE", "2"),          # skid steer
-    ("GPS_TYPE", "24"),           # UnicoreNMEA (single UM980)
+    ("GPS_TYPE", "25"),           # UnicoreMovingBaselineNMEA (dual-antenna UM982)
     ("SERVO1_FUNCTION", "73"),    # throttle left
     ("SERVO3_FUNCTION", "74"),    # throttle right
-    ("SPRAY_ENABLE", "1"),        # AC_Sprayer
+    ("SPRAY_ENABLE", "0"),        # AC_Sprayer disabled; relay-based Lua control
     ("SCR_ENABLE", "1"),          # Lua scripting
     ("RELAY1_PIN", None),         # paint solenoid (any value)
     ("RELAY2_PIN", None),         # pump (any value)
@@ -113,17 +113,18 @@ def validate_relay_consistency(params):
     if relay1_pin and relay2_pin and relay1_pin == relay2_pin:
         issues.append(("ERROR", f"RELAY1_PIN and RELAY2_PIN both set to {relay1_pin}!"))
 
-    # Check paint_control.lua references correct relay indices
-    paint_lua = os.path.join(LUA_DIR, "paint_control.lua")
+    # Check paint_unified.lua references correct relay indices
+    paint_lua = os.path.join(LUA_DIR, "paint_unified.lua")
     if os.path.isfile(paint_lua):
         with open(paint_lua, "r") as f:
             content = f.read()
         if "PAINT_RELAY" in content and "PUMP_RELAY" in content:
-            # Check they use relay 0 and 1
             if "= 0" not in content.split("PAINT_RELAY")[1][:20]:
-                issues.append(("WARN", "paint_control.lua PAINT_RELAY may not be 0"))
+                issues.append(("WARN", "paint_unified.lua PAINT_RELAY may not be 0"))
             if "= 1" not in content.split("PUMP_RELAY")[1][:20]:
-                issues.append(("WARN", "paint_control.lua PUMP_RELAY may not be 1"))
+                issues.append(("WARN", "paint_unified.lua PUMP_RELAY may not be 1"))
+    else:
+        issues.append(("MISSING", "paint_unified.lua not found — cannot validate relay assignments"))
 
     return issues
 
@@ -259,7 +260,7 @@ def print_preflight_checklist():
     print("  [ ] Temperature 50-90F (paint curing)")
     print()
     print("  FIRST-RUN EXTRAS:")
-    print("  [ ] Compass calibrated")
+    print("  [ ] UM982 dual-antenna heading shows valid yaw (compass disabled)")
     print("  [ ] Motor direction verified (both forward)")
     print("  [ ] RC channel mapping verified")
     print("  [ ] Test drive in MANUAL mode (10ft forward/back)")

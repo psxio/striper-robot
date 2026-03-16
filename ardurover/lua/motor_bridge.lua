@@ -39,6 +39,9 @@ local last_steer = 0
 local port = nil
 local send_count = 0
 local error_count = 0
+local last_send_ok_ms = 0         -- timestamp of last successful send
+local watchdog_tripped = false    -- true if UART watchdog has fired
+local WATCHDOG_MS = 1000          -- send zero commands if no ACK for this long
 
 -- Find the scripting serial port (Serial2 with protocol 28)
 local function find_port()
@@ -143,6 +146,19 @@ function update()
         end
     end
 
+    -- UART watchdog: if no successful send for WATCHDOG_MS, force zero commands
+    local now_ms = millis():toint()
+    if last_send_ok_ms > 0 and (now_ms - last_send_ok_ms) > WATCHDOG_MS then
+        if not watchdog_tripped then
+            watchdog_tripped = true
+            gcs:send_text(3, "motor_bridge: UART watchdog — no send for 1s, zeroing commands")
+        end
+        send_command(0, 0)
+        last_speed = 0
+        last_steer = 0
+        return update, SEND_INTERVAL
+    end
+
     -- Read ArduRover servo outputs
     local pwm_left  = SRV_Channels:get_output_pwm(SERVO_LEFT)
     local pwm_right = SRV_Channels:get_output_pwm(SERVO_RIGHT)
@@ -166,6 +182,8 @@ function update()
     -- Send command to hoverboard
     if send_command(cmd_steer, cmd_speed) then
         send_count = send_count + 1
+        last_send_ok_ms = millis():toint()
+        watchdog_tripped = false
     else
         error_count = error_count + 1
     end

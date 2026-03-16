@@ -139,10 +139,13 @@ async def forgot_password(request: Request, body: ForgotPasswordRequest):
     result = {"ok": True}
     if user:
         token = await user_store.create_reset_token(user["id"])
-        # Send reset email
-        from ..services.email_service import send_password_reset_email
-        frontend_url = settings.FRONTEND_URL or str(request.base_url).rstrip("/")
-        await send_password_reset_email(body.email, token, frontend_url)
+        # Send reset email (swallow errors to prevent email enumeration via 500)
+        try:
+            from ..services.email_service import send_password_reset_email
+            frontend_url = settings.FRONTEND_URL or str(request.base_url).rstrip("/")
+            await send_password_reset_email(body.email, token, frontend_url)
+        except Exception:
+            logger.warning("Failed to send password reset email to %s", body.email)
         # In dev mode, also include token in response for testing
         if settings.ENV == "dev":
             result["token"] = token

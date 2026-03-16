@@ -84,6 +84,7 @@ async def export_data(user: dict = Depends(get_current_user)):
         "lots": [],
         "jobs": [],
         "subscriptions": [],
+        "schedules": [],
     }
     async for db in get_db():
         cursor = await db.execute(
@@ -103,6 +104,12 @@ async def export_data(user: dict = Depends(get_current_user)):
             (user_id,),
         )
         export["subscriptions"] = [dict(r) for r in await cursor.fetchall()]
+
+        cursor = await db.execute(
+            "SELECT id, lot_id, frequency, day_of_week, day_of_month, time_preference, active, next_run, created_at, updated_at FROM recurring_schedules WHERE user_id = ?",
+            (user_id,),
+        )
+        export["schedules"] = [dict(r) for r in await cursor.fetchall()]
 
     return JSONResponse(
         content=export,

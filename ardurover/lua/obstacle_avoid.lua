@@ -43,9 +43,9 @@ end
 
 -- Main update
 function update()
-    -- Read rangefinder distances (returns meters, -1 if no data)
-    local dist_fl = rangefinder:distance_cm_orient(0)  -- RNGFND1
-    local dist_fr = rangefinder:distance_cm_orient(1)  -- RNGFND2
+    -- Read rangefinder distances by instance index (not orientation enum)
+    local dist_fl = rangefinder:distance_cm(0)  -- RNGFND1 (front-left, slot 0)
+    local dist_fr = rangefinder:distance_cm(1)  -- RNGFND2 (front-right, slot 1)
 
     -- Handle sensor faults
     local fl_valid = dist_fl ~= nil and dist_fl >= 0
@@ -80,6 +80,11 @@ function update()
     if fl_valid then min_dist = math.min(min_dist, dist_fl) end
     if fr_valid then min_dist = math.min(min_dist, dist_fr) end
 
+    -- Fail-safe: if ALL sensors are faulted, treat as obstacle (safe = stop)
+    if not fl_valid and not fr_valid then
+        min_dist = 0
+    end
+
     -- Publish telemetry
     if fl_valid then gcs:send_named_float('OBFL', dist_fl) end
     if fr_valid then gcs:send_named_float('OBFR', dist_fr) end
@@ -107,14 +112,14 @@ function update()
     end
 
     -- CLEAR: obstacle moved away past hysteresis threshold
+    -- Robot stays in HOLD — operator must manually resume AUTO for safety
     if obstacle_active and min_dist > CLEAR_DIST_CM then
         obstacle_active = false
 
-        -- Resume AUTO mode if that's where we came from
         if was_auto then
-            vehicle:set_mode(MODE_AUTO)
-            gcs:send_text(5, string.format(
-                "OBSTACLE CLEAR: %.0fcm - resuming AUTO", min_dist))
+            -- Stay in HOLD; do NOT auto-resume AUTO mode
+            gcs:send_text(3, string.format(
+                "OBSTACLE CLEAR: %.0fcm — HOLD MAINTAINED. Resume AUTO manually.", min_dist))
         else
             gcs:send_text(5, string.format(
                 "OBSTACLE CLEAR: %.0fcm", min_dist))

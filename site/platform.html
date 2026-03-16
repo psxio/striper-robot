@@ -993,13 +993,13 @@ function showUserMenu() {
     menu.style.cssText = 'position:fixed; top:56px; right:16px; background:var(--bg-card); border:1px solid var(--border); border-radius:8px; box-shadow:0 4px 12px rgba(0,0,0,0.4); padding:8px 0; z-index:10001; min-width:160px;';
 
     var userData = JSON.parse(localStorage.getItem('strype_user') || '{}');
-    var planBadge = userData.plan === 'pro'
-        ? '<span style="background:rgba(63,185,80,.2); color:#3fb950; padding:2px 6px; border-radius:8px; font-size:11px; margin-left:6px;">PRO</span>'
-        : '<span style="background:rgba(139,148,158,.2); color:#8b949e; padding:2px 6px; border-radius:8px; font-size:11px; margin-left:6px;">FREE</span>';
+    var PLAN_BADGES = { free: ['FREE','rgba(139,148,158,.2)','#8b949e'], pro: ['PRO','rgba(63,185,80,.2)','#3fb950'], robot: ['ROBOT','rgba(88,166,255,.2)','#58a6ff'], enterprise: ['ENT','rgba(240,136,62,.2)','#f0883e'] };
+    var pb = PLAN_BADGES[userData.plan] || PLAN_BADGES.free;
+    var planBadge = '<span style="background:' + pb[1] + '; color:' + pb[2] + '; padding:2px 6px; border-radius:8px; font-size:11px; margin-left:6px;">' + pb[0] + '</span>';
     menu.innerHTML =
         '<div style="padding:8px 16px; border-bottom:1px solid var(--border); font-size:13px; color:var(--text-2);">' + (userData.email || '') + planBadge + '</div>' +
         '<button onclick="openSettingsModal()" style="display:block; width:100%; text-align:left; padding:10px 16px; border:none; background:none; cursor:pointer; font-size:14px; color:var(--text);">Settings</button>' +
-        (userData.plan !== 'pro'
+        (userData.plan === 'free'
             ? '<button onclick="showUpgradePrompt()" style="display:block; width:100%; text-align:left; padding:10px 16px; border:none; background:none; cursor:pointer; font-size:14px; color:#3fb950;">Upgrade to Pro</button>'
             : '<button onclick="openBillingPortal()" style="display:block; width:100%; text-align:left; padding:10px 16px; border:none; background:none; cursor:pointer; font-size:14px; color:var(--text);">Manage Billing</button>') +
         '<button onclick="handleLogout()" style="display:block; width:100%; text-align:left; padding:10px 16px; border:none; background:none; cursor:pointer; font-size:14px; color:var(--text);">Log out</button>';
@@ -1098,7 +1098,7 @@ function showUpgradePrompt(message) {
     modal.innerHTML =
         '<div style="background:var(--bg-card); border:1px solid var(--border); border-radius:12px; padding:32px; width:420px; max-width:90vw; text-align:center;">' +
             '<h3 style="font-size:20px; margin-bottom:12px;">Upgrade to Pro</h3>' +
-            '<p style="color:var(--text-2); margin-bottom:20px;">' + (message || 'Free plan limit reached. Upgrade to Pro for unlimited lots and jobs.') + '</p>' +
+            '<p style="color:var(--text-2); margin-bottom:20px;">' + escapeHtml(message || 'Free plan limit reached. Upgrade to Pro for unlimited lots and jobs.') + '</p>' +
             '<div style="font-size:28px; font-weight:700; color:#3fb950; margin-bottom:20px;">$99<span style="font-size:14px; font-weight:400; color:var(--text-2);">/month</span></div>' +
             '<button onclick="startCheckout()" style="width:100%; padding:12px; background:#3fb950; color:white; border:none; border-radius:8px; font-size:16px; font-weight:600; cursor:pointer; margin-bottom:8px;">Upgrade Now</button>' +
             '<button onclick="document.getElementById(\'upgradeModal\').remove()" style="width:100%; padding:10px; background:none; border:1px solid var(--border); border-radius:8px; font-size:14px; cursor:pointer; color:var(--text-2);">Maybe Later</button>' +
@@ -1185,6 +1185,10 @@ function openSettingsModal() {
             '<input type="password" id="settingsNewPass" style="width:100%; padding:10px 12px; border:1px solid var(--border); border-radius:8px; font-size:14px; box-sizing:border-box; background:var(--bg); color:var(--text); margin-bottom:12px;">' +
             '<button onclick="updateSettingsPassword()" style="width:100%; padding:10px; background:var(--blue); color:white; border:none; border-radius:8px; font-size:14px; font-weight:600; cursor:pointer; margin-bottom:20px;">Change Password</button>' +
             '<hr style="border:none; border-top:1px solid var(--border); margin-bottom:16px;">' +
+            '<hr style="border:none; border-top:1px solid var(--border); margin-bottom:16px;">' +
+            '<h4 style="font-size:14px;font-weight:600;margin-bottom:10px;">Data Export</h4>' +
+            '<button onclick="downloadMyData()" id="exportDataBtn" style="width:100%; padding:10px; background:none; border:1px solid var(--blue); border-radius:8px; font-size:14px; cursor:pointer; color:var(--blue); margin-bottom:20px;">Download My Data</button>' +
+            '<hr style="border:none; border-top:1px solid var(--border); margin-bottom:16px;">' +
             '<button onclick="confirmDeleteAccount()" style="width:100%; padding:10px; background:none; border:1px solid #f85149; border-radius:8px; font-size:14px; cursor:pointer; color:#f85149;">Delete Account</button>' +
         '</div>';
     document.body.appendChild(modal);
@@ -1229,6 +1233,30 @@ async function updateSettingsPassword() {
         msgEl.style.display = 'block';
         msgEl.style.background = 'rgba(248,81,73,.1)';
         msgEl.style.color = '#f85149';
+    }
+}
+
+async function downloadMyData() {
+    var btn = document.getElementById('exportDataBtn');
+    var origText = btn.textContent;
+    btn.textContent = 'Downloading...';
+    btn.disabled = true;
+    try {
+        var resp = await fetch('/api/user/export', {
+            headers: { 'Authorization': 'Bearer ' + api.getToken() }
+        });
+        if (!resp.ok) throw new Error('Export failed');
+        var blob = await resp.blob();
+        var a = document.createElement('a');
+        a.href = URL.createObjectURL(blob);
+        a.download = 'strype-data-export.json';
+        a.click();
+        URL.revokeObjectURL(a.href);
+    } catch(e) {
+        showToast(e.message || 'Export failed', 'error');
+    } finally {
+        btn.textContent = origText;
+        btn.disabled = false;
     }
 }
 
@@ -2173,7 +2201,7 @@ function importDxfSvg(lotId) {
             if (idx >= 0 && result.features) {
                 lots[idx].features = result.features;
                 saveLots();
-                if (activeLotId === lotId) loadLotFeatures(lots[idx]);
+                if (activeLotId === lotId) loadLotFeatures(lotId);
                 renderLotList();
             }
             showToast('Imported ' + file.name + ' successfully');
@@ -3838,6 +3866,8 @@ document.addEventListener('visibilitychange', function() {
 });
 
 // --- Recurring Schedules ---
+var lastSchedules = [];
+
 function updateScheduleLotSelect() {
   var select = document.getElementById('scheduleLotSelect');
   select.innerHTML = '<option value="">Select a lot...</option>' +
@@ -3849,24 +3879,84 @@ function updateScheduleLotSelect() {
 async function loadSchedules() {
   try {
     var data = await api.get('/api/schedules');
+    lastSchedules = data.items || [];
     var container = document.getElementById('schedulesList');
-    if (!data.items || !data.items.length) {
+    if (!lastSchedules.length) {
       container.innerHTML = '<div style="padding:8px 0;color:var(--text-3);font-size:.75rem">No recurring schedules</div>';
       return;
     }
-    container.innerHTML = data.items.map(function(s) {
+    container.innerHTML = lastSchedules.map(function(s) {
       var lot = lots.find(function(l) { return l.id === s.lot_id; });
       var lotName = lot ? escapeHtml(lot.name) : 'Unknown Lot';
       return '<div class="job-item">' +
         '<div class="job-status" style="background:var(--blue)"></div>' +
         '<div class="job-info"><div class="job-lot-name">' + lotName + '</div>' +
         '<div class="job-date">' + s.frequency + ' — ' + s.time_preference + ' — next: ' + s.next_run + '</div></div>' +
-        '<div class="job-actions"><button class="job-action-btn" onclick="deleteSchedule(\'' + s.id + '\')" title="Remove"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg></button></div>' +
+        '<div class="job-actions">' +
+          '<button class="job-action-btn" onclick="editSchedule(\'' + s.id + '\')" title="Edit"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M11 4H4a2 2 0 00-2 2v14a2 2 0 002 2h14a2 2 0 002-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 013 3L12 15l-4 1 1-4 9.5-9.5z"/></svg></button>' +
+          '<button class="job-action-btn" onclick="deleteSchedule(\'' + s.id + '\')" title="Remove"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg></button>' +
+        '</div>' +
         '</div>';
     }).join('');
   } catch(e) {
     document.getElementById('schedulesList').innerHTML = '<div style="color:var(--text-3)">Failed to load schedules</div>';
   }
+}
+
+function editSchedule(scheduleId) {
+  var schedule = lastSchedules.find(function(s) { return s.id === scheduleId; });
+  if (!schedule) { showToast('Schedule not found', 'error'); return; }
+
+  var freqOptions = ['weekly','biweekly','monthly'].map(function(f) {
+    return '<option value="' + f + '"' + (schedule.frequency === f ? ' selected' : '') + '>' + f.charAt(0).toUpperCase() + f.slice(1) + '</option>';
+  }).join('');
+
+  var dayOptions = ['Monday','Tuesday','Wednesday','Thursday','Friday','Saturday','Sunday'].map(function(d, i) {
+    return '<option value="' + i + '"' + (schedule.day_of_week === i ? ' selected' : '') + '>' + d + '</option>';
+  }).join('');
+
+  var timeOptions = ['morning','afternoon','evening'].map(function(t) {
+    return '<option value="' + t + '"' + (schedule.time_preference === t ? ' selected' : '') + '>' + t.charAt(0).toUpperCase() + t.slice(1) + '</option>';
+  }).join('');
+
+  showModal(
+    '<h3>Edit Schedule</h3>' +
+    '<div class="modal-field"><label>Frequency</label><select id="editSchedFreq">' + freqOptions + '</select></div>' +
+    '<div class="modal-field" id="editSchedDayField"><label>Day of Week</label><select id="editSchedDay">' + dayOptions + '</select></div>' +
+    '<div class="modal-field"><label>Time Preference</label><select id="editSchedTime">' + timeOptions + '</select></div>' +
+    '<div class="modal-actions"><button class="modal-btn cancel" onclick="hideModal()">Cancel</button><button class="modal-btn primary" id="editSchedConfirm">Save</button></div>'
+  );
+
+  var freqSelect = document.getElementById('editSchedFreq');
+  var dayField = document.getElementById('editSchedDayField');
+  freqSelect.addEventListener('change', function() {
+    dayField.style.display = freqSelect.value === 'monthly' ? 'none' : 'flex';
+  });
+  if (schedule.frequency === 'monthly') dayField.style.display = 'none';
+
+  document.getElementById('editSchedConfirm').addEventListener('click', async function() {
+    var btn = this;
+    var freq = freqSelect.value;
+    var body = {
+      frequency: freq,
+      time_preference: document.getElementById('editSchedTime').value
+    };
+    if (freq === 'monthly') {
+      body.day_of_month = schedule.day_of_month || 1;
+    } else {
+      body.day_of_week = parseInt(document.getElementById('editSchedDay').value);
+    }
+    await withLoading(btn, async function() {
+      try {
+        await api.put('/api/schedules/' + scheduleId, body);
+        showToast('Schedule updated');
+        hideModal();
+        loadSchedules();
+      } catch(e) {
+        showToast(e.message || 'Failed to update schedule', 'error');
+      }
+    });
+  });
 }
 
 async function deleteSchedule(scheduleId) {
@@ -3914,7 +4004,9 @@ window.openSettingsModal = openSettingsModal;
 window.updateSettingsProfile = updateSettingsProfile;
 window.updateSettingsPassword = updateSettingsPassword;
 window.confirmDeleteAccount = confirmDeleteAccount;
+window.downloadMyData = downloadMyData;
 window.deleteSchedule = deleteSchedule;
+window.editSchedule = editSchedule;
 window.importDxfSvg = importDxfSvg;
 window.resendVerification = resendVerification;
 window.changePlan = changePlan;

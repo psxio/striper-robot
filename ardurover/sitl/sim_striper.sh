@@ -63,11 +63,57 @@ if [ ! -f "$PARAM_FILE" ]; then
     exit 1
 fi
 
+# ---- Parameter Validation ---------------------------------------------------
+
+validate_param() {
+    local param_name="$1"
+    local expected="$2"
+    local actual
+    actual=$(grep -E "^${param_name}," "$PARAM_FILE" | head -1 | cut -d',' -f2)
+    if [ -z "$actual" ]; then
+        echo "WARNING: $param_name not found in param file"
+        return 1
+    elif [ "$actual" != "$expected" ]; then
+        echo "ERROR: $param_name=$actual (expected $expected)"
+        return 1
+    fi
+    return 0
+}
+
+echo "Validating critical parameters..."
+PARAM_ERRORS=0
+
+validate_param "GPS_TYPE" "25"         || PARAM_ERRORS=$((PARAM_ERRORS + 1))
+validate_param "SPRAY_ENABLE" "0"      || PARAM_ERRORS=$((PARAM_ERRORS + 1))
+validate_param "COMPASS_ENABLE" "0"    || PARAM_ERRORS=$((PARAM_ERRORS + 1))
+validate_param "BATT_CAPACITY" "18000" || PARAM_ERRORS=$((PARAM_ERRORS + 1))
+validate_param "EK3_SRC1_YAW" "2"     || PARAM_ERRORS=$((PARAM_ERRORS + 1))
+
+# Verify Lua scripts exist
+if [ ! -f "$LUA_SCRIPT_DIR/paint_unified.lua" ]; then
+    echo "ERROR: paint_unified.lua not found (was paint_control.lua merged?)"
+    PARAM_ERRORS=$((PARAM_ERRORS + 1))
+fi
+if [ -f "$LUA_SCRIPT_DIR/paint_control.lua" ]; then
+    echo "WARNING: paint_control.lua still exists (should be replaced by paint_unified.lua)"
+fi
+if [ -f "$LUA_SCRIPT_DIR/paint_speed_sync.lua" ]; then
+    echo "WARNING: paint_speed_sync.lua still exists (should be deleted after merge)"
+fi
+
+if [ "$PARAM_ERRORS" -gt 0 ]; then
+    echo ""
+    echo "FATAL: $PARAM_ERRORS parameter validation error(s). Fix before running SITL."
+    exit 1
+fi
+echo "Parameter validation passed."
+echo ""
+
 # ---- Prepare Lua scripts for SITL -------------------------------------------
 
 # SITL looks for Lua scripts in the scripts/ directory relative to where it runs
 # Create a symlink or copy scripts to the SITL working directory
-SITL_SCRIPTS_DIR="$ARDUPILOT_DIR/Tools/autotest/scripts"
+SITL_SCRIPTS_DIR="$ARDUPILOT_DIR/scripts"
 mkdir -p "$SITL_SCRIPTS_DIR"
 
 echo "Copying Lua scripts to SITL scripts directory..."

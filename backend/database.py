@@ -1,9 +1,12 @@
 """Database initialization and connection management using aiosqlite."""
 
+import logging
 import os
 from datetime import datetime, timezone
 
 import aiosqlite
+
+logger = logging.getLogger("strype.database")
 
 from .config import settings
 
@@ -13,6 +16,7 @@ async def get_db():
     db = await aiosqlite.connect(settings.DATABASE_PATH)
     db.row_factory = aiosqlite.Row
     await db.execute("PRAGMA foreign_keys=ON")
+    await db.execute("PRAGMA busy_timeout=5000")
     try:
         yield db
     finally:
@@ -23,6 +27,7 @@ async def init_db():
     """Create tables if they don't exist."""
     os.makedirs(os.path.dirname(settings.DATABASE_PATH) or ".", exist_ok=True)
     async with aiosqlite.connect(settings.DATABASE_PATH) as db:
+        await db.execute("PRAGMA busy_timeout=5000")
         await db.execute("PRAGMA journal_mode=WAL")
         await db.execute("PRAGMA foreign_keys=ON")
 
@@ -259,6 +264,7 @@ async def init_db():
         await db.execute("CREATE INDEX IF NOT EXISTS idx_schedules_user ON recurring_schedules(user_id)")
         await db.execute("CREATE INDEX IF NOT EXISTS idx_schedules_next ON recurring_schedules(active, next_run)")
         await db.execute("CREATE INDEX IF NOT EXISTS idx_refresh_tokens_user ON refresh_tokens(user_id)")
+        await db.execute("CREATE INDEX IF NOT EXISTS idx_assignments_robot_status ON robot_assignments(robot_id, status)")
 
         # Cleanup expired password reset tokens and blocklist entries
         now = datetime.now(timezone.utc).isoformat()
@@ -268,8 +274,8 @@ async def init_db():
         # Add soft-delete column to lots (idempotent)
         try:
             await db.execute("ALTER TABLE lots ADD COLUMN deleted_at TEXT")
-        except Exception:
-            pass
+        except aiosqlite.OperationalError:
+            pass  # Column already exists
 
         # Index on deleted_at must come after the column is added
         await db.execute("CREATE INDEX IF NOT EXISTS idx_lots_user_deleted ON lots(user_id, deleted_at)")
@@ -287,11 +293,12 @@ async def init_db():
             ("users", "verification_token TEXT"),
             ("users", "verification_expires_at TEXT"),
             ("subscriptions", "cancel_at_period_end INTEGER DEFAULT 0"),
+            ("robots", "api_key_last4 TEXT"),
         ]
         for table, col_def in _alters:
             try:
                 await db.execute(f"ALTER TABLE {table} ADD COLUMN {col_def}")
-            except Exception:
-                pass
+            except aiosqlite.OperationalError:
+                pass  # Column already exists
 
         await db.commit()

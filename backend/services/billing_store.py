@@ -12,10 +12,10 @@ def _now() -> str:
 
 
 async def get_subscription_by_user(user_id: str) -> Optional[dict]:
-    """Get active subscription for a user."""
+    """Get the most recent active subscription for a user."""
     async for db in get_db():
         cursor = await db.execute(
-            "SELECT * FROM subscriptions WHERE user_id = ? ORDER BY created_at DESC LIMIT 1",
+            "SELECT * FROM subscriptions WHERE user_id = ? AND status = 'active' ORDER BY created_at DESC LIMIT 1",
             (user_id,),
         )
         row = await cursor.fetchone()

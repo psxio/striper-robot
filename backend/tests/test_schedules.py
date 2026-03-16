@@ -386,3 +386,106 @@ async def test_schedule_pagination(pro_client, pro_lot_id):
     assert len(data["items"]) == 1
     assert data["total"] == 5
     assert data["page"] == 3
+
+
+# -- 16. Schedule deactivation via update --
+
+@pytest.mark.asyncio
+async def test_deactivate_schedule(pro_client, pro_lot_id):
+    """Setting active=false via PUT deactivates the schedule."""
+    create_resp = await pro_client.post("/api/schedules", json={
+        "lot_id": pro_lot_id,
+        "frequency": "weekly",
+        "day_of_week": 2,
+        "time_preference": "morning",
+    })
+    assert create_resp.status_code == 201
+    schedule_id = create_resp.json()["id"]
+    assert create_resp.json()["active"] is True
+
+    resp = await pro_client.put(f"/api/schedules/{schedule_id}", json={
+        "active": False,
+    })
+    assert resp.status_code == 200
+    assert resp.json()["active"] is False
+
+    # Reactivate
+    resp = await pro_client.put(f"/api/schedules/{schedule_id}", json={
+        "active": True,
+    })
+    assert resp.status_code == 200
+    assert resp.json()["active"] is True
+
+
+# -- 17. Partial update preserves other fields --
+
+@pytest.mark.asyncio
+async def test_partial_update_preserves_fields(pro_client, pro_lot_id):
+    """Updating only time_preference preserves frequency and day_of_week."""
+    create_resp = await pro_client.post("/api/schedules", json={
+        "lot_id": pro_lot_id,
+        "frequency": "weekly",
+        "day_of_week": 4,
+        "time_preference": "morning",
+    })
+    assert create_resp.status_code == 201
+    schedule_id = create_resp.json()["id"]
+
+    resp = await pro_client.put(f"/api/schedules/{schedule_id}", json={
+        "time_preference": "evening",
+    })
+    assert resp.status_code == 200
+    data = resp.json()
+    assert data["frequency"] == "weekly"
+    assert data["day_of_week"] == 4
+    assert data["time_preference"] == "evening"
+
+
+# -- 18. Update recalculates next_run --
+
+@pytest.mark.asyncio
+async def test_update_recalculates_next_run(pro_client, pro_lot_id):
+    """Changing frequency recalculates next_run to a new value."""
+    create_resp = await pro_client.post("/api/schedules", json={
+        "lot_id": pro_lot_id,
+        "frequency": "weekly",
+        "day_of_week": 0,
+        "time_preference": "morning",
+    })
+    assert create_resp.status_code == 201
+    original_next_run = create_resp.json()["next_run"]
+
+    resp = await pro_client.put(
+        f"/api/schedules/{create_resp.json()['id']}",
+        json={"frequency": "monthly", "day_of_month": 15},
+    )
+    assert resp.status_code == 200
+    # next_run should have changed (monthly vs weekly)
+    assert resp.json()["next_run"] != original_next_run or resp.json()["frequency"] == "monthly"
+
+
+# -- 19. GDPR export includes schedules --
+
+@pytest.mark.asyncio
+async def test_export_includes_schedules(pro_client, pro_lot_id):
+    """GET /api/user/export includes recurring schedules in the response."""
+    # Create a schedule first
+    create_resp = await pro_client.post("/api/schedules", json={
+        "lot_id": pro_lot_id,
+        "frequency": "weekly",
+        "day_of_week": 3,
+        "time_preference": "afternoon",
+    })
+    assert create_resp.status_code == 201
+
+    # Export user data
+    resp = await pro_client.get("/api/user/export")
+    assert resp.status_code == 200
+    data = resp.json()
+
+    assert "schedules" in data
+    assert len(data["schedules"]) >= 1
+    schedule = data["schedules"][0]
+    assert schedule["frequency"] == "weekly"
+    assert schedule["day_of_week"] == 3
+    assert schedule["time_preference"] == "afternoon"

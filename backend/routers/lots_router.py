@@ -105,6 +105,16 @@ async def delete_lot(lot_id: str, user: dict = Depends(get_current_user)):
 
 @router.post("/{lot_id}/duplicate", response_model=LotResponse, status_code=201)
 async def duplicate_lot(lot_id: str, user: dict = Depends(get_current_user)):
+    # Enforce plan lot limit (same as create_lot)
+    plan = user.get("plan") or "free"
+    limits = settings.PLAN_LIMITS.get(plan, settings.PLAN_LIMITS["free"])
+    _, total = await lot_store.list_lots(user["id"])
+    if total >= limits["max_lots"]:
+        raise HTTPException(
+            status_code=403,
+            detail=f"Plan limited to {limits['max_lots']} lot"
+                   + ("s" if limits["max_lots"] != 1 else ""),
+        )
     lot = await lot_store.duplicate_lot(user["id"], lot_id)
     if not lot:
         raise HTTPException(status_code=404, detail="Lot not found")

@@ -26,9 +26,13 @@ async def _register_user(client, email="robot_user@example.com"):
 
 
 async def _set_robot_api_key(robot_id: str, api_key: str = "robot-status-key") -> None:
-    """Attach an API key to a robot for telemetry tests."""
+    """Attach a hashed API key to a robot for telemetry tests."""
+    from backend.services.robot_store import _hash_api_key
     async for db in get_db():
-        await db.execute("UPDATE robots SET api_key = ? WHERE id = ?", (api_key, robot_id))
+        await db.execute(
+            "UPDATE robots SET api_key = ?, api_key_last4 = ? WHERE id = ?",
+            (_hash_api_key(api_key), api_key[-4:], robot_id),
+        )
         await db.commit()
 
 

@@ -1,0 +1,33 @@
+name: Lua Syntax Check
+
+on:
+  push:
+    paths:
+      - 'ardurover/lua/**/*.lua'
+  pull_request:
+    paths:
+      - 'ardurover/lua/**/*.lua'
+
+jobs:
+  lua-check:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install Lua 5.3
+        run: sudo apt-get update && sudo apt-get install -y lua5.3
+
+      - name: Check Lua syntax
+        run: |
+          errors=0
+          for f in ardurover/lua/*.lua; do
+            echo "Checking $f..."
+            if ! luac5.3 -p "$f"; then
+              errors=$((errors + 1))
+            fi
+          done
+          if [ "$errors" -gt 0 ]; then
+            echo "FAIL: $errors file(s) with syntax errors"
+            exit 1
+          fi
+          echo "All Lua files pass syntax check"

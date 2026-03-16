@@ -8,23 +8,27 @@ from fastapi import APIRouter, Depends, HTTPException, Query, Request
 from ..auth import get_current_user, get_admin_user
 from ..database import get_db
 from ..models.schemas import TelemetryHeartbeat, TelemetryResponse
+from ..rate_limit import limiter
 from ..services import robot_store
+from ..services.robot_store import _hash_api_key
 
 router = APIRouter(prefix="/api/telemetry", tags=["telemetry"])
 logger = logging.getLogger("strype.telemetry")
 
 
 @router.post("/heartbeat")
+@limiter.limit("60/minute")
 async def heartbeat(request: Request, body: TelemetryHeartbeat):
     """Robot POSTs its current status. Authenticated via X-Robot-Key header."""
     api_key = request.headers.get("X-Robot-Key")
     if not api_key:
         raise HTTPException(status_code=401, detail="Missing X-Robot-Key header")
 
-    # Look up robot by api_key
+    # Look up robot by hashed api_key
+    key_hash = _hash_api_key(api_key)
     async for db in get_db():
         cursor = await db.execute(
-            "SELECT id FROM robots WHERE api_key = ?", (api_key,)
+            "SELECT id FROM robots WHERE api_key = ?", (key_hash,)
         )
         row = await cursor.fetchone()
         if not row:

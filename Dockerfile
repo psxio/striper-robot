@@ -1,16 +1,26 @@
+# Stage 1: Build — install dependencies in a virtual environment
+FROM python:3.12-slim AS builder
+
+WORKDIR /build
+
+COPY backend/requirements.txt ./backend/
+RUN python -m venv /venv && \
+    /venv/bin/pip install --no-cache-dir -r backend/requirements.txt
+
+COPY striper_pathgen/ ./striper_pathgen/
+RUN /venv/bin/pip install --no-cache-dir -e ./striper_pathgen/
+
+# Stage 2: Runtime — lean image with only what's needed to run
 FROM python:3.12-slim
 
 WORKDIR /app
 
-COPY backend/requirements.txt ./backend/
-RUN pip install --no-cache-dir -r backend/requirements.txt
-
-# Install striper_pathgen for DXF/SVG import/export
-COPY striper_pathgen/ ./striper_pathgen/
-RUN pip install --no-cache-dir -e ./striper_pathgen/
-
+COPY --from=builder /venv /venv
+COPY --from=builder /build/striper_pathgen/ ./striper_pathgen/
 COPY backend/ ./backend/
 COPY site/ ./site/
+
+ENV PATH="/venv/bin:$PATH"
 
 RUN addgroup --system appgroup && \
     adduser --system --ingroup appgroup appuser && \

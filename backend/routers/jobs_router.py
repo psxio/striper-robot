@@ -3,7 +3,7 @@
 import logging
 
 from fastapi import APIRouter, Depends, HTTPException, Query
-from typing import Optional
+from typing import Literal, Optional
 
 from ..auth import get_current_user
 from ..config import settings
@@ -23,7 +23,7 @@ def _to_response(job: dict) -> JobResponse:
 async def list_jobs(
     page: int = Query(default=1, ge=1),
     limit: int = Query(default=50, ge=1, le=200),
-    status: Optional[str] = Query(default=None),
+    status: Optional[Literal["pending", "in_progress", "completed", "cancelled"]] = Query(default=None),
     lot_id: Optional[str] = Query(default=None, alias="lotId"),
     user: dict = Depends(get_current_user),
 ):

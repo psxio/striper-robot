@@ -1,7 +1,8 @@
 # Striper Robot -- Quick Start Guide
 
 Step-by-step guide from a box of parts to a robot painting its first parking
-lot. This guide assumes the Tier 2 "Best Value" build (~$780).
+lot. This guide uses the validated BOM v3 (~$1,011 components, ~$1,200-$1,500 all-in).
+See `docs/validated_bom_v3.md` for the full parts list.
 
 Total estimated time: 2 weekends (20-25 hours of hands-on work).
 
@@ -34,7 +35,7 @@ out on a workbench and check off:
 | 4 | 3/4" plywood (24"x18" or sized to match frame) | [ ] |
 | 5 | Pixhawk 6C Mini | [ ] |
 | 6 | Unicore UM982 breakout + 2x multiband GNSS antennas (L1/L2 minimum, dual-antenna heading) | [ ] |
-| 7 | Shurflo 8000 diaphragm pump (12V, 60 PSI, 1 GPM) | [ ] |
+| 7 | Shurflo 8000 diaphragm pump (12V, 60 PSI, 1.8 GPM) | [ ] |
 | 8 | 12V solenoid valve (N.C., 3/8" NPT, brass, direct-acting) | [ ] |
 | 9 | TeeJet TP8004EVS even-fan nozzle + 60-mesh strainer + adapters + 3 ft 3/8" tubing | [ ] |
 | 10 | 36V 18Ah e-bike battery with charger | [ ] |

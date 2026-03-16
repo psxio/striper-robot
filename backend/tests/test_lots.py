@@ -112,10 +112,10 @@ async def test_delete_lot(auth_client):
 
 
 @pytest.mark.asyncio
-async def test_duplicate_lot(auth_client):
-    create_resp = await auth_client.post("/api/lots", json=LOT_DATA)
+async def test_duplicate_lot(pro_client):
+    create_resp = await pro_client.post("/api/lots", json=LOT_DATA)
     lot_id = create_resp.json()["id"]
-    resp = await auth_client.post(f"/api/lots/{lot_id}/duplicate")
+    resp = await pro_client.post(f"/api/lots/{lot_id}/duplicate")
     assert resp.status_code == 201
     data = resp.json()
     assert data["name"] == "Test Parking Lot (Copy)"

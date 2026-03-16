@@ -9,5 +9,9 @@ jobs:
         with:
           python-version: '3.12'
       - run: pip install -r backend/requirements.txt
-      - run: pip install pytest pytest-asyncio httpx
-      - run: python -m pytest backend/tests/ -v --tb=short
+      - run: pip install -e striper_pathgen/
+      - run: pip install pytest pytest-asyncio pytest-cov httpx
+      - name: Backend tests with coverage
+        run: python -m pytest backend/tests/ -v --tb=short --cov=backend --cov-report=term-missing --cov-report=xml
+      - name: Pathgen tests
+        run: python -m pytest striper_pathgen/tests/ -v --tb=short

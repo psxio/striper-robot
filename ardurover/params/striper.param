@@ -8,7 +8,7 @@
 # Paint: Shurflo 8000 pump + 3/8" direct-acting solenoid + TP8004EVS nozzle
 # Battery: 36V 18Ah e-bike pack (648Wh), Holybro PM06 V2 (5V), XL4015 (12V 5A)
 # RC: FlySky FS-i6X receiver (iBus or PPM)
-# Weight: ~29kg with full paint tank (20kg dry + 9kg paint)
+# Weight: ~22kg dry, ~45kg with full paint tank (5 gal / ~19L paint)
 # Wheels: 6.5" (0.165m diameter) hoverboard wheels
 # =============================================================================
 
@@ -113,8 +113,8 @@ GPS_POS1_Y,0.00
 GPS_POS1_Z,-0.15
 
 # GPS measurement delay (ms): accounts for GPS processing latency
-# UM982 is fast; 200ms is conservative
-GPS_DELAY_MS,200
+# UM982 RTK latency ~100ms; 120ms adds 20ms margin
+GPS_DELAY_MS,120
 
 # GPS driver auto-config: 2 = auto-configure the GPS module
 GPS_AUTO_CONFIG,2
@@ -206,33 +206,26 @@ SERVO2_FUNCTION,0
 SERVO4_FUNCTION,0
 
 # -----------------------------------------------------------------------------
-# SPRAYER (AC_Sprayer) CONFIGURATION
+# SPRAYER (AC_Sprayer) CONFIGURATION — DISABLED
 # -----------------------------------------------------------------------------
-# Enable the built-in sprayer subsystem
-SPRAY_ENABLE,1
+# AC_Sprayer is DISABLED. Paint control is handled entirely by relay-based
+# Lua scripting (paint_unified.lua) which provides:
+#   - DO_SET_RELAY edge detection with lead/lag compensation
+#   - Speed-synchronized paint with rolling average + hysteresis
+#   - Single source of truth for relay state (no dual-script conflicts)
+# SERVO9 and SERVO10 are freed for future use.
+SPRAY_ENABLE,0
 
-# Pump rate: percentage output at full pump speed (0-100)
-SPRAY_PUMP_RATE,100
-
-# Minimum pump rate when spraying: 0 = fully off when not spraying
-SPRAY_PUMP_MIN,0
-
-# Minimum ground speed (m/s) before sprayer activates
-# Prevents paint pooling when stopped or moving very slowly
+# Keep SPRAY_SPEED_MIN as a parameter for paint_unified.lua to read
 SPRAY_SPEED_MIN,0.10
 
-# Spinner RPM when active (used as generic spray width control)
-# For our solenoid: 1000 = on
-SPRAY_SPINNER,1000
-
-# Sprayer pump output: SERVO9 (AUX1), function 22 = SprayerPump
-SERVO9_FUNCTION,22
+# SERVO9 and SERVO10: disabled (no longer used by AC_Sprayer)
+SERVO9_FUNCTION,0
 SERVO9_MIN,1000
 SERVO9_MAX,2000
 SERVO9_TRIM,1000
 
-# Sprayer spinner/solenoid output: SERVO10 (AUX2), function 23 = SprayerSpinner
-SERVO10_FUNCTION,23
+SERVO10_FUNCTION,0
 SERVO10_MIN,1000
 SERVO10_MAX,2000
 SERVO10_TRIM,1000
@@ -576,7 +569,7 @@ SR1_RC_CHAN,2
 # -----------------------------------------------------------------------------
 # LUA SCRIPTING ENGINE
 # -----------------------------------------------------------------------------
-# Enable Lua scripting (required for paint_control.lua and paint_speed_sync.lua)
+# Enable Lua scripting (required for paint_unified.lua, motor_bridge.lua, etc.)
 SCR_ENABLE,1
 
 # Heap size (bytes): 120KB for all scripts (motor_bridge + paint + obstacle)

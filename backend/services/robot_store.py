@@ -1,11 +1,17 @@
 """Robot fleet management persistence layer using aiosqlite."""
 
+import hashlib
 import secrets
 import uuid
 from datetime import datetime, timezone
 from typing import Optional
 
 from ..database import get_db
+
+
+def _hash_api_key(key: str) -> str:
+    """Hash a robot API key for storage. Only the hash is persisted."""
+    return hashlib.sha256(key.encode()).hexdigest()
 
 
 def _now() -> str:
@@ -66,7 +72,7 @@ async def list_robots(
             d = dict(row)
             if d.get("api_key"):
                 d["has_api_key"] = True
-                d["api_key_last4"] = d["api_key"][-4:]
+                d["api_key_last4"] = d.get("api_key_last4") or d["api_key"][-4:]
                 d["api_key"] = None
             else:
                 d["has_api_key"] = False
@@ -357,11 +363,13 @@ async def generate_api_key(robot_id: str) -> Optional[str]:
         raise ValueError("Robot already has an API key")
 
     key = f"strk_{secrets.token_urlsafe(32)}"
+    key_hash = _hash_api_key(key)
+    last4 = key[-4:]
     now = _now()
     async for db in get_db():
         await db.execute(
-            "UPDATE robots SET api_key = ?, updated_at = ? WHERE id = ?",
-            (key, now, robot_id),
+            "UPDATE robots SET api_key = ?, api_key_last4 = ?, updated_at = ? WHERE id = ?",
+            (key_hash, last4, now, robot_id),
         )
         await db.commit()
     return key
@@ -372,7 +380,7 @@ async def clear_api_key(robot_id: str) -> bool:
     now = _now()
     async for db in get_db():
         cursor = await db.execute(
-            "UPDATE robots SET api_key = NULL, updated_at = ? WHERE id = ? AND api_key IS NOT NULL",
+            "UPDATE robots SET api_key = NULL, api_key_last4 = NULL, updated_at = ? WHERE id = ? AND api_key IS NOT NULL",
             (now, robot_id),
         )
         await db.commit()

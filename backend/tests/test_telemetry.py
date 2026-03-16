@@ -3,7 +3,7 @@
 import pytest
 
 from backend.database import get_db
-from backend.services.robot_store import create_robot, assign_robot
+from backend.services.robot_store import create_robot, assign_robot, _hash_api_key
 
 
 HEARTBEAT_URL = "/api/telemetry/heartbeat"
@@ -20,11 +20,12 @@ API_KEY = "test-robot-key-abc123"
 
 
 async def _create_robot_with_key(serial="TEL-001", api_key=API_KEY):
-    """Helper: create a robot via the store and set its api_key directly in DB."""
+    """Helper: create a robot via the store and set its api_key hash directly in DB."""
     robot = await create_robot(serial_number=serial)
     async for db in get_db():
         await db.execute(
-            "UPDATE robots SET api_key = ? WHERE id = ?", (api_key, robot["id"])
+            "UPDATE robots SET api_key = ?, api_key_last4 = ? WHERE id = ?",
+            (_hash_api_key(api_key), api_key[-4:], robot["id"]),
         )
         await db.commit()
     return robot

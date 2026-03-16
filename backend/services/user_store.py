@@ -118,6 +118,13 @@ async def update_profile(
     if email is not None:
         fields.append("email = ?")
         values.append(email)
+        # Reset email verification when address changes
+        fields.append("email_verified = ?")
+        values.append(0)
+        fields.append("verification_token = ?")
+        values.append(None)
+        fields.append("verification_expires_at = ?")
+        values.append(None)
     if company_name is not None:
         fields.append("company_name = ?")
         values.append(company_name)
@@ -298,14 +305,15 @@ async def delete_user_refresh_tokens(user_id: str) -> None:
 # --- Email Verification ---
 
 async def create_verification_token(user_id: str) -> str:
-    """Generate an email verification token and store it on the user. Returns the raw token."""
+    """Generate an email verification token and store its hash on the user. Returns the raw token."""
     token = str(uuid.uuid4())
+    token_hash = _hash_token(token)
     expires_at = (datetime.now(timezone.utc) + timedelta(hours=24)).isoformat()
 
     async for db in get_db():
         await db.execute(
             "UPDATE users SET verification_token = ?, verification_expires_at = ?, updated_at = ? WHERE id = ?",
-            (token, expires_at, _now(), user_id),
+            (token_hash, expires_at, _now(), user_id),
         )
         await db.commit()
 
@@ -314,12 +322,13 @@ async def create_verification_token(user_id: str) -> str:
 
 async def verify_email_token(token: str) -> Optional[str]:
     """Validate a verification token and mark the user as verified. Returns user_id or None."""
+    token_hash = _hash_token(token)
     now = datetime.now(timezone.utc).isoformat()
 
     async for db in get_db():
         cursor = await db.execute(
             "SELECT id FROM users WHERE verification_token = ? AND verification_expires_at > ?",
-            (token, now),
+            (token_hash, now),
         )
         row = await cursor.fetchone()
         if not row:

@@ -68,6 +68,49 @@
         .auth-gate h2 { margin-bottom: 8px; }
         .auth-gate p { color: var(--text2); }
         select { background: var(--card); color: var(--text); border: 1px solid var(--border); border-radius: 6px; padding: 4px 8px; font-size: 12px; }
+
+        /* ═══ MOBILE RESPONSIVE ═══ */
+        @media (max-width: 768px) {
+            .topbar { padding: 8px 12px; }
+            .topbar h1 { font-size: 15px; }
+            .container { padding: 12px; }
+            .tabs { overflow-x: auto; -webkit-overflow-scrolling: touch; flex-wrap: nowrap; gap: 2px; padding-bottom: 4px; }
+            .tab { white-space: nowrap; padding: 6px 14px; font-size: 13px; flex-shrink: 0; }
+            .stats-grid { grid-template-columns: repeat(2, 1fr); gap: 8px; }
+            .stat-card { padding: 14px; }
+            .stat-card .value { font-size: 28px; }
+            table { display: block; overflow-x: auto; -webkit-overflow-scrolling: touch; }
+            th, td { white-space: nowrap; padding: 8px 10px; font-size: 13px; }
+            .actions { flex-wrap: wrap; }
+        }
+
+        @media (max-width: 480px) {
+            .topbar .links { gap: 8px; font-size: 12px; }
+            .stats-grid { grid-template-columns: 1fr 1fr; gap: 6px; }
+            .stat-card .value { font-size: 24px; }
+            .stat-card .label { font-size: 11px; }
+
+            /* Card layout: hide table headers, use data-label attributes */
+            table.responsive-table { display: block; }
+            table.responsive-table thead { display: none; }
+            table.responsive-table tbody { display: block; }
+            table.responsive-table tr {
+                display: block; margin-bottom: 8px; padding: 12px;
+                background: var(--card); border: 1px solid var(--border);
+                border-radius: var(--radius);
+            }
+            table.responsive-table td {
+                display: flex; justify-content: space-between; align-items: center;
+                padding: 4px 0; border-bottom: none; white-space: normal;
+            }
+            table.responsive-table td::before {
+                content: attr(data-label);
+                font-size: 11px; font-weight: 500; color: var(--text2);
+                text-transform: uppercase; letter-spacing: 0.5px;
+                margin-right: 12px; flex-shrink: 0;
+            }
+            table.responsive-table td:last-child { padding-bottom: 0; }
+        }
     </style>
 </head>
 <body>
@@ -102,7 +145,7 @@
 
         <!-- Users Panel -->
         <div id="panel-users" class="panel">
-            <table>
+            <table class="responsive-table">
                 <thead>
                     <tr><th>Email</th><th>Name</th><th>Plan</th><th>Lots</th><th>Jobs</th><th>Joined</th><th>Actions</th></tr>
                 </thead>
@@ -116,7 +159,7 @@
             <div style="margin-bottom:12px;text-align:right;">
                 <button class="btn btn-sm" onclick="exportWaitlistCSV()">Export CSV</button>
             </div>
-            <table>
+            <table class="responsive-table">
                 <thead>
                     <tr><th>Email</th><th>Source</th><th>Date</th><th>Actions</th></tr>
                 </thead>
@@ -138,7 +181,7 @@
                     <button class="btn" onclick="document.getElementById('addRobotForm').style.display='none'">Cancel</button>
                 </div>
             </div>
-            <table>
+            <table class="responsive-table">
                 <thead>
                     <tr><th>Serial</th><th>Status</th><th>HW</th><th>Firmware</th><th>API Key</th><th>Last Seen</th><th>Actions</th></tr>
                 </thead>
@@ -149,7 +192,7 @@
 
         <!-- Assignments Panel -->
         <div id="panel-assignments" class="panel">
-            <table>
+            <table class="responsive-table">
                 <thead>
                     <tr><th>Robot</th><th>User</th><th>Status</th><th>Tracking</th><th>Shipped</th><th>Actions</th></tr>
                 </thead>
@@ -160,7 +203,7 @@
 
         <!-- Audit Log Panel -->
         <div id="panel-audit" class="panel">
-            <table>
+            <table class="responsive-table">
                 <thead>
                     <tr><th>Admin</th><th>Action</th><th>Target</th><th>Detail</th><th>Date</th></tr>
                 </thead>
@@ -213,7 +256,7 @@
             var grid = document.getElementById('statsGrid');
             var proCount = data.users_by_plan.pro || 0;
             var robotCount = data.users_by_plan.robot || 0;
-            var mrr = proCount * 49 + robotCount * 299;
+            var mrr = proCount * 99 + robotCount * 299;
             grid.innerHTML = [
                 card(data.users, 'Total Users'),
                 card(data.lots, 'Total Lots'),
@@ -244,13 +287,13 @@
                 if (u.is_admin) planBadge += ' <span class="badge badge-admin">admin</span>';
                 var date = new Date(u.created_at).toLocaleDateString();
                 return '<tr>' +
-                    '<td>' + escapeHtml(u.email) + '</td>' +
-                    '<td>' + escapeHtml(u.name || '-') + '</td>' +
-                    '<td>' + planBadge + '</td>' +
-                    '<td>' + u.lot_count + '</td>' +
-                    '<td>' + u.job_count + '</td>' +
-                    '<td>' + date + '</td>' +
-                    '<td class="actions">' +
+                    '<td data-label="Email">' + escapeHtml(u.email) + '</td>' +
+                    '<td data-label="Name">' + escapeHtml(u.name || '-') + '</td>' +
+                    '<td data-label="Plan">' + planBadge + '</td>' +
+                    '<td data-label="Lots">' + u.lot_count + '</td>' +
+                    '<td data-label="Jobs">' + u.job_count + '</td>' +
+                    '<td data-label="Joined">' + date + '</td>' +
+                    '<td data-label="Actions" class="actions">' +
                         '<select onchange="changePlan(\'' + u.id + '\', this.value)">' +
                             '<option value="free"' + (u.plan==='free'?' selected':'') + '>Free</option>' +
                             '<option value="pro"' + (u.plan==='pro'?' selected':'') + '>Pro</option>' +
@@ -267,10 +310,10 @@
     function loadWaitlist(page) {
         api('GET', '/admin/waitlist?page=' + page + '&limit=20').then(function(data) {
             var tbody = document.getElementById('waitlistBody');
-            if (!data.items.length) { tbody.innerHTML = '<tr><td colspan="3" class="empty">No entries</td></tr>'; return; }
+            if (!data.items.length) { tbody.innerHTML = '<tr><td colspan="4" class="empty">No entries</td></tr>'; return; }
             tbody.innerHTML = data.items.map(function(w) {
                 var date = new Date(w.created_at).toLocaleDateString();
-                return '<tr><td>' + escapeHtml(w.email) + '</td><td>' + escapeHtml(w.source) + '</td><td>' + date + '</td><td><button class="btn btn-sm btn-danger" onclick="deleteWaitlistEntry(' + w.id + ')">Delete</button></td></tr>';
+                return '<tr><td data-label="Email">' + escapeHtml(w.email) + '</td><td data-label="Source">' + escapeHtml(w.source) + '</td><td data-label="Date">' + date + '</td><td data-label="Actions"><button class="btn btn-sm btn-danger" onclick="deleteWaitlistEntry(' + w.id + ')">Delete</button></td></tr>';
             }).join('');
             renderPagination('waitlistPagination', data, loadWaitlist);
         });
@@ -298,7 +341,7 @@
             if (!data.items.length) { tbody.innerHTML = '<tr><td colspan="5" class="empty">No audit entries</td></tr>'; return; }
             tbody.innerHTML = data.items.map(function(a) {
                 var date = new Date(a.created_at).toLocaleString();
-                return '<tr><td>' + escapeHtml(a.admin_email) + '</td><td>' + escapeHtml(a.action) + '</td><td>' + escapeHtml(a.target || '-') + '</td><td>' + escapeHtml(a.detail || '-') + '</td><td>' + date + '</td></tr>';
+                return '<tr><td data-label="Admin">' + escapeHtml(a.admin_email) + '</td><td data-label="Action">' + escapeHtml(a.action) + '</td><td data-label="Target">' + escapeHtml(a.target || '-') + '</td><td data-label="Detail">' + escapeHtml(a.detail || '-') + '</td><td data-label="Date">' + date + '</td></tr>';
             }).join('');
             renderPagination('auditPagination', data, loadAudit);
         });
@@ -355,13 +398,13 @@
                 var statusClass = r.status === 'available' ? 'badge-pro' : r.status === 'retired' ? 'badge-free' : 'badge-admin';
                 var lastSeen = r.last_seen_at ? new Date(r.last_seen_at).toLocaleString() : 'Never';
                 return '<tr>' +
-                    '<td>' + escapeHtml(r.serial_number) + '</td>' +
-                    '<td><span class="badge ' + statusClass + '">' + r.status + '</span></td>' +
-                    '<td>' + escapeHtml(r.hardware_version || '') + '</td>' +
-                    '<td>' + escapeHtml(r.firmware_version || '-') + '</td>' +
-                    '<td>' + (r.has_api_key ? '****' + escapeHtml(r.api_key_last4 || '') + ' <button class="btn btn-sm" onclick="generateApiKey(\'' + r.id + '\')">Rotate</button> <button class="btn btn-sm btn-danger" onclick="revokeApiKey(\'' + r.id + '\')">Revoke</button>' : '<button class="btn btn-sm" onclick="generateApiKey(\'' + r.id + '\')">Generate</button>') + '</td>' +
-                    '<td>' + lastSeen + '</td>' +
-                    '<td class="actions">' +
+                    '<td data-label="Serial">' + escapeHtml(r.serial_number) + '</td>' +
+                    '<td data-label="Status"><span class="badge ' + statusClass + '">' + r.status + '</span></td>' +
+                    '<td data-label="HW">' + escapeHtml(r.hardware_version || '') + '</td>' +
+                    '<td data-label="Firmware">' + escapeHtml(r.firmware_version || '-') + '</td>' +
+                    '<td data-label="API Key">' + (r.has_api_key ? '****' + escapeHtml(r.api_key_last4 || '') + ' <button class="btn btn-sm" onclick="generateApiKey(\'' + r.id + '\')">Rotate</button> <button class="btn btn-sm btn-danger" onclick="revokeApiKey(\'' + r.id + '\')">Revoke</button>' : '<button class="btn btn-sm" onclick="generateApiKey(\'' + r.id + '\')">Generate</button>') + '</td>' +
+                    '<td data-label="Last Seen">' + lastSeen + '</td>' +
+                    '<td data-label="Actions" class="actions">' +
                         '<select onchange="updateRobotStatus(\'' + r.id + '\', this.value)">' +
                             '<option value="">Change...</option>' +
                             '<option value="available">Available</option>' +
@@ -453,12 +496,12 @@
             tbody.innerHTML = data.items.map(function(a) {
                 var shipped = a.shipped_at ? new Date(a.shipped_at).toLocaleDateString() : '-';
                 return '<tr>' +
-                    '<td>' + escapeHtml(a.serial_number || a.robot_id) + '</td>' +
-                    '<td>' + escapeHtml(a.user_email || a.user_id) + '</td>' +
-                    '<td><span class="badge badge-admin">' + a.status + '</span></td>' +
-                    '<td>' + escapeHtml(a.tracking_number || '-') + '</td>' +
-                    '<td>' + shipped + '</td>' +
-                    '<td class="actions">' +
+                    '<td data-label="Robot">' + escapeHtml(a.serial_number || a.robot_id) + '</td>' +
+                    '<td data-label="User">' + escapeHtml(a.user_email || a.user_id) + '</td>' +
+                    '<td data-label="Status"><span class="badge badge-admin">' + a.status + '</span></td>' +
+                    '<td data-label="Tracking">' + escapeHtml(a.tracking_number || '-') + '</td>' +
+                    '<td data-label="Shipped">' + shipped + '</td>' +
+                    '<td data-label="Actions" class="actions">' +
                         '<select onchange="updateAssignment(\'' + a.id + '\', this.value)">' +
                             '<option value="">Update...</option>' +
                             '<option value="shipped">Mark Shipped</option>' +

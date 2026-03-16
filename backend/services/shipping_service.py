@@ -12,7 +12,16 @@ logger = logging.getLogger("strype.shipping")
 
 def _is_dev_mode() -> bool:
     """Return True if we should use mock data instead of real API calls."""
-    return settings.ENV == "dev" or not getattr(settings, "EASYPOST_API_KEY", "")
+    return settings.ENV == "dev"
+
+
+def _require_api_key() -> None:
+    """Raise RuntimeError in production if EasyPost API key is not configured."""
+    if not _is_dev_mode() and not getattr(settings, "EASYPOST_API_KEY", ""):
+        raise RuntimeError(
+            "EASYPOST_API_KEY is not configured. "
+            "Set it in environment variables or use ENV=dev for mock mode."
+        )
 
 
 async def create_shipment(to_address: dict, weight_oz: int = 800) -> dict:
@@ -25,6 +34,7 @@ async def create_shipment(to_address: dict, weight_oz: int = 800) -> dict:
     Returns:
         Dict with shipment id, tracking_number, label_url, and rates list.
     """
+    _require_api_key()
     if _is_dev_mode():
         mock_id = f"shp_mock_{uuid.uuid4().hex[:12]}"
         logger.info(
@@ -99,6 +109,7 @@ async def buy_label(shipment_id: str, rate_id: str) -> dict:
     Returns:
         Dict with tracking_number and label_url.
     """
+    _require_api_key()
     if _is_dev_mode():
         tracking = f"MOCK{random.randint(1000000000, 9999999999)}"
         logger.info(
@@ -143,6 +154,7 @@ async def create_return_label(assignment_id: str) -> dict:
     Returns:
         Dict with tracking_number and label_url for the return shipment.
     """
+    _require_api_key()
     if _is_dev_mode():
         tracking = f"MOCKRET{random.randint(1000000, 9999999)}"
         logger.info(
@@ -193,6 +205,7 @@ async def get_tracking(tracking_number: str) -> dict:
     """
     now_iso = datetime.now(timezone.utc).isoformat()
 
+    _require_api_key()
     if _is_dev_mode():
         logger.info(
             "Tracking lookup (dev mode):\n  Tracking: %s",

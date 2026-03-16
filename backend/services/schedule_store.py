@@ -1,7 +1,7 @@
 """Recurring schedule persistence layer using aiosqlite with tenant isolation."""
 
 import uuid
-from datetime import datetime, timezone, timedelta, date
+from datetime import datetime, timezone, timedelta
 from typing import Optional
 
 from ..database import get_db
@@ -22,7 +22,7 @@ def calculate_next_run(
     For monthly: find the next occurrence of day_of_month (1-28).
     Returns ISO date string (YYYY-MM-DD).
     """
-    today = date.today()
+    today = datetime.now(timezone.utc).date()
 
     if frequency in ("weekly", "biweekly"):
         # day_of_week: 0=Mon..6=Sun (matches Python's weekday())
@@ -213,7 +213,7 @@ async def delete_schedule(user_id: str, schedule_id: str) -> bool:
 
 async def get_due_schedules() -> list[dict]:
     """Return all active schedules where next_run <= today (date comparison)."""
-    today_str = date.today().isoformat()
+    today_str = datetime.now(timezone.utc).date().isoformat()
     async for db in get_db():
         cursor = await db.execute(
             "SELECT * FROM recurring_schedules WHERE active = 1 AND next_run <= ?",

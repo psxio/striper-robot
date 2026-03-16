@@ -10,8 +10,9 @@ def _now() -> str:
 
 
 async def get_stats() -> dict:
-    """Get platform-wide statistics."""
+    """Get platform-wide statistics in a single snapshot transaction."""
     async for db in get_db():
+        await db.execute("BEGIN DEFERRED")
         stats = {}
 
         cursor = await db.execute("SELECT COUNT(*) FROM users")
@@ -44,6 +45,7 @@ async def get_stats() -> dict:
         )
         stats["active_assignments"] = (await cursor.fetchone())[0]
 
+        await db.execute("COMMIT")
         return stats
 
 

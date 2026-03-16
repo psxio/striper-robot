@@ -31,8 +31,8 @@ def _point_feature(coord):
 # ---- 1. Empty features → all zeros ----
 
 @pytest.mark.asyncio
-async def test_estimate_empty_features(auth_client):
-    resp = await auth_client.post(ENDPOINT, json={"features": []})
+async def test_estimate_empty_features(pro_client):
+    resp = await pro_client.post(ENDPOINT, json={"features": []})
     assert resp.status_code == 200
     data = resp.json()
     assert data["total_line_length_ft"] == 0.0
@@ -44,10 +44,10 @@ async def test_estimate_empty_features(auth_client):
 # ---- 2. Single LineString → non-zero values ----
 
 @pytest.mark.asyncio
-async def test_estimate_single_line(auth_client):
+async def test_estimate_single_line(pro_client):
     # Use points far enough apart (~440 ft) so runtime rounds to >= 1 min.
     feature = _line_feature([[-74.006, 40.7128], [-74.006, 40.7140]])
-    resp = await auth_client.post(ENDPOINT, json={"features": [feature]})
+    resp = await pro_client.post(ENDPOINT, json={"features": [feature]})
     assert resp.status_code == 200
     data = resp.json()
     assert data["total_line_length_ft"] > 0
@@ -59,12 +59,12 @@ async def test_estimate_single_line(auth_client):
 # ---- 3. Multiple LineStrings → larger values than single ----
 
 @pytest.mark.asyncio
-async def test_estimate_multiple_lines(auth_client):
+async def test_estimate_multiple_lines(pro_client):
     line1 = _line_feature([[-74.006, 40.7128], [-74.006, 40.7130]])
     line2 = _line_feature([[-74.005, 40.7128], [-74.005, 40.7130]])
 
-    single_resp = await auth_client.post(ENDPOINT, json={"features": [line1]})
-    multi_resp = await auth_client.post(ENDPOINT, json={"features": [line1, line2]})
+    single_resp = await pro_client.post(ENDPOINT, json={"features": [line1]})
+    multi_resp = await pro_client.post(ENDPOINT, json={"features": [line1, line2]})
 
     single = single_resp.json()
     multi = multi_resp.json()
@@ -77,9 +77,9 @@ async def test_estimate_multiple_lines(auth_client):
 # ---- 4. Non-LineString (Point) is ignored → zeros ----
 
 @pytest.mark.asyncio
-async def test_estimate_non_linestring_ignored(auth_client):
+async def test_estimate_non_linestring_ignored(pro_client):
     point = _point_feature([-74.006, 40.7128])
-    resp = await auth_client.post(ENDPOINT, json={"features": [point]})
+    resp = await pro_client.post(ENDPOINT, json={"features": [point]})
     assert resp.status_code == 200
     data = resp.json()
     assert data["total_line_length_ft"] == 0.0
@@ -91,12 +91,12 @@ async def test_estimate_non_linestring_ignored(auth_client):
 # ---- 5. Mixed features → only LineStrings counted ----
 
 @pytest.mark.asyncio
-async def test_estimate_mixed_features(auth_client):
+async def test_estimate_mixed_features(pro_client):
     line = _line_feature([[-74.006, 40.7128], [-74.006, 40.7130]])
     point = _point_feature([-74.005, 40.7128])
 
-    line_only_resp = await auth_client.post(ENDPOINT, json={"features": [line]})
-    mixed_resp = await auth_client.post(ENDPOINT, json={"features": [line, point]})
+    line_only_resp = await pro_client.post(ENDPOINT, json={"features": [line]})
+    mixed_resp = await pro_client.post(ENDPOINT, json={"features": [line, point]})
 
     assert line_only_resp.json() == mixed_resp.json()
 
@@ -104,9 +104,9 @@ async def test_estimate_mixed_features(auth_client):
 # ---- 6. Response shape — all 4 fields present ----
 
 @pytest.mark.asyncio
-async def test_estimate_response_shape(auth_client):
+async def test_estimate_response_shape(pro_client):
     feature = _line_feature([[-74.006, 40.7128], [-74.006, 40.7130]])
-    resp = await auth_client.post(ENDPOINT, json={"features": [feature]})
+    resp = await pro_client.post(ENDPOINT, json={"features": [feature]})
     assert resp.status_code == 200
     data = resp.json()
     assert "total_line_length_ft" in data
@@ -131,11 +131,11 @@ async def test_estimate_requires_auth(client):
 # ---- 8. Known-distance line → reasonable values ----
 
 @pytest.mark.asyncio
-async def test_estimate_values_reasonable(auth_client):
+async def test_estimate_values_reasonable(pro_client):
     # Two points ~100m apart (same longitude, ~0.0009 degrees latitude difference).
     # Expected distance: roughly 100m ≈ 330 feet.
     feature = _line_feature([[-74.006, 40.7128], [-74.006, 40.7137]])
-    resp = await auth_client.post(ENDPOINT, json={"features": [feature]})
+    resp = await pro_client.post(ENDPOINT, json={"features": [feature]})
     assert resp.status_code == 200
     data = resp.json()
 
@@ -155,10 +155,10 @@ async def test_estimate_values_reasonable(auth_client):
 # ---- 9. LineString with a single coordinate → 0 length ----
 
 @pytest.mark.asyncio
-async def test_estimate_single_point_line(auth_client):
+async def test_estimate_single_point_line(pro_client):
     # A degenerate LineString with only one coordinate has no segments.
     feature = _line_feature([[-74.006, 40.7128]])
-    resp = await auth_client.post(ENDPOINT, json={"features": [feature]})
+    resp = await pro_client.post(ENDPOINT, json={"features": [feature]})
     assert resp.status_code == 200
     data = resp.json()
     assert data["total_line_length_ft"] == 0.0
@@ -170,9 +170,9 @@ async def test_estimate_single_point_line(auth_client):
 # ---- 10. Cost formula: cost = length_ft * 0.15 ----
 
 @pytest.mark.asyncio
-async def test_estimate_cost_formula(auth_client):
+async def test_estimate_cost_formula(pro_client):
     feature = _line_feature([[-74.006, 40.7128], [-74.006, 40.7140]])
-    resp = await auth_client.post(ENDPOINT, json={"features": [feature]})
+    resp = await pro_client.post(ENDPOINT, json={"features": [feature]})
     assert resp.status_code == 200
     data = resp.json()
 

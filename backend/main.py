@@ -94,7 +94,7 @@ async def csrf_protection(request: Request, call_next):
     ):
         csrf_cookie = request.cookies.get("csrf_token")
         csrf_header = request.headers.get("X-CSRF-Token")
-        if csrf_cookie and csrf_header != csrf_cookie:
+        if not csrf_cookie or csrf_header != csrf_cookie:
             return JSONResponse(
                 status_code=403,
                 content={"detail": "CSRF validation failed"},
