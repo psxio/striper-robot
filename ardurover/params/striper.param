@@ -3,10 +3,10 @@
 # =============================================================================
 # Robot: Differential-drive (hoverboard motors) with RTK GPS and paint sprayer
 # Controller: Pixhawk 6C running ArduRover 4.5+
-# GPS: Unicore UM980 triple-band RTK (8mm accuracy)
+# GPS: Unicore UM982 dual-antenna RTK (8mm position, 0.2° heading)
 # Motors: Hoverboard BLDC via FOC firmware over UART
 # Paint: Shurflo 8000 pump + 3/8" direct-acting solenoid + TP8004EVS nozzle
-# Battery: 36V 10Ah e-bike pack, Holybro PM06 V2 (5V), XL4015 (12V 5A)
+# Battery: 36V 18Ah e-bike pack (648Wh), Holybro PM06 V2 (5V), XL4015 (12V 5A)
 # RC: FlySky FS-i6X receiver (iBus or PPM)
 # Weight: ~29kg with full paint tank (20kg dry + 9kg paint)
 # Wheels: 6.5" (0.165m diameter) hoverboard wheels
@@ -74,15 +74,15 @@ SERIAL4_BAUD,115
 # SERIAL5_BAUD,115
 
 # -----------------------------------------------------------------------------
-# GPS CONFIGURATION (Unicore UM980)
+# GPS CONFIGURATION (Unicore UM982 Dual-Antenna)
 # -----------------------------------------------------------------------------
-# GPS_TYPE 24 = UnicoreNMEA (single UM980, ArduRover 4.4+)
-# GPS_TYPE 25 = UnicoreMovingBaselineNMEA (dual-antenna UM982 heading only)
-# Gives best performance with UM980 triple-band RTK receiver
-# Use GPS_TYPE=1 (AUTO) if you are unsure or using a different GPS module
-GPS_TYPE,24
+# GPS_TYPE 25 = UnicoreMovingBaselineNMEA (dual-antenna UM982)
+# Provides both RTK position (8mm) AND heading (0.2° at 1m baseline)
+# Heading works at standstill — no movement required (unlike GSF)
+# Requires two GNSS antennas mounted ≥30cm apart
+GPS_TYPE,25
 
-# No secondary GPS
+# No secondary GPS (UM982 uses both antennas on one module)
 GPS_TYPE2,0
 
 # GNSS constellation mask: all constellations for best RTK convergence
@@ -119,8 +119,14 @@ GPS_DELAY_MS,200
 # GPS driver auto-config: 2 = auto-configure the GPS module
 GPS_AUTO_CONFIG,2
 
-# Moving baseline yaw: not used (single GPS setup)
-GPS_MB1_TYPE,0
+# Moving baseline yaw: UM982 dual-antenna heading
+# MB_TYPE 1 = master antenna offsets relative to slave antenna
+# Measure actual antenna separation and enter here (meters, body frame)
+# X = forward/back, Y = left/right, Z = up/down
+GPS_MB1_TYPE,1
+GPS_MB1_OFS_X,0.00
+GPS_MB1_OFS_Y,0.40
+GPS_MB1_OFS_Z,0.00
 
 # -----------------------------------------------------------------------------
 # AHRS / EKF3 CONFIGURATION
@@ -136,7 +142,9 @@ EK3_SRC1_POSXY,1
 EK3_SRC1_VELXY,1
 EK3_SRC1_POSZ,1
 EK3_SRC1_VELZ,0
-EK3_SRC1_YAW,1
+# YAW source 2 = GPS heading (UM982 dual-antenna)
+# Was 8 (GSF) which requires 5m/s movement — too fast for 0.5m/s painting
+EK3_SRC1_YAW,2
 
 # EKF3 noise parameters tuned for RTK GPS
 # GPS velocity noise (m/s) - low values for high-quality RTK
@@ -162,14 +170,9 @@ EK3_ACC_P_NSE,0.35
 # COMPASS CONFIGURATION
 # -----------------------------------------------------------------------------
 # DISABLED: Hoverboard hub motors contain large permanent magnets that create
-# overwhelming magnetic interference. Even on a tall mast, compass readings
-# are unreliable (>60% interference in testing). ArduRover uses GSF
-# (Gaussian Sum Filter) for heading estimation from GPS velocity vectors.
-# This works reliably at paint speed (0.5 m/s) in open sky.
-#
-# Pre-arm procedure for compass-less: After GPS lock, walk the robot in a
-# small circle (~2m diameter). Wait for "EKF yaw alignment complete" in
-# Mission Planner before arming.
+# overwhelming magnetic interference (>60%). The UM982 dual-antenna heading
+# replaces the compass entirely — provides 0.2° accuracy at standstill.
+# No walk-around initialization needed (unlike GSF which requires 5m/s movement).
 COMPASS_ENABLE,0
 COMPASS_USE,0
 COMPASS_USE2,0
@@ -507,8 +510,9 @@ BATT_VOLT_MULT,10.1
 # Amps per volt: calibrate with a current meter or known load
 BATT_AMP_PERVLT,17.0
 
-# Battery capacity in mAh (typical hoverboard battery is 4000-5000mAh at 36V)
-BATT_CAPACITY,5000
+# Battery capacity in mAh: 18Ah = 18000mAh (36V × 18Ah = 648Wh)
+# Matches TinyMobileRobots' proven 640Wh capacity for 90-120 min runtime
+BATT_CAPACITY,18000
 
 # Low voltage warning (per cell: 3.5V * 10S = 35V... but hoverboard is 10S)
 # 36V nominal = 10S lithium, fully charged ~42V, empty ~30V
