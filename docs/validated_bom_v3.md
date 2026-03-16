@@ -100,14 +100,19 @@ or unavailable during painting.
 - **Recommended Lua timing**: `LEAD_TIME_MS=40`, `LAG_TIME_MS=25` (start here, field-tune)
 - **Flyback diode required**: 1N4007 across coil terminals
 
-### 7. Nozzle: TeeJet TP8004EVS — $15 (UNCHANGED, with validated specs)
-- **Validated specs**:
+### 7. Nozzle: TeeJet TP80015EVS — $15 (CHANGED from TP8004EVS)
+- **Change**: TP8004 (0.40 GPM) → TP80015 (0.15 GPM)
+- **Why**: The TP8004 delivers 0.40 GPM but the robot only needs ~0.001 GPM at paint speed.
+  This would require an extremely low PWM duty cycle (~0.25%), giving poor flow control.
+  The TP80015 at lower pressure (20-30 PSI) brings the duty cycle to a controllable 5-15%.
+  This matches how agricultural sprayers and competitor robots handle flow control.
+- **Validated specs (TP80015EVS)**:
   - 80° even flat fan spray pattern
-  - 0.4 GPM at 40 PSI (0.35-0.49 GPM range at 30-60 PSI)
-  - **Spray height for 4" line**: 6-8 inches (15-20 cm) above pavement
-  - EVS = VisiFlo color-coded (Red = 04 size), stainless steel core
+  - 0.15 GPM at 40 PSI (0.11-0.18 GPM range at 20-60 PSI)
+  - **Spray height for 4" line**: ~2.4 inches (6 cm) — geometry: `width = 2 × height × tan(40°)`
+  - EVS = VisiFlo color-coded, stainless steel core
   - Use with 50-mesh strainer to prevent clogging
-- **Line width at 6" height**: ~4 inches (10 cm) with 80° fan angle
+- **Flow control**: ArduRover AC_Sprayer PWM at 10-15 Hz, duty cycle proportional to ground speed
 - **Source**: [TeeJet Catalog](https://www.teejet.com/-/media/dam/agricultural/usa/sales-material/catalog/technical_information.pdf)
 
 ### 8. Battery: 36V 18Ah e-bike battery — $160 (CHANGED from 10Ah $100)
@@ -233,6 +238,69 @@ ATC_STR_RAT_P=0.30        # Steering rate P gain (tune on field)
 - **With 18Ah (648Wh)**: Even at 400W continuous, runtime = 97 minutes
 - **Competitors prove 640Wh works**: TinyMobileRobots claims 5hr spray time at lower continuous draw
 - **Safety margin**: Adequate for 1-2 parking lots per charge
+
+---
+
+## PAINT SYSTEM: CRITICAL NOZZLE SIZING ANALYSIS
+
+The original TP8004EVS was massively oversized. Here's the math:
+
+**Paint consumption at robot speed:**
+- Industry standard: 1 gallon = 350 linear feet at 4" width, 15-mil wet thickness
+- At 0.5 m/s (1.64 ft/s): consumption = 1.64 / 350 = 0.0047 gal/min = **0.005 GPM**
+- TP8004 delivers 0.40 GPM at 40 PSI — that's **80x more than needed**
+- PWM duty cycle would be 0.005/0.40 = **1.25%** — too low for reliable control
+
+**With TP80015EVS at 20 PSI:**
+- Flow: ~0.11 GPM
+- Required duty cycle: 0.005/0.11 = **4.5%** — much more controllable
+- At 30 PSI: ~0.13 GPM, duty = 3.8%
+- ArduRover AC_Sprayer supports PWM at 10-15 Hz, making 4-5% duty cycle reliable
+
+**Robot-specific paint recommended:**
+- US Specialty Coatings "RoboTraffic RTS" — pre-thinned for robotic low-pressure spray
+- Standard traffic paint (80-90 KU viscosity) needs 10-20% water thinning for nozzle spray
+- Target: 60-70 KU viscosity for reliable atomization at 20-40 PSI
+
+---
+
+## MOTOR PERFORMANCE: VALIDATED NUMBERS
+
+From measured data (ODrive calibration, FOC firmware testing, published papers):
+
+| Parameter | Value | Source |
+|-----------|-------|--------|
+| Phase resistance | 0.179 Ω | ODrive calibration |
+| Phase inductance | 0.336 mH | ODrive calibration |
+| Torque at 15A | 6-15 Nm | FFbeast testing, SimpleFOC community |
+| Stall current (unprotected) | ~100A | V/R calculation |
+| Robot locomotion (40kg, flat) | 50-100W | MDPI Sensors paper |
+| Total with paint system | 150-250W | Engineering estimate |
+| Battery runtime at 200W avg | 90-120 min (18Ah) | Discharge calculation |
+
+**FOC firmware recommendations for this robot:**
+- Use **SPEED mode** (not voltage mode) — active current control prevents stall
+- `I_MOT_MAX=15A` (safe continuous for 6.5" motors)
+- `I_DC_MAX=17A` (safety margin above motor limit)
+- `N_MOT_MAX=400 RPM` (limit top speed to ~1.5 m/s)
+- The 15A limit provides ~6-10 Nm per wheel — sufficient for a 40kg robot that only
+  needs ~3 Nm per wheel for acceleration on flat ground
+
+---
+
+## ARDUROVER CROSS-TRACK ACCURACY: REAL-WORLD DATA
+
+Position accuracy ≠ path-following accuracy. Field reports from ArduRover users:
+
+| Setup | Cross-Track Error | Source |
+|-------|------------------|--------|
+| RTK Float, tractor, 1.3 m/s | ±19-20 cm | ArduPilot forum |
+| RTK Fixed, mower, repeated loops | ~10 cm drift | The Mower Project |
+| RTK Fixed, slow rover, tuned PIDs | 2-5 cm | Community consensus |
+| Near buildings (multipath) | 5-15 cm | NovAtel multipath studies |
+
+**Our realistic target: ±2-5 cm in open areas, ±5-10 cm near buildings.**
+Parking lot line tolerance is ±5-7 cm ("looks straight"), so this is adequate.
 
 ---
 
