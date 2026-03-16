@@ -1,5 +1,7 @@
 # Striper Robot -- Bill of Materials (BOM)
 
+**NOTE: This BOM is superseded by docs/validated_bom_v3.md which has research-validated pricing and specs.**
+
 Bill of materials for the autonomous parking-lot line-striping robot,
 redesigned around **ArduRover on a Pixhawk flight controller** with
 **hoverboard drive motors** running open-source FOC firmware.

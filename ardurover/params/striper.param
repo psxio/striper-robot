@@ -53,9 +53,9 @@ SERIAL1_BAUD,57
 SERIAL2_PROTOCOL,28
 SERIAL2_BAUD,115
 
-# Serial3 = UM980 RTK GPS (UART)
+# Serial3 = UM982 RTK GPS (UART)
 # Protocol 5 = GPS
-# UM980 default baud: 115200
+# UM982 default baud: 115200
 SERIAL3_PROTOCOL,5
 SERIAL3_BAUD,115
 
@@ -66,12 +66,11 @@ SERIAL3_BAUD,115
 SERIAL4_PROTOCOL,28
 SERIAL4_BAUD,115
 
-# Serial5 = RC input if using iBus/SBUS over UART (FlySky FS-i6X)
-# If using PPM on the dedicated RC port, leave this disabled
-# Protocol 23 = RCIN
-# Uncomment the following two lines if RC is on Serial5 instead of the RC port:
-# SERIAL5_PROTOCOL,23
-# SERIAL5_BAUD,115
+# Serial5 = UM982 GPS2 (second antenna data for moving baseline heading)
+# Protocol 5 = GPS
+# UM982 dual-antenna requires two serial ports: Serial3 for GPS1, Serial5 for GPS2
+SERIAL5_PROTOCOL,5
+SERIAL5_BAUD,115
 
 # -----------------------------------------------------------------------------
 # GPS CONFIGURATION (Unicore UM982 Dual-Antenna)
@@ -82,8 +81,9 @@ SERIAL4_BAUD,115
 # Requires two GNSS antennas mounted ≥30cm apart
 GPS_TYPE,25
 
-# No secondary GPS (UM982 uses both antennas on one module)
-GPS_TYPE2,0
+# Secondary GPS: UM982 dual-antenna moving baseline requires GPS_TYPE2
+# GPS_TYPE 25 = UnicoreMovingBaselineNMEA (second antenna on Serial5)
+GPS_TYPE2,25
 
 # GNSS constellation mask: all constellations for best RTK convergence
 # Bit 0=GPS, 1=SBAS, 2=Galileo, 3=BeiDou, 4=IRST, 5=QZSS, 6=GLONASS
@@ -113,7 +113,7 @@ GPS_POS1_Y,0.00
 GPS_POS1_Z,-0.15
 
 # GPS measurement delay (ms): accounts for GPS processing latency
-# UM980 is fast; 200ms is conservative
+# UM982 is fast; 200ms is conservative
 GPS_DELAY_MS,200
 
 # GPS driver auto-config: 2 = auto-configure the GPS module
@@ -157,7 +157,7 @@ EK3_POSNE_M_NSE,0.05
 # GPS check mask: enable all GPS quality checks
 EK3_GPS_CHECK,31
 
-# Number of EKF cores: 1 is sufficient for rover
+# Number of EKF cores: 2 cores for redundancy
 EK3_IMU_MASK,3
 
 # Gyro noise (rad/s) - default is fine for Pixhawk 6C IMU
@@ -240,6 +240,9 @@ SERVO10_TRIM,1000
 # -----------------------------------------------------------------------------
 # RELAY OUTPUTS (Solenoid and Pump control via Lua / Mission commands)
 # -----------------------------------------------------------------------------
+# NOTE: Use EITHER relay-based Lua paint control OR AC_Sprayer — not both. If using Lua scripts (paint_control.lua), set SPRAY_ENABLE=0.
+# NOTE: Shurflo pump draws 6.4A peak at 12V. Use a SEPARATE 12V converter for the pump, not the same one powering Pixhawk/GPS.
+
 # Relay 1 = Paint solenoid valve
 # Pixhawk 6C AUX5 = SERVO13 = FMU pin 54
 RELAY1_FUNCTION,1
@@ -291,7 +294,7 @@ WP_SPEED,0.50
 WP_RADIUS,0.15
 
 # Waypoint overshoot distance (meters): how far past a WP we can go
-WP_OVERSHOOT,0.10
+WP_OVERSHOOT,0.05
 
 # Pivot turn rate (deg/s) for point turns in skid steer
 WP_PIVOT_RATE,60
@@ -309,7 +312,7 @@ WP_PIVOT_SPEED,0.0
 # L1 period (seconds): controls path-following tightness
 # Lower = tighter tracking but more oscillation risk
 # For precise striping on smooth surfaces, 4-6 is a good starting range
-NAVL1_PERIOD,5
+NAVL1_PERIOD,4
 
 # L1 damping: 0.7-0.85 typical, higher = more damped
 NAVL1_DAMPING,0.75
@@ -326,7 +329,7 @@ NAVL1_XTRACK_I,0.02
 
 # === Steering rate PID (controls yaw rate response) ===
 # P: proportional gain - how aggressively steering corrects heading error
-ATC_STR_RAT_P,0.20
+ATC_STR_RAT_P,0.30
 # I: integral gain - corrects steady-state steering bias
 ATC_STR_RAT_I,0.20
 # D: derivative gain - damps oscillation (keep low to start)
@@ -432,8 +435,8 @@ RC10_OPTION,0
 # -----------------------------------------------------------------------------
 # Arming checks bitmask:
 # Bit 0=All, 1=Baro, 2=Compass, 3=GPS, 4=INS, 5=Params, 6=RC, 7=Voltage
-# 124 = compass + GPS + INS + params + RC + voltage (skip barometer for ground robot)
-ARMING_CHECK,124
+# 120 = GPS + INS + params + RC + voltage (skip barometer AND compass for ground robot)
+ARMING_CHECK,120
 
 # Require arming method: 1 = require rudder stick or GCS arm command
 ARMING_REQUIRE,1
@@ -520,8 +523,8 @@ BATT_CAPACITY,18000
 # Low warning at 33V (3.3V/cell)
 BATT_LOW_VOLT,33.0
 
-# Critical voltage: land/hold immediately (3.0V/cell = 30V)
-BATT_CRT_VOLT,30.0
+# Critical voltage: land/hold immediately (3.1V/cell = 31V)
+BATT_CRT_VOLT,31.0
 
 # Minimum voltage for arming (3.5V/cell = 35V, ensures charged battery)
 BATT_ARM_VOLT,35.0
@@ -601,6 +604,8 @@ SIMPLE,0
 # The Lua script obstacle_avoid.lua reads the rangefinder data and
 # implements stop/resume logic with hysteresis.
 
+# NOTE: Requires rangefinder_bridge.lua script to parse Arduino Nano serial data. Without this script, obstacle avoidance is non-functional.
+
 # Rangefinder 1: Front-Left HC-SR04
 RNGFND1_TYPE,36
 RNGFND1_MIN_CM,2
@@ -645,7 +650,7 @@ RALLY_TOTAL,0
 # POST-LOAD CHECKLIST:
 # 1. Calibrate accelerometers (level the robot on flat ground)
 # 2. Compass disabled (COMPASS_ENABLE=0) — skip compass calibration
-#    Instead: after GPS lock, walk robot in a 2m circle for GSF heading init
+#    Verify UM982 dual-antenna heading shows valid yaw in Mission Planner before arming. No walk-around needed.
 # 3. Calibrate RC transmitter (full stick deflections)
 # 4. Verify battery voltage reading matches multimeter
 # 5. Upload polygon geofence matching your parking lot boundary

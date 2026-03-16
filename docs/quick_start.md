@@ -33,11 +33,11 @@ out on a workbench and check off:
 | 3 | 2020 aluminum extrusion (500mm lengths, 4-6 pieces) + corner brackets + T-nuts + M5 screws | [ ] |
 | 4 | 3/4" plywood (24"x18" or sized to match frame) | [ ] |
 | 5 | Pixhawk 6C Mini | [ ] |
-| 6 | Unicore UM980 breakout + multiband GNSS antenna (L1/L2 minimum) | [ ] |
+| 6 | Unicore UM982 breakout + 2x multiband GNSS antennas (L1/L2 minimum, dual-antenna heading) | [ ] |
 | 7 | Shurflo 8000 diaphragm pump (12V, 60 PSI, 1 GPM) | [ ] |
 | 8 | 12V solenoid valve (N.C., 3/8" NPT, brass, direct-acting) | [ ] |
 | 9 | TeeJet TP8004EVS even-fan nozzle + 60-mesh strainer + adapters + 3 ft 3/8" tubing | [ ] |
-| 10 | 36V 10Ah e-bike battery with charger | [ ] |
+| 10 | 36V 18Ah e-bike battery with charger | [ ] |
 | 11 | DC-DC converter 36V to 12V (5A minimum, XL4015) | [ ] |
 | 12 | Holybro PM06 V2 power module (5V/3A + battery monitoring) | [ ] |
 | 13 | E-stop button (22mm mushroom, twist-release, N.C.) + 40A DC contactor | [ ] |
@@ -90,7 +90,7 @@ slide the hoverboard wheels into position.
      width). This goes into `WHL_TRACK` in the parameter file. Typical
      hoverboard: 0.40-0.45m
 3. Mount the hoverboard mainboard to the frame deck, at least 15cm from
-   the hub motors (to reduce compass interference). Use M3 standoffs to
+   the hub motors (to reduce electromagnetic interference). Use M3 standoffs to
    elevate it off the deck for airflow
 4. Reconnect motor phase wires (3 wires per motor: typically yellow, blue,
    green) and hall sensor cables (5-pin JST-XH) to the mainboard
@@ -186,16 +186,18 @@ Wire the power distribution system. Refer to `docs/wiring_guide.md` Section
    Pin 1 = VCC (5V), Pin 6 = GND
 3. Power on. Verify Pixhawk boots: LED goes through startup sequence and
    settles on a pattern (likely flashing yellow = no GPS)
-4. Mount the UM980 GPS breakout board near the Pixhawk
-5. Connect the UM980 to Pixhawk SERIAL3 (GPS1) port:
-   - Pixhawk TX (pin 2) to UM980 RX
-   - Pixhawk RX (pin 3) to UM980 TX
-   - Pixhawk GND (pin 6) to UM980 GND
-   - Pixhawk VCC (pin 1, 5V) to UM980 VCC
-6. Mount the GNSS antenna on the highest point of the robot (top of an
-   upright, or on a small mast). Clear 360-degree sky view
-7. Connect the antenna to the UM980 breakout SMA connector
-8. If you have a ground plane disc (100mm aluminum), mount it under the
+4. Mount the UM982 GPS breakout board near the Pixhawk
+5. Connect the UM982 to Pixhawk using **two serial ports**:
+   - **SERIAL3 (GPS1)** — position: Pixhawk TX (pin 2) to UM982 Port 1 RX,
+     Pixhawk RX (pin 3) to UM982 Port 1 TX, GND (pin 6) to GND,
+     VCC (pin 1, 5V) to UM982 VCC
+   - **SERIAL4 (GPS2)** — heading: Pixhawk TX (pin 2) to UM982 Port 2 RX,
+     Pixhawk RX (pin 3) to UM982 Port 2 TX, GND (pin 6) to GND
+6. Mount **both** GNSS antennas on the highest point of the robot, separated
+   by at least 20cm (larger baseline = better heading accuracy). Clear
+   360-degree sky view for both
+7. Connect the antennas to the UM982 breakout SMA connectors
+8. If you have ground plane discs (100mm aluminum), mount them under each
    antenna
 
 ---
@@ -221,7 +223,7 @@ Wire the power distribution system. Refer to `docs/wiring_guide.md` Section
 6. Reconnect and verify key parameters loaded:
    - `FRAME_TYPE` = 2 (skid steer)
    - `SERIAL2_PROTOCOL` = 28 (Scripting)
-   - `GPS_TYPE` = 24 (UnicoreNMEA / UM980)
+   - `GPS_TYPE` = 25 (UnicoreMovingBaselineNMEA / UM982)
    - `SCR_ENABLE` = 1
 7. Update `WHL_TRACK` to match your measured track width (default 0.40m)
 
@@ -267,22 +269,26 @@ Wire the power distribution system. Refer to `docs/wiring_guide.md` Section
    - CH7 (SwA): paint solenoid toggle
    - CH8 (SwB): pump toggle
 
-### Step 12: Compass Calibration (15 minutes)
+### Step 12: Verify UM982 Heading in Mission Planner (15 minutes)
+
+Compass is disabled (`COMPASS_ENABLE=0`) because hub motor magnets cause
+overwhelming magnetic interference. The UM982 dual-antenna GPS provides
+heading instead.
 
 1. Take the robot outdoors, away from vehicles, buildings, and metal
    structures (at least 10 meters clear)
-2. In Mission Planner, go to Setup > Mandatory Hardware > Compass
-3. Click "Start" to begin onboard calibration
-4. Pick up the robot (or place it on a small table) and rotate it through
-   all orientations:
-   - Rotate 360 degrees around each of 3 axes (roll, pitch, yaw)
-   - Move in large figure-8 patterns
-5. Mission Planner will show a progress bar. When all compasses reach
-   100%, calibration is complete
-6. Click "Accept" to save
+2. In Mission Planner, verify both GNSS antennas have satellite lock
+   (GPS status should show 3D Fix or better)
+3. Check the heading readout in Mission Planner's HUD -- it should match
+   the robot's actual forward direction
+4. Verify `EK3_SRC1_YAW=2` (GPS heading) in the parameter list
+5. Wait for the "EKF yaw alignment complete" message in the Messages tab
+6. UM982 heading works at standstill -- no need to walk the robot in a
+   circle to initialize yaw (unlike the old GSF approach with UM980)
 
-**If calibration fails**: you are too close to a metal structure. Move to a
-more open area and try again.
+**If heading is wrong or erratic**: check both antenna connections, verify
+antenna baseline separation (minimum 20cm), and ensure both antennas have
+clear sky view.
 
 ### Step 13: Motor Direction Test (15 minutes)
 
@@ -430,7 +436,7 @@ The moment of truth. Start with a simple pattern, no paint.
     - Does it stop at the end of the mission?
 11. If the robot veers off course:
     - Switch to MANUAL immediately and steer to safety
-    - Check compass heading vs actual heading
+    - Check UM982 heading vs actual heading
     - Check PID tuning (see `docs/troubleshooting.md`)
 12. Run the mission 3-5 times until navigation is consistent
 
@@ -512,7 +518,7 @@ You are ready for paint. Start with a small job (5-10 spaces).
 | 9 | Load parameters | 15 min |
 | 10 | Install Lua scripts | 10 min |
 | 11 | RC transmitter binding and channel setup | 30 min |
-| 12 | Compass calibration | 15 min |
+| 12 | Verify UM982 heading | 15 min |
 | 13 | Motor direction test | 15 min |
 | 14 | First drive test (manual RC) | 30 min |
 | 15 | GPS test (achieve RTK fix) | 1-2 hrs |
@@ -536,7 +542,7 @@ You are ready for paint. Start with a small job (5-10 spaces).
 | Robot drives backward | Motor phase wires swapped or SERVO_REVERSED wrong | Swap two phase wires, or set SERVO1_REVERSED=1 |
 | Robot turns wrong way | Steering channel reversed or left/right motors swapped | Set RC1_REVERSED or swap motor connectors |
 | Relay does not click | 5V not reaching relay module, or signal wire disconnected from AUX5/AUX6 | Check relay VCC, GND, and signal connections |
-| Cannot arm | Pre-arm checks failing | Read the pre-arm failure message in Mission Planner HUD. Most common: compass not calibrated, GPS no fix, battery voltage too low |
+| Cannot arm | Pre-arm checks failing | Read the pre-arm failure message in Mission Planner HUD. Most common: GPS no fix, UM982 heading not converged, battery voltage too low |
 | RC transmitter not bound | Binding procedure not completed | Re-do binding: hold bind button on receiver during power-on, then bind from transmitter menu |
 
 ---

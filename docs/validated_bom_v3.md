@@ -17,8 +17,8 @@ or unavailable during painting.
 **The UM982 solves this completely:**
 - Dual-antenna heading works at standstill (no movement required)
 - ArduPilot GPS_TYPE=25 (UnicoreMovingBaseline), officially documented for Rover
-- ArduSimple simpleRTK3B Compass is a direct drop-in (~$210, vs $180 for UM980)
-- Heading accuracy: 0.2°/1m baseline (better than any compass near hub motors)
+- ArduSimple simpleRTK3B Compass is 299 EUR (~$325); Holybro H-RTK UM982 at $250 is the better deal (includes dual antennas + cables)
+- Heading accuracy: 0.1°/1m baseline (better than any compass near hub motors)
 - Same RTK position accuracy as UM980 (8mm horizontal)
 
 **Sources:**
@@ -39,7 +39,7 @@ or unavailable during painting.
 | Battery | Not published | 640 Wh (5 hr spray) | 640 Wh |
 | Paint capacity | 5.5 gal | 10 L (2.6 gal) | 5 gal |
 | Line width | Adjustable | 5-10 cm (2-4") | 4" (10 cm) |
-| Price | ~$6,000/yr lease | ~$5,000/yr lease | $780 BOM / $299/yr RaaS |
+| Price | ~$6,000/yr lease | ~$5,000/yr lease | $1,011 BOM / $299/yr RaaS |
 
 **Sources:**
 - [Turf Tank One Specs](https://turftank.com/us/turftankone/)
@@ -60,11 +60,12 @@ or unavailable during painting.
 - **Actual price verified**: Holybro official store $249.99 (includes dual antennas + cables)
 - **Specs validated from datasheet**:
   - Position: 8mm horizontal RTK, L1/L2/L5 triband
-  - Heading: 0.2° at 1m baseline (antenna separation ≥30cm)
+  - Heading: 0.1° at 1m baseline (at 0.4m baseline: 0.25° accuracy; antenna separation ≥30cm)
   - Works at standstill — no movement needed for heading
   - ArduPilot GPS_TYPE=25 (UnicoreMovingBaseline)
 - **Includes**: Two GNSS antennas + JST Pixhawk cable (no separate antenna purchase needed)
 - **Config**: `GPS1_MB_TYPE=1`, `EK3_SRC1_YAW=2`
+- **Serial ports**: Requires two serial ports on Pixhawk (GPS1 + GPS2). Use Serial3 for master, Serial5 for slave.
 - **Source**: [Holybro H-RTK UM982](https://holybro.com/products/h-rtk-unicore-um982)
 
 ### 4. Motors: Used Hoverboard — $30 (UNCHANGED, with caveats)
@@ -79,13 +80,13 @@ or unavailable during painting.
 
 ### 5. Paint Pump: Shurflo 8000-543-236 — $90 (UNCHANGED)
 - **Validated specs**:
-  - 12V DC, 1.0 GPM at 50 PSI (demand switch at 50 PSI)
+  - 12V DC, 1.8 GPM open flow, 60 PSI demand switch
   - Viton valves + Santoprene diaphragm — compatible with water-based traffic paint
   - Self-priming, runs dry without damage
 - **Paint coverage validated**: 1 gallon = 300-400 linear feet at 4" width, 15-mil wet thickness
-- **At 0.5 m/s paint speed**: Need ~0.28 GPM flow — pump at 1.0 GPM has ~3.5x headroom
+- **At 0.5 m/s paint speed**: Need ~0.28 GPM flow — pump at 1.8 GPM has ~6x headroom
   - Pump maintains pressure; solenoid gates flow to nozzle
-  - Add inline pressure regulator (20 PSI) for proper nozzle flow rate
+  - Nozzle is the flow limiter, not the pump — use PWM to control duty cycle
 - **Source**: [Shurflo 8000-543-236](https://www.amazon.com/Pentair-8000-543-236-Automatic-Demand-Diaphragm-Santoprene/dp/B00E5UV0W8)
 
 ### 6. Solenoid: 3/8" 12V Direct-Acting — $20 (UNCHANGED, with timing data)
@@ -98,14 +99,15 @@ or unavailable during painting.
 ### 7. Nozzle: TeeJet TP8004EVS — $15 (UNCHANGED, validated correct)
 - **Validated flow rate match** (see analysis section below):
   - At 0.5 m/s, robot needs 0.281 GPM of paint
-  - TP8004 at 20 PSI delivers 0.283 GPM — nearly perfect match
+  - TP8004 minimum rated pressure is 30 PSI; at 30 PSI delivers 0.40 × sqrt(30/40) = 0.346 GPM
+  - Duty cycle = 0.281/0.346 = **81%** — good duty cycle for PWM control
   - At 40 PSI (0.40 GPM), solenoid PWM at ~70% duty provides exact flow
-- **Requires inline pressure regulator** ($10, set to 20 PSI) between pump and solenoid
-  - Pump demand switch is 50 PSI; regulator drops to 20 PSI at nozzle
-  - Alternative: skip regulator, use AC_Sprayer PWM at 70% duty at full speed
+- **No pressure regulator needed** — use AC_Sprayer PWM at ~81% duty cycle instead
+  - Paint-compatible pressure regulators cost $800+; cheap ones clog with paint
+  - PWM is free and provides better speed-proportional flow control
 - **Validated specs**:
   - 80° even flat fan spray pattern
-  - 0.40 GPM at 40 PSI (0.28 GPM at 20 PSI)
+  - 0.40 GPM at 40 PSI, 0.346 GPM at 30 PSI (minimum rated pressure)
   - **Spray height for 4" line**: ~2.4 inches (6 cm) — geometry: `width = 2 × height × tan(40°)`
   - EVS = VisiFlo color-coded (Red = 04 size), stainless steel core
   - Use with 50-mesh strainer to prevent clogging
@@ -116,9 +118,10 @@ or unavailable during painting.
 - **Why**: Competitors use 640Wh. Our original 360Wh (10Ah) was marginal.
   - 36V × 18Ah = 648 Wh — matches TinyMobileRobots' proven capacity
   - TinyMobileRobots gets 5 hours spray time from 640Wh
-  - At 300W average draw: 648Wh ÷ 300W = 2.16 hours runtime
-  - At 200W average draw: 648Wh ÷ 200W = 3.24 hours runtime
-  - Conservative estimate: 90-120 minutes of active painting
+  - At typical 200W draw: 648Wh ÷ 200W = ~3 hours runtime
+  - At heavy 300W draw: 648Wh ÷ 300W = ~2 hours runtime
+  - Range with 150-250W average: 2.6-4.3 hours
+  - Conservative for budgeting: 90-120 minutes of active painting (accounts for terrain, wind, paint viscosity overhead)
 - **Requires**: Same form factor (Hailong case, XT60 connector, 10S BMS with cell balancing)
 - **BATT_LOW_VOLT=33V** (3.3V/cell), **BATT_CRT_VOLT=31V** (3.1V/cell)
 
@@ -151,7 +154,7 @@ or unavailable during painting.
 - GPS antenna mount: 200mm aluminum standoff, centered, ≥30cm between dual antennas
 - Paint tank mount: Centered over axle line (CG over drive wheels)
 - Nozzle mount: Adjustable height arm, 6-8" above ground, trailing behind robot
-- **Weight target**: 20-25 kg dry, ~44 kg with 5 gal paint (paint = ~23 kg at 1.2 kg/L density)
+- **Weight target**: 20-25 kg dry, ~44-48 kg with 5 gal paint (5 gal = 18.9L; at 1.2-1.4 g/cm³ density = 23-27 kg)
 
 ### 13. Paint Tank & Plumbing — $30 (NEW, previously unspecified)
 - 5-gallon HDPE pressure tank with lid (not open bucket — prevents splash)
@@ -179,8 +182,25 @@ or unavailable during painting.
 | RC transmitter | $50 | $50 | — |
 | Frame + hardware | $80 | $80 | — |
 | Paint tank + plumbing | — | $30 | NEW |
-| Wiring, fuses, misc | $53 | $53 | — |
-| **TOTAL** | **$780** | **$958** | **+$178** |
+| Wiring, fuses, misc | $53 | $106 | +$53 (see additional parts below) |
+| **TOTAL** | **$780** | **$1,011** | **+$231** |
+
+### Additional Parts Not in Line Items
+
+Included in the "Wiring, fuses, misc" line ($106):
+
+| Part | Est. Cost |
+|------|-----------|
+| ST-Link V2 programmer (for hoverboard flash) | $12 |
+| USB-serial adapter (for UM982 config) | $8 |
+| 50-mesh inline strainer | $10 |
+| Quick-disconnect fittings | $10 |
+| 1000uF capacitor for 12V rail | $3 |
+| Hose + clamps | $10 |
+| Wiring, fuses, connectors, heatshrink | $53 |
+| **Subtotal** | **$106** |
+
+**Note**: This is component cost only. Tools (soldering iron, multimeter, drill), shipping, and spare parts add $100-300 depending on what you already own. Realistic all-in cost for a first build: **$1,200-1,500**.
 
 **Cost increase justified by:**
 - UM982 eliminates the #1 technical risk (heading at paint speed)
@@ -243,6 +263,12 @@ ATC_STR_RAT_P=0.30        # Steering rate P gain (tune on field)
 - **Competitors prove 640Wh works**: TinyMobileRobots claims 5hr spray time at lower continuous draw
 - **Safety margin**: Adequate for 1-2 parking lots per charge
 
+### 5. RTK Corrections (NTRIP) — REQUIRED FOR 2CM ACCURACY
+- RTK corrections (NTRIP) are required for 2cm accuracy. Options:
+  - Free community base stations (RTK2GO, if available near your site)
+  - Paid service ($40/month from RTKdata or Point One Polaris)
+  - Own base station ($300-500 additional hardware cost)
+
 ---
 
 ## PAINT SYSTEM: FLOW RATE ANALYSIS (corrected)
@@ -254,20 +280,20 @@ ATC_STR_RAT_P=0.30        # Steering rate P gain (tune on field)
 
 **Nozzle sizing validation:**
 
-| Nozzle | Flow @ 40 PSI | Flow @ 20 PSI | Duty cycle needed |
-|--------|--------------|--------------|-------------------|
-| TP8004EVS | 0.40 GPM | 0.283 GPM | 70% @ 40 PSI, **99% @ 20 PSI** |
-| TP80015EVS | 0.15 GPM | 0.106 GPM | **187% — UNDERSIZED** |
+| Nozzle | Flow @ 40 PSI | Flow @ 30 PSI (min rated) | Duty cycle needed |
+|--------|--------------|--------------------------|-------------------|
+| TP8004EVS | 0.40 GPM | 0.346 GPM | 70% @ 40 PSI, **81% @ 30 PSI** |
+| TP80015EVS | 0.15 GPM | 0.130 GPM | **187% — UNDERSIZED** |
 
-**Result: TP8004EVS is the correct nozzle.** At 20 PSI it delivers 0.283 GPM —
-almost exactly the 0.281 GPM needed. An inline pressure regulator (20 PSI, ~$10)
-between pump and solenoid provides the right operating point. At 40 PSI without a
-regulator, use AC_Sprayer PWM at ~70% duty cycle.
+**Result: TP8004EVS is the correct nozzle.** Minimum rated pressure is 30 PSI.
+At 30 PSI it delivers 0.346 GPM; duty cycle = 0.281/0.346 = 81% — a good operating
+point for PWM control via AC_Sprayer. At 40 PSI, use ~70% duty cycle.
+No pressure regulator needed — PWM provides speed-proportional flow control for free.
 
 **Robot-specific paint recommended:**
 - US Specialty Coatings "RoboTraffic RTS" — pre-thinned for robotic low-pressure spray
 - Standard traffic paint (80-90 KU viscosity) needs 10-20% water thinning for nozzle spray
-- Target: 60-70 KU viscosity for reliable atomization at 20-40 PSI
+- Target: 60-70 KU viscosity for reliable atomization at 30-40 PSI
 
 ---
 
@@ -283,7 +309,7 @@ From measured data (ODrive calibration, FOC firmware testing, published papers):
 | Stall current (unprotected) | ~100A | V/R calculation |
 | Robot locomotion (40kg, flat) | 50-100W | MDPI Sensors paper |
 | Total with paint system | 150-250W | Engineering estimate |
-| Battery runtime at 200W avg | 90-120 min (18Ah) | Discharge calculation |
+| Battery runtime at 200W avg | ~3 hours (18Ah/648Wh) | Discharge calculation |
 
 **FOC firmware recommendations for this robot:**
 - Use **SPEED mode** (not voltage mode) — active current control prevents stall
@@ -313,12 +339,12 @@ Parking lot line tolerance is ±5-7 cm ("looks straight"), so this is adequate.
 
 ## PRE-BUILD VALIDATION CHECKLIST
 
-Before spending $935, validate these on the bench:
+Before spending $1,011, validate these on the bench:
 
 - [ ] **UM982 heading test**: Order eval board, verify GPS_TYPE=25 heading at standstill
 - [ ] **Hoverboard UART test**: Flash FOC firmware, verify motor_bridge.lua protocol works
 - [ ] **Solenoid timing test**: Measure actual open/close time with water, then with paint
-- [ ] **Pump pressure test**: Verify Shurflo 8000 maintains 40 PSI with paint viscosity
+- [ ] **Pump pressure test**: Verify Shurflo 8000 maintains 60 PSI demand switch with paint viscosity
 - [ ] **Nozzle pattern test**: Verify 4" line width at 6-8" spray height with TeeJet TP8004EVS
 - [ ] **Battery discharge test**: Measure actual current draw of motors under load on pavement
 - [ ] **NTRIP connectivity test**: Verify RTK Fix at your test site with chosen NTRIP provider

@@ -2,7 +2,7 @@
 
 Complete wiring reference for the ArduRover + hoverboard architecture.
 This guide covers the Tier 2 "Best Value" build (Pixhawk 6C Mini +
-UM980 GPS + hoverboard motors). Tier 1 (ESP32) and Tier 3 (full-size
+UM982 GPS + hoverboard motors). Tier 1 (ESP32) and Tier 3 (full-size
 Pixhawk 6C) builders: adapt as noted inline.
 
 A builder should be able to wire the entire robot from this document.
@@ -14,7 +14,7 @@ A builder should be able to wire the entire robot from this document.
 ```
                     +=========================+
                     |  36V E-BIKE BATTERY     |
-                    |  (10Ah / 360Wh)         |
+                    |  (18Ah / 648Wh)         |
                     +=========================+
                        |         |         |
                   [30A FUSE]     |         |
@@ -49,7 +49,9 @@ A builder should be able to wire the entire robot from this document.
      +===========================================+
      |           PIXHAWK 6C MINI                 |
      |                                           |
-     | SERIAL3 ────── UM980 GPS (UART, 4 wires)  |
+     | SERIAL3 ────── UM982 GPS port 1 (UART)    |
+     |                                           |
+     | SERIAL4 ────── UM982 GPS port 2 (heading) |
      |                                           |
      | SERIAL1/2 ──── Hoverboard UART (TX/RX/GND)|
      |                                           |
@@ -87,7 +89,7 @@ derived from it:
 |------|--------|----------|------------|
 | 36V direct | Battery through fuse, contactor, and e-stop | Hoverboard mainboard (motors) | **12 AWG** min |
 | 12V | 36V to 12V DC-DC converter (**5A min**) | Shurflo pump, solenoid valve | 18 AWG |
-| 5V | Holybro PM06 V2 (5V/3A + battery monitoring) | Pixhawk, UM980 GPS, RC receiver | 22 AWG |
+| 5V | Holybro PM06 V2 (5V/3A + battery monitoring) | Pixhawk, UM982 GPS, RC receiver | 22 AWG |
 
 ### 2.2 Wiring
 
@@ -201,50 +203,65 @@ SERIAL2_BAUD = 115200
 
 ---
 
-## 4. GPS Wiring (UM980)
+## 4. GPS Wiring (UM982)
 
 ### 4.1 Connections
 
-The UM980 breakout board communicates with the Pixhawk over UART.
-Connect to **SERIAL3** (GPS1) or **SERIAL4** (GPS2) on the Pixhawk.
+The UM982 breakout board communicates with the Pixhawk over UART. The
+UM982 provides dual-antenna heading, which requires **two serial ports**
+on the Pixhawk: one for position (SERIAL3 / GPS1) and one for the
+moving-baseline heading solution (SERIAL4 / GPS2).
 
-| Pixhawk GPS Port Pin | Function | Connects To |
-|-----------------------|----------|-------------|
-| Pin 1 | VCC (5V) | UM980 VCC (5V input) |
-| Pin 2 | TX (out) | UM980 RX |
-| Pin 3 | RX (in) | UM980 TX |
-| Pin 6 | GND | UM980 GND |
+**Port 1 — Position (SERIAL3 / GPS1):**
 
-> **Important:** TX-to-RX crossover. Pixhawk TX goes to UM980 RX, and
-> vice versa.
+| Pixhawk GPS1 Port Pin | Function | Connects To |
+|------------------------|----------|-------------|
+| Pin 1 | VCC (5V) | UM982 VCC (5V input) |
+| Pin 2 | TX (out) | UM982 Port 1 RX |
+| Pin 3 | RX (in) | UM982 Port 1 TX |
+| Pin 6 | GND | UM982 GND |
 
-### 4.2 Antenna
+**Port 2 — Heading (SERIAL4 / GPS2):**
 
-Connect a multiband GNSS antenna (L1/L2 minimum, L1/L2/L5 preferred) to
-the UM980 breakout's SMA connector using an SMA cable. Mount the antenna
-on top of the robot with a clear view of the sky. Use an aluminum ground
-plane disc (100mm diameter) under the antenna for better multipath
-rejection.
+| Pixhawk GPS2 Port Pin | Function | Connects To |
+|------------------------|----------|-------------|
+| Pin 2 | TX (out) | UM982 Port 2 RX |
+| Pin 3 | RX (in) | UM982 Port 2 TX |
+| Pin 6 | GND | UM982 GND |
+
+> **Important:** TX-to-RX crossover on both ports. Pixhawk TX goes to
+> UM982 RX, and vice versa.
+
+### 4.2 Antennas
+
+The UM982 requires **two multiband GNSS antennas** for dual-antenna
+heading. Connect both to the UM982 breakout's SMA connectors. Mount the
+antennas on top of the robot with clear sky views, separated by at least
+20cm (larger baseline = better heading accuracy). Use aluminum ground
+plane discs (100mm diameter) under each antenna for multipath rejection.
 
 ### 4.3 ArduRover Configuration
 
 ```
 SERIAL3_PROTOCOL = 5       (GPS)
 SERIAL3_BAUD = 115         (115200 baud — ArduPilot uses shorthand)
-GPS_TYPE = 24              (UnicoreNMEA — single UM980)
+SERIAL4_PROTOCOL = 5       (GPS — second port for UM982 heading)
+SERIAL4_BAUD = 115         (115200 baud)
+GPS_TYPE = 25              (UnicoreMovingBaselineNMEA — UM982 dual-antenna)
 GPS_RATE_MS = 200          (5 Hz update, or 100 for 10 Hz)
+EK3_SRC1_YAW = 2           (GPS heading — UM982 dual-antenna)
 COMPASS_ENABLE = 0         (disable compass — hub motor magnets cause
-                            overwhelming interference; use GPS-based heading)
+                            overwhelming interference; UM982 provides heading)
 ```
 
-> **GPS_TYPE values:** `24` = UnicoreNMEA (single UM980). `25` =
-> UnicoreMovingBaselineNMEA (dual-antenna UM982 for GPS-based heading).
-> Use 24 unless you upgrade to UM982.
+> **GPS_TYPE values:** `25` = UnicoreMovingBaselineNMEA (dual-antenna
+> UM982 for GPS-based heading). The previous value `24` (UnicoreNMEA)
+> was for the single-antenna UM980.
 
-> **Compass-less operation:** ArduRover uses GSF (Gaussian Sum Filter) to
-> estimate heading from GPS velocity vectors. Works reliably at 0.5+ m/s
-> in open sky. After GPS lock, walk the robot in a small circle (~2m)
-> to initialize yaw. Wait for "EKF yaw alignment complete" in Mission
+> **UM982 dual-antenna heading:** Unlike the old GSF (Gaussian Sum
+> Filter) approach used with the UM980, the UM982 dual-antenna heading
+> works at standstill. No need to walk the robot in a circle to
+> initialize yaw. Wait for "EKF yaw alignment complete" in Mission
 > Planner before arming.
 
 > **Tier 1 (ZED-F9P):** Set `GPS_TYPE = 2` (u-blox). The simpleRTK2B
@@ -373,8 +390,8 @@ manual override and mode switching.
 | RC Channel | Function |
 |------------|----------|
 | CH1 | Steering (left stick horizontal) |
-| CH2 | Throttle (left stick vertical) |
-| CH3 | (spare) |
+| CH2 | (spare — see note below) |
+| CH3 | Throttle (left stick vertical — matches param file RCMAP_THROTTLE=3) |
 | CH4 | (spare) |
 | CH5 | Flight mode switch (3-position: MANUAL / HOLD / AUTO) |
 | CH6 | Spray toggle (switch or knob) |
@@ -488,6 +505,10 @@ When contacts are open (e-stop pressed): pin reads LOW (pulled to GND).
 - **Verify DC-DC converter output** with a multimeter before connecting
   the Pixhawk or GPS. A converter set to the wrong voltage will destroy
   them.
+- **Use a separate 12V converter for the pump.** The Shurflo 8000 pump
+  has a 15-24A inrush on startup. If it shares a 12V converter with the
+  solenoid, the voltage sag can cause relay dropout. Use a dedicated
+  36V-to-12V converter (5A minimum, 10A preferred) for the pump circuit.
 - **Common ground is mandatory.** Every device (Pixhawk, GPS, hoverboard,
   relay module, DC-DC converters) must share a common ground reference.
 - **Keep signal wires away from motor power wires.** Route them on
@@ -546,10 +567,10 @@ Follow this order. Do not proceed until the current step is verified.
 - [ ] **11.** Connect the Pixhawk to your laptop via USB-C. Open Mission
        Planner. Flash ArduRover firmware. Set `FRAME_TYPE = 2`
        (differential drive / skid steering).
-- [ ] **12.** Wire the UM980 GPS to Pixhawk SERIAL3 (GPS1 port). Connect
-       the GNSS antenna. Take the robot outdoors. In Mission Planner,
-       verify GPS fix (3D fix, then RTK float/fixed when corrections
-       are available).
+- [ ] **12.** Wire the UM982 GPS to Pixhawk SERIAL3 (GPS1 port, position)
+       and SERIAL4 (GPS2 port, heading). Connect both GNSS antennas.
+       Take the robot outdoors. In Mission Planner, verify GPS fix
+       (3D fix, then RTK float/fixed when corrections are available).
 
 ### Phase 4: Motor Control via Pixhawk (Steps 13-15)
 
@@ -605,8 +626,8 @@ Follow this order. Do not proceed until the current step is verified.
 | POWER | JST-GH 6-pin | 5V BEC input |
 | TELEM1 (SERIAL1) | JST-GH 6-pin | Hoverboard UART (or telemetry radio) |
 | TELEM2 (SERIAL2) | JST-GH 6-pin | Hoverboard UART (alt) or telemetry |
-| GPS1 (SERIAL3) | JST-GH 6-pin | UM980 GPS UART |
-| GPS2 (SERIAL4) | JST-GH 6-pin | (spare / 2nd GPS) |
+| GPS1 (SERIAL3) | JST-GH 6-pin | UM982 GPS UART (position) |
+| GPS2 (SERIAL4) | JST-GH 6-pin | UM982 GPS UART (heading) |
 | RC IN | JST-GH 3-pin | FlySky SBUS receiver |
 | MAIN OUT 1-8 | JST-GH (servo rail) | AUX5 (pin 54): solenoid relay, AUX6 (pin 55): pump relay |
 | USB-C | USB-C | Laptop (Mission Planner) |

@@ -4,8 +4,8 @@ Every failure scenario for the autonomous parking lot line striper, organized
 by subsystem. For each failure: what the operator sees, what the robot does
 automatically, and what the operator should do.
 
-Hardware reference: Pixhawk 6C Mini, Unicore UM980 GPS, hoverboard hub motors
-(350W x2) with FOC firmware, 36V 10Ah e-bike battery, 12V diaphragm pump +
+Hardware reference: Pixhawk 6C Mini, Unicore UM982 GPS (dual-antenna heading),
+hoverboard hub motors (350W x2) with FOC firmware, 36V 18Ah e-bike battery, 12V diaphragm pump +
 solenoid valve + TeeJet TP8004EVS nozzle, FlySky FS-i6X RC, 2x HC-SR04 ultrasonics.
 
 ---
@@ -16,10 +16,10 @@ solenoid valve + TeeJet TP8004EVS nozzle, FlySky FS-i6X RC, 2x HC-SR04 ultrasoni
 
 | Item | Detail |
 |------|--------|
-| **Cause** | Antenna disconnected, antenna cable damaged, UM980 module failure, or complete sky obstruction (indoors, under dense cover) |
+| **Cause** | Antenna disconnected, antenna cable damaged, UM982 module failure, or complete sky obstruction (indoors, under dense cover) |
 | **What operator sees** | Mission Planner shows "No GPS" or "No Fix". HUD GPS indicator turns red. Robot refuses to arm or, if mid-mission, triggers EKF failsafe |
 | **Automatic action** | ArduRover triggers `FS_ACTION` (RTL or Hold depending on config). EKF rejects position estimates. Robot stops autonomous navigation |
-| **Operator action** | 1. Switch to MANUAL mode on RC transmitter (CH5). 2. Drive robot to safety manually. 3. Check antenna SMA connector -- hand-tighten firmly. 4. Check antenna cable for cuts or kinks. 5. Verify antenna has clear sky view (no metal overhead). 6. In Mission Planner, check GPS tab for satellite count -- need 6+ for valid fix. 7. If no satellites at all, suspect UM980 module or wiring -- check SERIAL3 TX/RX/GND connections |
+| **Operator action** | 1. Switch to MANUAL mode on RC transmitter (CH5). 2. Drive robot to safety manually. 3. Check antenna SMA connector -- hand-tighten firmly. 4. Check antenna cable for cuts or kinks. 5. Verify antenna has clear sky view (no metal overhead). 6. In Mission Planner, check GPS tab for satellite count -- need 6+ for valid fix. 7. If no satellites at all, suspect UM982 module or wiring -- check SERIAL3/SERIAL4 TX/RX/GND connections |
 | **Prevention** | Secure SMA connector with threadlock (removable blue). Route antenna cable away from sharp edges. Pre-flight GPS lock check before every job |
 
 ### 1.2 RTK Float / Degraded Accuracy
@@ -40,7 +40,7 @@ solenoid valve + TeeJet TP8004EVS nozzle, FlySky FS-i6X RC, 2x HC-SR04 ultrasoni
 | **What operator sees** | Position jumps sideways by 10-50cm intermittently. Painted lines have sudden jogs or S-curves near buildings. RTK status may remain "Fixed" despite errors |
 | **Automatic action** | None. The EKF may filter some outliers, but sustained multipath appears as valid position data |
 | **Operator action** | 1. Stop the mission. 2. Identify the multipath source (usually a large flat metal surface within 5-10 meters). 3. If possible, paint the lines farthest from buildings first while RTK conditions are best. 4. For lines close to buildings, consider switching to manual RC driving with visual guides. 5. In Mission Planner, review the HDOP value -- values above 1.5 in RTK Fixed suggest multipath contamination. 6. Increase `GPS_MIN_ELEV` from 5 to 10-15 degrees to reject low-elevation satellites that are most affected by multipath |
-| **Prevention** | Use a survey-grade antenna with ground plane (Tier 3 BOM). Schedule painting near buildings for times when satellite geometry is favorable (check GNSS planning tools). Consider dual-antenna heading for heading-independent of compass in future upgrade |
+| **Prevention** | Use a survey-grade antenna with ground plane (Tier 3 BOM). Schedule painting near buildings for times when satellite geometry is favorable (check GNSS planning tools). The UM982 dual-antenna heading provides compass-independent heading that is immune to motor magnetic interference |
 
 ### 1.4 Antenna Disconnected Mid-Mission
 
@@ -171,8 +171,8 @@ solenoid valve + TeeJet TP8004EVS nozzle, FlySky FS-i6X RC, 2x HC-SR04 ultrasoni
 | **Cause** | Battery not fully charged before the job, battery capacity degraded, or job took longer than expected |
 | **What operator sees** | Mission Planner shows low voltage warning (below 33V). Robot behavior becomes sluggish. Eventually the battery failsafe triggers |
 | **Automatic action** | At `BATT_LOW_VOLT` (33V / 3.3V per cell): `BATT_FS_LOW_ACT=2` triggers Hold mode -- robot stops in place. At `BATT_CRT_VOLT` (30V / 3.0V per cell): `BATT_FS_CRT_ACT=1` triggers RTL. ArduRover will not arm below `BATT_ARM_VOLT` (35V) |
-| **Operator action** | 1. When low voltage warning appears, note the current waypoint number. 2. Switch to HOLD or MANUAL. 3. Drive the robot back to the staging area manually (to save remaining battery for safe return). 4. Swap batteries or charge. The 36V 10Ah battery takes 3-5 hours on a standard 42V 2A charger. 5. Resume mission from the noted waypoint |
-| **Prevention** | Fully charge before every job (42V at the charger). Monitor voltage in Mission Planner throughout the job. For large lots (100+ spaces), bring a second battery. The Tier 2 battery provides 45-70 minutes of runtime; plan jobs accordingly. For large lots, bring a spare battery |
+| **Operator action** | 1. When low voltage warning appears, note the current waypoint number. 2. Switch to HOLD or MANUAL. 3. Drive the robot back to the staging area manually (to save remaining battery for safe return). 4. Swap batteries or charge. The 36V 18Ah battery takes 5-7 hours on a standard 42V 2A charger (consider a 5A fast charger). 5. Resume mission from the noted waypoint |
+| **Prevention** | Fully charge before every job (42V at the charger). Monitor voltage in Mission Planner throughout the job. For large lots (100+ spaces), bring a second battery. The Tier 2 18Ah battery provides 80-120 minutes of runtime; plan jobs accordingly. For large lots, bring a spare battery |
 
 ### 4.2 DC-DC Converter Failure (36V to 12V)
 
@@ -248,39 +248,39 @@ solenoid valve + TeeJet TP8004EVS nozzle, FlySky FS-i6X RC, 2x HC-SR04 ultrasoni
 |------|--------|
 | **Cause** | Robot speed too fast for the turn, `WP_OVERSHOOT` set too high, PID tuning too aggressive, or GPS latency causing late turn detection |
 | **What operator sees** | Robot drives past waypoints before turning. Lines extend beyond where they should end. Corners are rounded instead of sharp |
-| **Automatic action** | ArduRover accepts the waypoint as reached if it passes within `WP_RADIUS` (0.05m) and has overshot by less than `WP_OVERSHOOT` (0.10m) |
-| **Operator action** | 1. Reduce `WP_SPEED` from 0.50 to 0.30 m/s. 2. Reduce `WP_OVERSHOOT` from 0.10 to 0.05m. 3. Reduce `CRUISE_SPEED` from 1.00 to 0.50 m/s for transit segments. 4. Check `GPS_DELAY_MS` -- if set too high, the EKF position estimate lags reality. Try reducing from 200 to 100ms. 5. Check PID tuning: reduce `ATC_SPEED_P` if braking is not responsive enough |
+| **Automatic action** | ArduRover accepts the waypoint as reached if it passes within `WP_RADIUS` (0.15m) and has overshot by less than `WP_OVERSHOOT` (0.10m) |
+| **Operator action** | 1. Reduce `WP_SPEED` from 0.50 to 0.30 m/s. 2. Reduce `WP_OVERSHOOT` from 0.10 to 0.05m. 3. Reduce `CRUISE_SPEED` from 1.00 to 0.50 m/s for transit segments. 4. Check `GPS_DELAY_MS` -- if set too high, the EKF position estimate lags reality. Try reducing from 200 to 100ms. 5. Check PID tuning: reduce `ATC_SPEED_P` if braking is not responsive enough. Note: `WP_RADIUS` is now 0.15m (relaxed from 0.05m) which helps reduce circling at waypoints |
 | **Prevention** | Always start with conservative (slow) speeds and tighten gradually. Use Mission Planner's auto-tune feature on flat pavement before running paint missions |
 
 ### 6.2 Circular Looping
 
 | Item | Detail |
 |------|--------|
-| **Cause** | Compass interference from motor magnets, incorrect compass calibration, compass oriented wrong (`COMPASS_ORIENT`), or motor direction reversed |
+| **Cause** | Compass interference from motor magnets (compass is disabled in v3; UM982 dual-antenna heading is used instead), incorrect heading source config, or motor direction reversed |
 | **What operator sees** | Robot drives in circles instead of toward the waypoint. Heading indicator in Mission Planner shows a heading that does not match the robot's actual pointing direction |
 | **Automatic action** | None. ArduRover trusts the heading estimate |
-| **Operator action** | 1. Switch to MANUAL and verify both sticks work correctly. 2. Check heading in Mission Planner vs actual robot orientation. If off by 180 degrees: set `COMPASS_ORIENT=4` (Yaw180). 3. If heading is erratic or spinning: motor magnetic interference. Increase distance between Pixhawk and hub motors. 4. Redo compass calibration: large figure-8 pattern in all 3 axes, away from metal and motors. 5. Enable compass learning: `COMPASS_LEARN=1` and drive in a straight line for 100m |
-| **Prevention** | Mount Pixhawk as far from hub motors as possible (at least 15cm). Do compass motor compensation (`COMPASS_MOT_TYPE=2`). Calibrate compass at the job site, not at home |
+| **Operator action** | 1. Switch to MANUAL and verify both sticks work correctly. 2. Check heading in Mission Planner vs actual robot orientation. 3. Verify UM982 dual-antenna heading is active: `EK3_SRC1_YAW=2` (GPS heading). 4. If heading is erratic: check both UM982 antenna connections and baseline distance. 5. Compass is disabled (`COMPASS_ENABLE=0`) due to hub motor magnetic interference -- do not attempt compass calibration |
+| **Prevention** | Mount Pixhawk as far from hub motors as possible (at least 15cm). Compass is disabled; heading comes from UM982 dual-antenna GPS (`EK3_SRC1_YAW=2`). Ensure both GNSS antennas have clear sky view and correct baseline separation |
 
 ### 6.3 Wrong Heading at Start
 
 | Item | Detail |
 |------|--------|
-| **Cause** | Compass interference at the starting position (near a vehicle, manhole cover, or rebar). The robot drives off in the wrong direction at the start of the mission |
-| **What operator sees** | Robot drives confidently but in the wrong direction for the first 5-20 meters until GPS-based heading correction kicks in |
-| **Automatic action** | EKF3 with `EK3_SRC1_YAW=1` (GPS yaw) will gradually correct the heading using GPS velocity vector. This requires the robot to be moving at 1+ m/s |
-| **Operator action** | 1. Switch to MANUAL, stop the robot. 2. Drive forward manually in a known direction (straight line, 10+ meters) to let the EKF learn the correct heading. 3. Switch back to AUTO. 4. If this persists, disable the internal compass for heading and rely solely on GPS course: set `COMPASS_USE=0` and ensure `EK3_SRC1_YAW=1` (requires motion for heading) |
-| **Prevention** | Always start the robot in an open area, away from vehicles and metal structures. Drive forward manually for 10 meters before switching to AUTO to establish heading. Consider dual-GPS heading setup for future upgrade |
+| **Cause** | UM982 dual-antenna heading not yet converged, or antenna baseline obstructed at the starting position (near a vehicle, manhole cover, or rebar) |
+| **What operator sees** | Robot drives confidently but in the wrong direction for the first few meters until UM982 heading converges |
+| **Automatic action** | EKF3 with `EK3_SRC1_YAW=2` (GPS heading) uses UM982 dual-antenna heading. Unlike GSF, this works at standstill and does not require motion |
+| **Operator action** | 1. Switch to MANUAL, stop the robot. 2. Verify UM982 heading status in Mission Planner -- both antennas must have clear sky view. 3. Wait for "EKF yaw alignment complete" message. 4. UM982 heading works at standstill, so no need to drive forward to initialize yaw. 5. If heading remains wrong, check antenna cable connections and baseline separation |
+| **Prevention** | Always start the robot in an open area with clear sky view for both GNSS antennas. Verify UM982 heading in Mission Planner before switching to AUTO. UM982 dual-antenna heading works at standstill -- no walk-in-circle initialization needed |
 
 ### 6.4 Missed Waypoint
 
 | Item | Detail |
 |------|--------|
 | **Cause** | `WP_RADIUS` too tight (robot passes close but not close enough), GPS accuracy insufficient, or waypoint is physically inaccessible (on a curb, in a planter) |
-| **What operator sees** | Robot circles around a waypoint repeatedly, unable to reach it within `WP_RADIUS` (0.05m). In Mission Planner, the current waypoint number does not advance |
+| **What operator sees** | Robot circles around a waypoint repeatedly, unable to reach it within `WP_RADIUS` (0.15m). In Mission Planner, the current waypoint number does not advance |
 | **Automatic action** | ArduRover keeps trying to reach the waypoint indefinitely. It will not skip it automatically |
-| **Operator action** | 1. Switch to HOLD. 2. In Mission Planner, manually advance to the next waypoint (right-click waypoint, "Set WP"). 3. If this happens frequently: increase `WP_RADIUS` from 0.05m to 0.10m. 4. Check GPS accuracy: if not in RTK Fixed, the 5cm radius is too tight for float or 3D fix accuracy. 5. Check mission file: verify waypoint coordinates are on accessible pavement, not on a wall or obstacle |
-| **Prevention** | Generate missions with waypoints at least 0.15m away from physical obstacles. Validate missions with the pathgen waypoint validator (`scripts/pathgen_cli.py validate`). Use `WP_RADIUS=0.10m` if GPS accuracy is routinely in the 5-10cm range |
+| **Operator action** | 1. Switch to HOLD. 2. In Mission Planner, manually advance to the next waypoint (right-click waypoint, "Set WP"). 3. If this happens frequently: increase `WP_RADIUS` from 0.15m to 0.20m. 4. Check GPS accuracy: if not in RTK Fixed, the 15cm radius may still be too tight for float or 3D fix accuracy. 5. Check mission file: verify waypoint coordinates are on accessible pavement, not on a wall or obstacle |
+| **Prevention** | Generate missions with waypoints at least 0.15m away from physical obstacles. Validate missions with the pathgen waypoint validator (`scripts/pathgen_cli.py validate`). Use `WP_RADIUS=0.15m` as the default (relaxed from the previous 0.05m to reduce circling) |
 
 ---
 
