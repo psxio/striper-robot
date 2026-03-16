@@ -88,9 +88,9 @@ or unavailable during painting.
   - Viton valves + Santoprene diaphragm — compatible with water-based traffic paint
   - Self-priming, runs dry without damage
 - **Paint coverage validated**: 1 gallon = 300-400 linear feet at 4" width, 15-mil wet thickness
-- **At 0.5 m/s paint speed**: Need ~0.025 GPM flow — pump is 40x oversized
-  - Control via duty-cycling solenoid, NOT pump speed
+- **At 0.5 m/s paint speed**: Need ~0.28 GPM flow — pump at 1.0 GPM has ~3.5x headroom
   - Pump maintains pressure; solenoid gates flow to nozzle
+  - Add inline pressure regulator (20 PSI) for proper nozzle flow rate
 - **Source**: [Shurflo 8000-543-236](https://www.amazon.com/Pentair-8000-543-236-Automatic-Demand-Diaphragm-Santoprene/dp/B00E5UV0W8)
 
 ### 6. Solenoid: 3/8" 12V Direct-Acting — $20 (UNCHANGED, with timing data)
@@ -100,19 +100,20 @@ or unavailable during painting.
 - **Recommended Lua timing**: `LEAD_TIME_MS=40`, `LAG_TIME_MS=25` (start here, field-tune)
 - **Flyback diode required**: 1N4007 across coil terminals
 
-### 7. Nozzle: TeeJet TP80015EVS — $15 (CHANGED from TP8004EVS)
-- **Change**: TP8004 (0.40 GPM) → TP80015 (0.15 GPM)
-- **Why**: The TP8004 delivers 0.40 GPM but the robot only needs ~0.001 GPM at paint speed.
-  This would require an extremely low PWM duty cycle (~0.25%), giving poor flow control.
-  The TP80015 at lower pressure (20-30 PSI) brings the duty cycle to a controllable 5-15%.
-  This matches how agricultural sprayers and competitor robots handle flow control.
-- **Validated specs (TP80015EVS)**:
+### 7. Nozzle: TeeJet TP8004EVS — $15 (UNCHANGED, validated correct)
+- **Validated flow rate match** (see analysis section below):
+  - At 0.5 m/s, robot needs 0.281 GPM of paint
+  - TP8004 at 20 PSI delivers 0.283 GPM — nearly perfect match
+  - At 40 PSI (0.40 GPM), solenoid PWM at ~70% duty provides exact flow
+- **Requires inline pressure regulator** ($10, set to 20 PSI) between pump and solenoid
+  - Pump demand switch is 50 PSI; regulator drops to 20 PSI at nozzle
+  - Alternative: skip regulator, use AC_Sprayer PWM at 70% duty at full speed
+- **Validated specs**:
   - 80° even flat fan spray pattern
-  - 0.15 GPM at 40 PSI (0.11-0.18 GPM range at 20-60 PSI)
+  - 0.40 GPM at 40 PSI (0.28 GPM at 20 PSI)
   - **Spray height for 4" line**: ~2.4 inches (6 cm) — geometry: `width = 2 × height × tan(40°)`
-  - EVS = VisiFlo color-coded, stainless steel core
+  - EVS = VisiFlo color-coded (Red = 04 size), stainless steel core
   - Use with 50-mesh strainer to prevent clogging
-- **Flow control**: ArduRover AC_Sprayer PWM at 10-15 Hz, duty cycle proportional to ground speed
 - **Source**: [TeeJet Catalog](https://www.teejet.com/-/media/dam/agricultural/usa/sales-material/catalog/technical_information.pdf)
 
 ### 8. Battery: 36V 18Ah e-bike battery — $160 (CHANGED from 10Ah $100)
@@ -241,21 +242,24 @@ ATC_STR_RAT_P=0.30        # Steering rate P gain (tune on field)
 
 ---
 
-## PAINT SYSTEM: CRITICAL NOZZLE SIZING ANALYSIS
-
-The original TP8004EVS was massively oversized. Here's the math:
+## PAINT SYSTEM: FLOW RATE ANALYSIS (corrected)
 
 **Paint consumption at robot speed:**
 - Industry standard: 1 gallon = 350 linear feet at 4" width, 15-mil wet thickness
-- At 0.5 m/s (1.64 ft/s): consumption = 1.64 / 350 = 0.0047 gal/min = **0.005 GPM**
-- TP8004 delivers 0.40 GPM at 40 PSI — that's **80x more than needed**
-- PWM duty cycle would be 0.005/0.40 = **1.25%** — too low for reliable control
+- At 0.5 m/s = 1.64 ft/s = 98.4 ft/min
+- Paint consumption: 98.4 ft/min ÷ 350 ft/gal = **0.281 GPM**
 
-**With TP80015EVS at 20 PSI:**
-- Flow: ~0.11 GPM
-- Required duty cycle: 0.005/0.11 = **4.5%** — much more controllable
-- At 30 PSI: ~0.13 GPM, duty = 3.8%
-- ArduRover AC_Sprayer supports PWM at 10-15 Hz, making 4-5% duty cycle reliable
+**Nozzle sizing validation:**
+
+| Nozzle | Flow @ 40 PSI | Flow @ 20 PSI | Duty cycle needed |
+|--------|--------------|--------------|-------------------|
+| TP8004EVS | 0.40 GPM | 0.283 GPM | 70% @ 40 PSI, **99% @ 20 PSI** |
+| TP80015EVS | 0.15 GPM | 0.106 GPM | **187% — UNDERSIZED** |
+
+**Result: TP8004EVS is the correct nozzle.** At 20 PSI it delivers 0.283 GPM —
+almost exactly the 0.281 GPM needed. An inline pressure regulator (20 PSI, ~$10)
+between pump and solenoid provides the right operating point. At 40 PSI without a
+regulator, use AC_Sprayer PWM at ~70% duty cycle.
 
 **Robot-specific paint recommended:**
 - US Specialty Coatings "RoboTraffic RTS" — pre-thinned for robotic low-pressure spray
