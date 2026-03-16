@@ -1,5 +1,6 @@
 """Robot fleet management persistence layer using aiosqlite."""
 
+import secrets
 import uuid
 from datetime import datetime, timezone
 from typing import Optional
@@ -59,7 +60,19 @@ async def list_robots(
             (*params, limit, offset),
         )
         rows = await cursor.fetchall()
-        return [dict(row) for row in rows], total
+        # Mask api_key in list responses
+        result = []
+        for row in rows:
+            d = dict(row)
+            if d.get("api_key"):
+                d["has_api_key"] = True
+                d["api_key_last4"] = d["api_key"][-4:]
+                d["api_key"] = None
+            else:
+                d["has_api_key"] = False
+                d["api_key_last4"] = None
+            result.append(d)
+        return result, total
 
 
 async def get_robot(robot_id: str) -> Optional[dict]:
@@ -331,6 +344,39 @@ async def get_robot_history(robot_id: str) -> list[dict]:
         )
         rows = await cursor.fetchall()
         return [dict(row) for row in rows]
+
+
+async def generate_api_key(robot_id: str) -> Optional[str]:
+    """Generate a new API key for a robot. Returns the raw key, or None if robot not found.
+    Raises ValueError if robot already has a key.
+    """
+    robot = await get_robot(robot_id)
+    if robot is None:
+        return None
+    if robot.get("api_key"):
+        raise ValueError("Robot already has an API key")
+
+    key = f"strk_{secrets.token_urlsafe(32)}"
+    now = _now()
+    async for db in get_db():
+        await db.execute(
+            "UPDATE robots SET api_key = ?, updated_at = ? WHERE id = ?",
+            (key, now, robot_id),
+        )
+        await db.commit()
+    return key
+
+
+async def clear_api_key(robot_id: str) -> bool:
+    """Revoke a robot's API key. Returns True if key was cleared."""
+    now = _now()
+    async for db in get_db():
+        cursor = await db.execute(
+            "UPDATE robots SET api_key = NULL, updated_at = ? WHERE id = ? AND api_key IS NOT NULL",
+            (now, robot_id),
+        )
+        await db.commit()
+        return cursor.rowcount > 0
 
 
 async def return_robot(assignment_id: str) -> Optional[dict]:

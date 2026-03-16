@@ -209,6 +209,29 @@ async def update_assignment(
     return assignment
 
 
+@router.post("/robots/{robot_id}/api-key")
+async def generate_api_key(robot_id: str, admin: dict = Depends(get_admin_user)):
+    """Generate a new API key for a robot. Shown once, then masked."""
+    try:
+        key = await robot_store.generate_api_key(robot_id)
+    except ValueError as e:
+        raise HTTPException(status_code=409, detail=str(e))
+    if key is None:
+        raise HTTPException(status_code=404, detail="Robot not found")
+    await admin_store.log_audit(admin["email"], "generate_api_key", robot_id)
+    return {"api_key": key, "robot_id": robot_id}
+
+
+@router.delete("/robots/{robot_id}/api-key")
+async def revoke_api_key(robot_id: str, admin: dict = Depends(get_admin_user)):
+    """Revoke a robot's API key."""
+    cleared = await robot_store.clear_api_key(robot_id)
+    if not cleared:
+        raise HTTPException(status_code=404, detail="Robot not found or has no key")
+    await admin_store.log_audit(admin["email"], "revoke_api_key", robot_id)
+    return {"ok": True}
+
+
 @router.get("/assignments")
 async def list_assignments(
     page: int = Query(default=1, ge=1),

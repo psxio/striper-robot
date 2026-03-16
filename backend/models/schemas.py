@@ -42,6 +42,7 @@ class UserResponse(BaseModel):
     active_lot_id: Optional[str] = None
     map_state: Optional[dict] = None  # {lat, lng, zoom}
     limits: Optional[dict] = None  # {max_lots, max_jobs}
+    email_verified: bool = False
 
 
 class AuthResponse(BaseModel):

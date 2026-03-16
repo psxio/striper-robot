@@ -561,3 +561,114 @@ async def test_stats_include_robots(admin_client, client):
     assert data["robot_count"] == 2
     assert data["robots_available"] == 1
     assert data["active_assignments"] == 1
+
+
+# ---- API Key Management ----
+
+
+@pytest.mark.asyncio
+async def test_admin_generate_api_key(admin_client):
+    """POST /api/admin/robots/{id}/api-key generates a new key prefixed with strk_."""
+    resp = await admin_client.post("/api/admin/robots", json={"serial_number": "KEY-001"})
+    robot_id = resp.json()["id"]
+
+    # Generate key
+    resp = await admin_client.post(f"/api/admin/robots/{robot_id}/api-key")
+    assert resp.status_code == 200
+    data = resp.json()
+    assert data["robot_id"] == robot_id
+    assert data["api_key"].startswith("strk_")
+
+
+@pytest.mark.asyncio
+async def test_admin_generate_api_key_duplicate_409(admin_client):
+    """Generating a second API key without revoking the first returns 409."""
+    resp = await admin_client.post("/api/admin/robots", json={"serial_number": "KEY-002"})
+    robot_id = resp.json()["id"]
+
+    # First key
+    resp = await admin_client.post(f"/api/admin/robots/{robot_id}/api-key")
+    assert resp.status_code == 200
+
+    # Second attempt should 409
+    resp = await admin_client.post(f"/api/admin/robots/{robot_id}/api-key")
+    assert resp.status_code == 409
+
+
+@pytest.mark.asyncio
+async def test_admin_revoke_api_key(admin_client):
+    """DELETE /api/admin/robots/{id}/api-key revokes the key."""
+    resp = await admin_client.post("/api/admin/robots", json={"serial_number": "KEY-003"})
+    robot_id = resp.json()["id"]
+
+    await admin_client.post(f"/api/admin/robots/{robot_id}/api-key")
+
+    # Revoke
+    resp = await admin_client.delete(f"/api/admin/robots/{robot_id}/api-key")
+    assert resp.status_code == 200
+    assert resp.json()["ok"] is True
+
+
+@pytest.mark.asyncio
+async def test_admin_revoke_regenerate_lifecycle(admin_client):
+    """After revoking a key, generating a new one should produce a different key."""
+    resp = await admin_client.post("/api/admin/robots", json={"serial_number": "KEY-004"})
+    robot_id = resp.json()["id"]
+
+    # Generate, revoke, regenerate
+    resp1 = await admin_client.post(f"/api/admin/robots/{robot_id}/api-key")
+    key1 = resp1.json()["api_key"]
+
+    await admin_client.delete(f"/api/admin/robots/{robot_id}/api-key")
+
+    resp2 = await admin_client.post(f"/api/admin/robots/{robot_id}/api-key")
+    key2 = resp2.json()["api_key"]
+    assert key1 != key2  # New key should be different
+
+
+@pytest.mark.asyncio
+async def test_generated_key_works_for_heartbeat(admin_client, client):
+    """A generated API key should authenticate telemetry heartbeat requests."""
+    # Create robot and generate key
+    resp = await admin_client.post("/api/admin/robots", json={"serial_number": "KEY-005"})
+    robot_id = resp.json()["id"]
+
+    resp = await admin_client.post(f"/api/admin/robots/{robot_id}/api-key")
+    api_key = resp.json()["api_key"]
+
+    # Use key for heartbeat (unauthenticated client, just X-Robot-Key header)
+    hb_resp = await client.post("/api/telemetry/heartbeat",
+        json={"battery_pct": 85, "state": "idle"},
+        headers={"X-Robot-Key": api_key},
+    )
+    assert hb_resp.status_code == 200
+
+
+@pytest.mark.asyncio
+async def test_non_admin_cannot_generate_key(admin_client, client):
+    """Non-admin user gets 403 when trying to generate an API key."""
+    resp = await admin_client.post("/api/admin/robots", json={"serial_number": "KEY-006"})
+    robot_id = resp.json()["id"]
+
+    # Register a non-admin user via a separate unauthenticated client
+    user_id, user_token = await _register_user(client, email="nonadmin_key@example.com")
+    client.headers["Authorization"] = f"Bearer {user_token}"
+    resp = await client.post(f"/api/admin/robots/{robot_id}/api-key")
+    assert resp.status_code == 403
+
+
+@pytest.mark.asyncio
+async def test_list_robots_masks_api_key(admin_client):
+    """GET /api/admin/robots should mask the full API key and expose has_api_key + last4."""
+    resp = await admin_client.post("/api/admin/robots", json={"serial_number": "MASK-001"})
+    robot_id = resp.json()["id"]
+
+    await admin_client.post(f"/api/admin/robots/{robot_id}/api-key")
+
+    # List robots — key should be masked
+    resp = await admin_client.get("/api/admin/robots")
+    robots = resp.json()["items"]
+    robot = [r for r in robots if r["id"] == robot_id][0]
+    assert robot["api_key"] is None  # Full key not exposed
+    assert robot["has_api_key"] is True
+    assert len(robot["api_key_last4"]) == 4

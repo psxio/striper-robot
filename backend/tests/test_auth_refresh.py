@@ -203,3 +203,29 @@ async def test_resend_verification_fails_if_already_verified(client):
     resp = await client.post("/api/auth/resend-verification")
     assert resp.status_code == 400
     assert "already verified" in resp.json()["detail"].lower()
+
+
+@pytest.mark.asyncio
+async def test_me_returns_email_verified_field(client):
+    """GET /api/auth/me should include email_verified field, toggling after verification."""
+    # Register
+    resp = await client.post("/api/auth/register", json={
+        "email": "verify@example.com", "password": "testpass123", "name": "Test",
+    })
+    token = resp.json()["token"]
+    client.headers["Authorization"] = f"Bearer {token}"
+
+    # Check email_verified is false
+    resp = await client.get("/api/auth/me")
+    assert resp.status_code == 200
+    assert resp.json()["email_verified"] is False
+
+    # Verify email directly
+    from backend.services.user_store import create_verification_token, verify_email_token
+    user_id = resp.json()["id"]
+    vtoken = await create_verification_token(user_id)
+    await verify_email_token(vtoken)
+
+    # Check email_verified is now true
+    resp = await client.get("/api/auth/me")
+    assert resp.json()["email_verified"] is True

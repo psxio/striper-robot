@@ -303,6 +303,28 @@ select{-webkit-appearance:none;appearance:none;background-image:url("data:image/
   .cost-panel{padding:6px 12px;gap:12px}
   .undo-redo{display:none}
 }
+
+/*═══ EMAIL VERIFICATION BANNER ═══*/
+.verify-banner {
+    background: rgba(245,158,11,.12);
+    border-bottom: 1px solid rgba(245,158,11,.4);
+    padding: 8px 16px;
+    font-size: .8125rem;
+    color: #f59e0b;
+    text-align: center;
+    z-index: 999;
+}
+.verify-banner button {
+    background: #f59e0b;
+    color: #0d1117;
+    border: none;
+    padding: 4px 12px;
+    border-radius: 4px;
+    cursor: pointer;
+    font-size: .8125rem;
+    font-weight: 600;
+    margin-left: 8px;
+}
 </style>
 </head>
 <body>
@@ -361,6 +383,11 @@ select{-webkit-appearance:none;appearance:none;background-image:url("data:image/
   <div class="user-avatar" id="userAvatar" title="Account" onclick="openAuthModal()">&#x1F464;</div>
 </header>
 
+<div id="verifyBanner" class="verify-banner" style="display:none;">
+  <span>Please verify your email address to unlock all features.</span>
+  <button onclick="resendVerification(this)">Resend verification email</button>
+</div>
+
 <!-- ═══════════════════════════════════════════════ MAIN ═══════════════════════════════════════════════ -->
 <div class="main-container">
 
@@ -374,6 +401,7 @@ select{-webkit-appearance:none;appearance:none;background-image:url("data:image/
         <span style="font-size:.8125rem;font-weight:600;color:var(--green)">My Robot</span>
       </div>
       <div id="robotStatusInfo" style="font-size:.75rem;color:var(--text-2)">Loading...</div>
+      <div id="robotTelemetry" style="margin-top:8px"></div>
     </div>
     <div class="sidebar-tabs">
       <button class="sidebar-tab active" data-tab="design">Design</button>
@@ -749,6 +777,13 @@ var measurePoints = [];
 var measureLayers = [];
 var measureLabels = [];
 
+// Token refresh state
+var _refreshTimerId = null;
+
+// Telemetry polling state
+var _telemetryPollerId = null;
+var _currentRobotId = null;
+
 /* ═══════════════════════════════════════════════════════════════════
    API LAYER
 ═══════════════════════════════════════════════════════════════════ */
@@ -769,6 +804,7 @@ const api = {
             var resp = await fetch(this.baseUrl + path, {
                 method: method,
                 headers: headers,
+                credentials: 'include',
                 body: body ? JSON.stringify(body) : undefined
             });
 
@@ -814,6 +850,51 @@ const api = {
     patch: function(p, b) { return this._fetch('PATCH', p, b); },
     del: function(p) { return this._fetch('DELETE', p); }
 };
+
+/* ═══════════════════════════════════════════════════════════════════
+   TOKEN REFRESH
+═══════════════════════════════════════════════════════════════════ */
+function parseJwtExp(token) {
+    try {
+        var payload = token.split('.')[1];
+        var decoded = atob(payload.replace(/-/g, '+').replace(/_/g, '/'));
+        return JSON.parse(decoded).exp;
+    } catch (e) { return null; }
+}
+
+function scheduleTokenRefresh() {
+    if (_refreshTimerId) clearTimeout(_refreshTimerId);
+    var token = localStorage.getItem('strype_token');
+    if (!token) return;
+    var exp = parseJwtExp(token);
+    if (!exp) return;
+    var msUntilExpiry = (exp * 1000) - Date.now() - 60000; // 1 min before
+    if (msUntilExpiry <= 0) {
+        refreshAccessToken();
+        return;
+    }
+    _refreshTimerId = setTimeout(refreshAccessToken, msUntilExpiry);
+}
+
+async function refreshAccessToken() {
+    try {
+        var resp = await fetch('/api/auth/refresh', {
+            method: 'POST',
+            credentials: 'include'
+        });
+        if (resp.ok) {
+            var data = await resp.json();
+            localStorage.setItem('strype_token', data.token);
+            scheduleTokenRefresh();
+        } else {
+            showToast('Session expired. Please log in again.', 'error');
+            handleLogout();
+        }
+    } catch (e) {
+        // Network error — don't force logout, retry later
+        _refreshTimerId = setTimeout(refreshAccessToken, 30000);
+    }
+}
 
 /* ═══════════════════════════════════════════════════════════════════
    AUTH UI
@@ -869,6 +950,7 @@ async function handleAuth(e) {
         closeAuthModal();
         await loadState();
         updateAuthUI();
+        scheduleTokenRefresh();
     } catch (err) {
         errorEl.textContent = err.message || 'Authentication failed';
         errorEl.style.display = 'block';
@@ -892,6 +974,13 @@ function updateAuthUI() {
         avatarEl.style.background = '';
         avatarEl.style.color = '';
         avatarEl.onclick = openAuthModal;
+    }
+
+    // Show/hide email verification banner
+    var banner = document.getElementById('verifyBanner');
+    if (banner) {
+        var bannerUserData = JSON.parse(localStorage.getItem('strype_user') || '{}');
+        banner.style.display = (api.isLoggedIn() && !bannerUserData.email_verified) ? 'block' : 'none';
     }
 }
 
@@ -924,6 +1013,11 @@ function showUserMenu() {
 }
 
 async function handleLogout() {
+    // Clear refresh timer
+    if (_refreshTimerId) { clearTimeout(_refreshTimerId); _refreshTimerId = null; }
+    // Clear telemetry polling
+    if (_telemetryPollerId) { clearInterval(_telemetryPollerId); _telemetryPollerId = null; }
+    _currentRobotId = null;
     // Revoke token on server before clearing locally
     if (api.isLoggedIn()) {
         try { await api.post('/api/auth/logout'); } catch (e) { /* best effort */ }
@@ -1039,6 +1133,30 @@ async function openBillingPortal() {
     }
 }
 
+// --- Email Verification ---
+async function resendVerification(btn) {
+    var orig = btn.textContent;
+    btn.textContent = 'Sending...';
+    btn.disabled = true;
+    try {
+        var resp = await fetch('/api/auth/resend-verification', {
+            method: 'POST',
+            headers: { 'Authorization': 'Bearer ' + localStorage.getItem('strype_token'), 'Content-Type': 'application/json' },
+            credentials: 'include'
+        });
+        if (resp.ok) {
+            showToast('Verification email sent! Check your inbox.', 'success');
+        } else {
+            var data = await resp.json();
+            showToast(data.detail || 'Failed to send', 'error');
+        }
+    } catch (e) {
+        showToast('Network error', 'error');
+    }
+    btn.textContent = orig;
+    btn.disabled = false;
+}
+
 // --- Settings Modal ---
 function openSettingsModal() {
     var userMenu = document.getElementById('userMenu');
@@ -1059,6 +1177,8 @@ function openSettingsModal() {
             '<input type="text" id="settingsName" value="' + escapeHtml(userData.name || '') + '" style="width:100%; padding:10px 12px; border:1px solid var(--border); border-radius:8px; font-size:14px; box-sizing:border-box; background:var(--bg); color:var(--text); margin-bottom:12px;">' +
             '<button onclick="updateSettingsProfile()" style="width:100%; padding:10px; background:var(--blue); color:white; border:none; border-radius:8px; font-size:14px; font-weight:600; cursor:pointer; margin-bottom:20px;">Save Profile</button>' +
             '<hr style="border:none; border-top:1px solid var(--border); margin-bottom:16px;">' +
+            '<div style="margin-bottom:16px;"><h4 style="font-size:14px;font-weight:600;margin-bottom:10px;">Subscription Plan</h4><div id="planChangeSection"></div></div>' +
+            '<hr style="border:none; border-top:1px solid var(--border); margin-bottom:16px;">' +
             '<label style="display:block; font-size:13px; color:var(--text-2); margin-bottom:4px;">Current Password</label>' +
             '<input type="password" id="settingsOldPass" style="width:100%; padding:10px 12px; border:1px solid var(--border); border-radius:8px; font-size:14px; box-sizing:border-box; background:var(--bg); color:var(--text); margin-bottom:8px;">' +
             '<label style="display:block; font-size:13px; color:var(--text-2); margin-bottom:4px;">New Password</label>' +
@@ -1069,6 +1189,7 @@ function openSettingsModal() {
         '</div>';
     document.body.appendChild(modal);
     modal.addEventListener('click', function(e) { if (e.target === modal) modal.remove(); });
+    renderPlanChangeUI();
 }
 
 async function updateSettingsProfile() {
@@ -1145,6 +1266,96 @@ function confirmDeleteAccount() {
     pwInput.addEventListener('keydown', function(e) {
         if (e.key === 'Enter') document.getElementById('deleteAccConfirm').click();
     });
+}
+
+// --- Plan Change UI ---
+function renderPlanChangeUI() {
+    var el = document.getElementById('planChangeSection');
+    if (!el) return;
+    var userData = JSON.parse(localStorage.getItem('strype_user') || '{}');
+    var plan = userData.plan || 'free';
+    var plans = [
+        { id: 'free', name: 'Free', price: '$0/mo', desc: '1 lot, 5 jobs' },
+        { id: 'pro', name: 'Pro', price: '$99/mo', desc: 'Unlimited lots & jobs' },
+        { id: 'robot', name: 'Robot', price: '$299/mo', desc: 'Includes robot rental' },
+        { id: 'enterprise', name: 'Enterprise', price: 'Custom', desc: 'Up to 10 robots' }
+    ];
+    var html = '<div style="display:grid;gap:8px;">';
+    for (var i = 0; i < plans.length; i++) {
+        var p = plans[i];
+        var isCurrent = p.id === plan;
+        var isEnterprise = p.id === 'enterprise';
+        html += '<div style="display:flex;align-items:center;justify-content:space-between;padding:10px 12px;border-radius:6px;border:1px solid ' + (isCurrent ? '#f59e0b' : 'rgba(255,255,255,.1)') + ';background:' + (isCurrent ? 'rgba(245,158,11,.08)' : 'transparent') + ';">';
+        html += '<div><strong>' + p.name + '</strong> <span style="color:var(--text-2);font-size:.8125rem;">' + p.price + '</span><br><span style="color:var(--text-2);font-size:.75rem;">' + p.desc + '</span></div>';
+        if (isCurrent) {
+            html += '<span style="color:#f59e0b;font-size:.75rem;font-weight:600;">Current</span>';
+        } else if (isEnterprise) {
+            html += '<span style="color:var(--text-2);font-size:.75rem;">Contact us</span>';
+        } else {
+            var planOrder = ['free','pro','robot','enterprise'];
+            var isUpgrade = planOrder.indexOf(p.id) > planOrder.indexOf(plan);
+            html += '<button onclick="changePlan(\'' + p.id + '\')" style="background:' + (isUpgrade ? '#f59e0b' : 'transparent') + ';color:' + (isUpgrade ? '#0d1117' : 'var(--text-2)') + ';border:1px solid ' + (isUpgrade ? '#f59e0b' : 'rgba(255,255,255,.2)') + ';padding:4px 12px;border-radius:4px;cursor:pointer;font-size:.75rem;">' + (isUpgrade ? 'Upgrade' : 'Downgrade') + '</button>';
+        }
+        html += '</div>';
+    }
+    html += '</div>';
+    el.innerHTML = html;
+}
+
+async function changePlan(plan) {
+    var userData = JSON.parse(localStorage.getItem('strype_user') || '{}');
+    var currentPlan = userData.plan || 'free';
+    var paidPlans = ['pro', 'robot'];
+
+    // For upgrades to paid plans from free, go through Stripe checkout
+    if (currentPlan === 'free' && paidPlans.indexOf(plan) >= 0) {
+        try {
+            var resp = await fetch('/api/billing/create-checkout', {
+                method: 'POST',
+                headers: { 'Authorization': 'Bearer ' + localStorage.getItem('strype_token'), 'Content-Type': 'application/json' },
+                credentials: 'include',
+                body: JSON.stringify({ plan: plan })
+            });
+            if (resp.ok) {
+                var data = await resp.json();
+                if (data.url) window.location.href = data.url;
+            } else {
+                var errData = await resp.json();
+                showToast(errData.detail || 'Checkout failed', 'error');
+            }
+        } catch (e) { showToast('Network error', 'error'); }
+        return;
+    }
+
+    // For all other changes (downgrade or paid-to-paid), use change-plan
+    if (!confirm('Change plan from ' + currentPlan + ' to ' + plan + '?')) return;
+    try {
+        var resp2 = await fetch('/api/billing/change-plan', {
+            method: 'POST',
+            headers: { 'Authorization': 'Bearer ' + localStorage.getItem('strype_token'), 'Content-Type': 'application/json' },
+            credentials: 'include',
+            body: JSON.stringify({ plan: plan })
+        });
+        var data2 = await resp2.json();
+        if (resp2.ok) {
+            showToast('Plan changed to ' + plan, 'success');
+            // Update local data
+            userData.plan = plan;
+            localStorage.setItem('strype_user', JSON.stringify(userData));
+            renderPlanChangeUI();
+            // Reload user data from server
+            var meResp = await fetch('/api/auth/me', {
+                headers: { 'Authorization': 'Bearer ' + localStorage.getItem('strype_token') },
+                credentials: 'include'
+            });
+            if (meResp.ok) {
+                var me = await meResp.json();
+                localStorage.setItem('strype_user', JSON.stringify(me));
+            }
+        } else {
+            showToast(data2.detail || 'Plan change failed', 'error');
+        }
+    } catch (e) { showToast('Network error', 'error'); }
 }
 
 /* ═══════════════════════════════════════════════════════════════════
@@ -3434,8 +3645,37 @@ async function init() {
   updateDashboard();
   updateAuthUI();
 
-  // Handle billing redirect
+  // Schedule token refresh if already logged in
+  if (api.isLoggedIn()) {
+    scheduleTokenRefresh();
+  }
+
+  // Handle email verification token
   var params = new URLSearchParams(window.location.search);
+  var verifyToken = params.get('verify_token');
+  if (verifyToken) {
+    fetch('/api/auth/verify-email', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        credentials: 'include',
+        body: JSON.stringify({ token: verifyToken })
+    }).then(function(r) { return r.json(); }).then(function(data) {
+        if (data.ok) {
+            showToast('Email verified successfully!', 'success');
+            // Update local user data
+            var ud = JSON.parse(localStorage.getItem('strype_user') || '{}');
+            ud.email_verified = true;
+            localStorage.setItem('strype_user', JSON.stringify(ud));
+            var verifyBanner = document.getElementById('verifyBanner');
+            if (verifyBanner) verifyBanner.style.display = 'none';
+        } else {
+            showToast(data.detail || 'Verification failed', 'error');
+        }
+    }).catch(function() { showToast('Verification failed', 'error'); });
+    window.history.replaceState({}, '', window.location.pathname);
+  }
+
+  // Handle billing redirect
   var billingStatus = params.get('billing');
   if (billingStatus === 'success') {
     showToast('Payment successful! Your plan has been upgraded.');
@@ -3523,11 +3763,79 @@ async function loadRobotStatus() {
         jobText +
         (data.tracking_number ? '<div style="margin-top:4px">Tracking: ' + escapeHtml(data.tracking_number) + '</div>' : '') +
         (data.error_code ? '<div style="margin-top:4px;color:var(--red)">Error: ' + escapeHtml(data.error_code) + '</div>' : '');
+      // Start telemetry polling if robot is active
+      if (data.robot_id && data.status === 'active') {
+        _currentRobotId = data.robot_id;
+        pollTelemetry();
+        if (_telemetryPollerId) clearInterval(_telemetryPollerId);
+        _telemetryPollerId = setInterval(pollTelemetry, 30000);
+      }
     }
   } catch(e) {
     document.getElementById('robotStatusInfo').innerHTML = 'Unable to load robot status.';
   }
 }
+
+// --- Telemetry Polling ---
+async function pollTelemetry() {
+    if (!_currentRobotId) return;
+    try {
+        var resp = await fetch('/api/telemetry/robot/' + _currentRobotId + '/latest', {
+            headers: { 'Authorization': 'Bearer ' + localStorage.getItem('strype_token') },
+            credentials: 'include'
+        });
+        if (resp.ok) {
+            var data = await resp.json();
+            updateTelemetryDisplay(data);
+        } else if (resp.status === 404) {
+            updateTelemetryDisplay(null);
+        }
+    } catch (e) { /* silent fail on network issues */ }
+}
+
+function updateTelemetryDisplay(data) {
+    var el = document.getElementById('robotTelemetry');
+    if (!el) return;
+    if (!data) {
+        el.innerHTML = '<div style="color:var(--text-2);font-size:.8125rem;">Waiting for first heartbeat...</div>';
+        return;
+    }
+    var lastSeen = new Date(data.created_at);
+    var isOnline = (Date.now() - lastSeen.getTime()) < 120000;
+    var battColor = data.battery_pct > 50 ? '#3fb950' : data.battery_pct > 20 ? '#f59e0b' : '#f85149';
+    var stateColors = { idle: '#8b949e', mowing: '#3fb950', error: '#f85149', charging: '#f59e0b' };
+
+    el.innerHTML =
+        '<div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;font-size:.8125rem;">' +
+            '<div><span style="color:var(--text-2);">Status</span><br>' +
+                '<span style="display:inline-block;width:8px;height:8px;border-radius:50%;background:' + (isOnline ? '#3fb950' : '#f85149') + ';margin-right:4px;"></span>' +
+                (isOnline ? 'Online' : 'Offline') +
+            '</div>' +
+            '<div><span style="color:var(--text-2);">Battery</span><br>' +
+                '<span style="color:' + battColor + ';font-weight:600;">' + (data.battery_pct != null ? data.battery_pct + '%' : '--') + '</span>' +
+            '</div>' +
+            '<div><span style="color:var(--text-2);">State</span><br>' +
+                '<span style="color:' + (stateColors[data.state] || '#8b949e') + ';text-transform:capitalize;">' + (data.state || '--') + '</span>' +
+            '</div>' +
+            '<div><span style="color:var(--text-2);">Paint</span><br>' +
+                (data.paint_level_pct != null ? data.paint_level_pct + '%' : '--') +
+            '</div>' +
+            '<div style="grid-column:1/-1;"><span style="color:var(--text-2);">Last seen</span><br>' +
+                lastSeen.toLocaleString() +
+            '</div>' +
+            (data.error_code ? '<div style="grid-column:1/-1;color:#f85149;">Error: ' + escapeHtml(data.error_code) + '</div>' : '') +
+        '</div>';
+}
+
+// Page Visibility API — pause/resume telemetry polling
+document.addEventListener('visibilitychange', function() {
+    if (document.hidden) {
+        if (_telemetryPollerId) { clearInterval(_telemetryPollerId); _telemetryPollerId = null; }
+    } else if (_currentRobotId && localStorage.getItem('strype_token')) {
+        pollTelemetry();
+        _telemetryPollerId = setInterval(pollTelemetry, 30000);
+    }
+});
 
 // --- Recurring Schedules ---
 function updateScheduleLotSelect() {
@@ -3608,6 +3916,9 @@ window.updateSettingsPassword = updateSettingsPassword;
 window.confirmDeleteAccount = confirmDeleteAccount;
 window.deleteSchedule = deleteSchedule;
 window.importDxfSvg = importDxfSvg;
+window.resendVerification = resendVerification;
+window.changePlan = changePlan;
+window.renderPlanChangeUI = renderPlanChangeUI;
 
 init();
 

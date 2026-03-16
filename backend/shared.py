@@ -22,4 +22,5 @@ def user_to_response(user: dict) -> UserResponse:
         active_lot_id=user.get("active_lot_id"),
         map_state=map_state,
         limits=settings.PLAN_LIMITS.get(plan),
+        email_verified=bool(user.get("email_verified", 0)),
     )

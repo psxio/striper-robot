@@ -140,7 +140,7 @@
             </div>
             <table>
                 <thead>
-                    <tr><th>Serial</th><th>Status</th><th>HW</th><th>Firmware</th><th>Last Seen</th><th>Actions</th></tr>
+                    <tr><th>Serial</th><th>Status</th><th>HW</th><th>Firmware</th><th>API Key</th><th>Last Seen</th><th>Actions</th></tr>
                 </thead>
                 <tbody id="robotsBody"></tbody>
             </table>
@@ -350,7 +350,7 @@
     function loadRobots(page) {
         api('GET', '/admin/robots?page=' + page + '&limit=20').then(function(data) {
             var tbody = document.getElementById('robotsBody');
-            if (!data.items.length) { tbody.innerHTML = '<tr><td colspan="6" class="empty">No robots</td></tr>'; return; }
+            if (!data.items.length) { tbody.innerHTML = '<tr><td colspan="7" class="empty">No robots</td></tr>'; return; }
             tbody.innerHTML = data.items.map(function(r) {
                 var statusClass = r.status === 'available' ? 'badge-pro' : r.status === 'retired' ? 'badge-free' : 'badge-admin';
                 var lastSeen = r.last_seen_at ? new Date(r.last_seen_at).toLocaleString() : 'Never';
@@ -359,6 +359,7 @@
                     '<td><span class="badge ' + statusClass + '">' + r.status + '</span></td>' +
                     '<td>' + escapeHtml(r.hardware_version || '') + '</td>' +
                     '<td>' + escapeHtml(r.firmware_version || '-') + '</td>' +
+                    '<td>' + (r.has_api_key ? '****' + escapeHtml(r.api_key_last4 || '') + ' <button class="btn btn-sm" onclick="generateApiKey(\'' + r.id + '\')">Rotate</button> <button class="btn btn-sm btn-danger" onclick="revokeApiKey(\'' + r.id + '\')">Revoke</button>' : '<button class="btn btn-sm" onclick="generateApiKey(\'' + r.id + '\')">Generate</button>') + '</td>' +
                     '<td>' + lastSeen + '</td>' +
                     '<td class="actions">' +
                         '<select onchange="updateRobotStatus(\'' + r.id + '\', this.value)">' +
@@ -379,6 +380,42 @@
         api('PUT', '/admin/robots/' + robotId, { status: status }).then(function() {
             loadRobots(1);
         });
+    }
+
+    function generateApiKey(robotId) {
+        try {
+            fetch(API_BASE + '/admin/robots/' + robotId + '/api-key', {
+                method: 'POST',
+                headers: { 'Authorization': 'Bearer ' + token }
+            }).then(function(resp) {
+                return resp.json().then(function(data) {
+                    if (resp.ok) {
+                        alert('API Key (copy it now, it won\'t be shown again):\n\n' + data.api_key);
+                        loadRobots(1);
+                    } else {
+                        alert(data.detail || 'Failed to generate key');
+                    }
+                });
+            }).catch(function() { alert('Network error'); });
+        } catch (e) { alert('Network error'); }
+    }
+
+    function revokeApiKey(robotId) {
+        if (!confirm('Revoke this API key? The robot will stop sending telemetry until a new key is generated.')) return;
+        try {
+            fetch(API_BASE + '/admin/robots/' + robotId + '/api-key', {
+                method: 'DELETE',
+                headers: { 'Authorization': 'Bearer ' + token }
+            }).then(function(resp) {
+                if (resp.ok) {
+                    loadRobots(1);
+                } else {
+                    resp.json().then(function(data) {
+                        alert(data.detail || 'Failed to revoke key');
+                    });
+                }
+            }).catch(function() { alert('Network error'); });
+        } catch (e) { alert('Network error'); }
     }
 
     function showAssignModal(robotId) {
