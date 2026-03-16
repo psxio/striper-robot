@@ -285,9 +285,10 @@ CRUISE_THROTTLE,30
 # Waypoint navigation speed (m/s): slower for painting accuracy
 WP_SPEED,0.50
 
-# Waypoint acceptance radius (meters): 5cm for precise line striping
-# This defines how close the robot must get to a waypoint before advancing
-WP_RADIUS,0.05
+# Waypoint acceptance radius (meters): 15cm is the tightest safe value
+# ArduPilot forums report looping/oscillation below 0.20m with RTK.
+# 5cm WILL cause looping. Start at 0.15 and tune down cautiously.
+WP_RADIUS,0.15
 
 # Waypoint overshoot distance (meters): how far past a WP we can go
 WP_OVERSHOOT,0.10

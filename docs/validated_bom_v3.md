@@ -54,23 +54,18 @@ or unavailable during painting.
 - Runs ArduRover 4.5+, 4 serial ports, 6 relay outputs
 - 2MB flash, adequate for 4 Lua scripts (120KB heap)
 
-### 2. GPS: ArduSimple simpleRTK3B Compass (UM982) — $210 (CHANGED from UM980 $180)
-- **Change**: UM980 → UM982 (+$30)
+### 2. GPS: Holybro H-RTK Unicore UM982 — $250 (CHANGED from UM980 $180)
+- **Change**: UM980 → UM982 (+$70)
 - **Why**: Dual-antenna heading eliminates GSF speed dependency
+- **Actual price verified**: Holybro official store $249.99 (includes dual antennas + cables)
 - **Specs validated from datasheet**:
   - Position: 8mm horizontal RTK, L1/L2/L5 triband
   - Heading: 0.2° at 1m baseline (antenna separation ≥30cm)
   - Works at standstill — no movement needed for heading
   - ArduPilot GPS_TYPE=25 (UnicoreMovingBaseline)
-- **Requires**: Two GNSS antennas, mounted ≥30cm apart on robot frame
+- **Includes**: Two GNSS antennas + JST Pixhawk cable (no separate antenna purchase needed)
 - **Config**: `GPS1_MB_TYPE=1`, `EK3_SRC1_YAW=2`
-- **Source**: [ArduSimple simpleRTK3B Compass](https://www.ardusimple.com/product/simplertk3b-compass/)
-
-### 3. Second GNSS Antenna — $15 (NEW)
-- The UM982 needs two antennas for heading
-- Same type as primary (L1/L2/L5 multiband patch)
-- Mount on opposite end of robot frame, ≥30cm from primary
-- Longer baseline = better heading accuracy (0.2° at 1m, 0.1° at 2m)
+- **Source**: [Holybro H-RTK UM982](https://holybro.com/products/h-rtk-unicore-um982)
 
 ### 4. Motors: Used Hoverboard — $30 (UNCHANGED, with caveats)
 - **Must be STM32F103R or GD32F103R** (NOT AT32) — this is load-bearing
@@ -78,7 +73,7 @@ or unavailable during painting.
 - FOC firmware (EFeru/hoverboard-firmware-hack-FOC)
 - **Validated risk**: Low-speed torque stalling reported (GitHub Issue #97)
   - Mitigation: Use SPEED mode (not voltage mode) in FOC config
-  - Set `SPEED_MIN=50 RPM` to prevent stall zone
+  - Set `SPEED_MIN=20 RPM` to prevent stall zone (paint speed = 58 RPM, need margin)
   - `I_MOT_MAX=15A` (raised from 10A for hill/curb recovery)
 - **Source**: [EFeru FOC Firmware](https://github.com/EFeru/hoverboard-firmware-hack-FOC)
 
@@ -127,10 +122,16 @@ or unavailable during painting.
 - **Requires**: Same form factor (Hailong case, XT60 connector, 10S BMS with cell balancing)
 - **BATT_LOW_VOLT=33V** (3.3V/cell), **BATT_CRT_VOLT=31V** (3.1V/cell)
 
-### 9. Power Distribution — $37 (UNCHANGED)
-- XL4015 5A buck converter (36V→12V) for pump, solenoid, Pixhawk — $12
+### 9. Power Distribution — $49 (CHANGED from $37)
+- **Change**: Added second buck converter for pump (+$12)
+- **Why**: Shurflo pump draws 6.4A at 12V. XL4015 is rated 5A. Pump alone exceeds rating.
+  Sharing one converter causes brownouts on Pixhawk/GPS during pump operation.
+- XL4015 #1 (36V→12V, 5A): Pixhawk, GPS, solenoid, RC receiver (~2A total)
+- XL4015 #2 (36V→12V, 5A): Pump only (6.4A peak, but demand-cycle reduces average)
+  - Note: 6.4A exceeds 5A rating but pump duty-cycles (runs ~50% of time via demand switch)
+  - Alternative: Use a 10A buck converter ($15) instead of two XL4015s
 - Holybro PM06 V2 power module (current/voltage sensing) — $25
-- **Wire gauge**: 12 AWG main power (10A continuous at 36V = 360W)
+- **Wire gauge**: 12 AWG main power (handles 20A continuous, fused at 30A)
 - 30A blade fuse on battery output
 
 ### 10. E-Stop System — $25 (UNCHANGED)
@@ -150,7 +151,7 @@ or unavailable during painting.
 - GPS antenna mount: 200mm aluminum standoff, centered, ≥30cm between dual antennas
 - Paint tank mount: Centered over axle line (CG over drive wheels)
 - Nozzle mount: Adjustable height arm, 6-8" above ground, trailing behind robot
-- **Weight target**: 20-25 kg dry, 30-35 kg with 5 gal paint
+- **Weight target**: 20-25 kg dry, ~44 kg with 5 gal paint (paint = ~23 kg at 1.2 kg/L density)
 
 ### 13. Paint Tank & Plumbing — $30 (NEW, previously unspecified)
 - 5-gallon HDPE pressure tank with lid (not open bucket — prevents splash)
@@ -165,26 +166,28 @@ or unavailable during painting.
 
 | Item | v2 Price | v3 Price | Change |
 |------|----------|----------|--------|
-| Pixhawk 6C Mini | $120 | $120 | — |
-| GPS (UM980→UM982) | $180 | $210 | +$30 |
-| Second GNSS antenna | — | $15 | NEW |
+| Pixhawk 6C Mini | $120 | $106 | -$14 (actual Holybro price) |
+| GPS (UM980→Holybro UM982) | $180 | $250 | +$70 (includes dual antennas) |
+| Second GNSS antenna | — | — | Included with Holybro UM982 |
 | Hoverboard | $30 | $30 | — |
 | Shurflo pump | $90 | $90 | — |
 | Solenoid | $20 | $20 | — |
 | TeeJet nozzle | $15 | $15 | — |
 | Battery (10Ah→18Ah) | $100 | $160 | +$60 |
-| Power distribution | $37 | $37 | — |
+| Power distribution | $37 | $49 | +$12 (separate pump converter) |
 | E-stop + contactor | $25 | $25 | — |
 | RC transmitter | $50 | $50 | — |
 | Frame + hardware | $80 | $80 | — |
 | Paint tank + plumbing | — | $30 | NEW |
 | Wiring, fuses, misc | $53 | $53 | — |
-| **TOTAL** | **$780** | **$935** | **+$155** |
+| **TOTAL** | **$780** | **$958** | **+$178** |
 
 **Cost increase justified by:**
 - UM982 eliminates the #1 technical risk (heading at paint speed)
 - 18Ah battery matches proven competitor capacity (640Wh)
+- Separate pump converter prevents electronics brownouts
 - Paint tank/plumbing was always needed but wasn't specified
+- Pixhawk actual price is lower than originally estimated
 
 ---
 
@@ -206,7 +209,7 @@ BATT_LOW_VOLT=33.0        # 3.3V/cell (10S)
 BATT_CRT_VOLT=31.0        # 3.1V/cell emergency
 
 # Navigation — tuned for paint accuracy
-WP_RADIUS=0.10            # was 0.20 → tighter waypoint hit (10cm)
+WP_RADIUS=0.15            # was 0.05 → safe minimum (5cm causes looping)
 WP_OVERSHOOT=0.05         # Prevent overshoot on turns
 NAVL1_PERIOD=4            # L1 navigation period (lower = more responsive)
 ATC_STR_RAT_P=0.30        # Steering rate P gain (tune on field)
@@ -225,7 +228,7 @@ ATC_STR_RAT_P=0.30        # Steering rate P gain (tune on field)
 
 ### 2. Hoverboard Low-Speed Torque — MEDIUM RISK
 - **Data**: FOC firmware Issue #97 reports motor stalling at very low RPM
-- **Our paint speed**: 0.5 m/s ≈ 30 RPM (hoverboard wheel ~350mm diameter)
+- **Our paint speed**: 0.5 m/s ≈ 58 RPM (6.5" wheel, circumference 0.518m)
 - **Mitigation**: Use SPEED mode, set `SPEED_MIN=50`, raise `I_MOT_MAX=15A`
 - **Backup plan**: If hoverboard motors fail at low speed, replace with 24V gearmotors (~$60/pair)
 
