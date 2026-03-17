@@ -3,6 +3,8 @@
 import asyncio
 import json
 import logging
+
+__version__ = "0.5.1"
 from contextlib import asynccontextmanager
 from datetime import datetime, timezone
 
@@ -151,10 +153,10 @@ async def health():
     try:
         async for db in get_db():
             await db.execute("SELECT 1")
-        return {"status": "ok", "version": "0.5.0"}
+        return {"status": "ok", "version": __version__}
     except Exception:
         return Response(
-            content='{"status":"error","version":"0.5.0"}',
+            content='{"status":"error","version":"' + __version__ + '"}',
             status_code=503,
             media_type="application/json",
         )

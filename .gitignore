@@ -37,5 +37,10 @@ terrain/
 *.db
 *.sqlite3
 
+# Node / Playwright
+node_modules/
+test-results/
+playwright-report/
+
 # Claude Code
 .claude/

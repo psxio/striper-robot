@@ -5,7 +5,7 @@ import io
 import logging
 
 from fastapi import APIRouter, Depends, HTTPException, Query
-from fastapi.responses import Response
+from fastapi.responses import Response, StreamingResponse
 
 from ..auth import get_admin_user
 from ..models.schemas import (
@@ -43,25 +43,31 @@ async def list_waitlist(
     format: str = Query(default="json"),
     admin: dict = Depends(get_admin_user),
 ):
-    """List all waitlist entries. Use format=csv for CSV export."""
-    # CSV exports get all entries regardless of pagination params
+    """List all waitlist entries. Use format=csv for streaming CSV export."""
     if format == "csv":
-        items, total = await admin_store.list_waitlist(page=1, limit=100000)
-    else:
-        items, total = await admin_store.list_waitlist(page=page, limit=limit)
+        async def csv_generator():
+            yield "id,email,source,created_at\r\n"
+            batch_page = 1
+            while True:
+                items, _ = await admin_store.list_waitlist(page=batch_page, limit=500)
+                if not items:
+                    break
+                buf = io.StringIO()
+                writer = csv.writer(buf)
+                for item in items:
+                    writer.writerow([item["id"], item["email"], item["source"], item["created_at"]])
+                yield buf.getvalue()
+                if len(items) < 500:
+                    break
+                batch_page += 1
 
-    if format == "csv":
-        output = io.StringIO()
-        writer = csv.writer(output)
-        writer.writerow(["id", "email", "source", "created_at"])
-        for item in items:
-            writer.writerow([item["id"], item["email"], item["source"], item["created_at"]])
-        return Response(
-            content=output.getvalue(),
+        return StreamingResponse(
+            csv_generator(),
             media_type="text/csv",
             headers={"Content-Disposition": "attachment; filename=waitlist.csv"},
         )
 
+    items, total = await admin_store.list_waitlist(page=page, limit=limit)
     return {"items": items, "total": total, "page": page, "limit": limit}
 
 

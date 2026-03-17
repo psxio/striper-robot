@@ -31,6 +31,17 @@ def _row_to_dict(row) -> dict:
     return job
 
 
+async def get_job(user_id: str, job_id: str) -> Optional[dict]:
+    """Get a single job by ID, scoped to the given user."""
+    async for db in get_db():
+        cursor = await db.execute(
+            "SELECT * FROM jobs WHERE id = ? AND user_id = ?",
+            (job_id, user_id),
+        )
+        row = await cursor.fetchone()
+        return _row_to_dict(row) if row else None
+
+
 async def list_jobs(user_id: str, page: int = 1, limit: int = 50, status: str | None = None, lot_id: str | None = None) -> tuple[list[dict], int]:
     """Return paginated jobs for a given user, optionally filtered."""
     async for db in get_db():

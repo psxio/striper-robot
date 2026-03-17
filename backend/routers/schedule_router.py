@@ -33,6 +33,16 @@ async def list_schedules(
     }
 
 
+@router.get("/{schedule_id}", response_model=ScheduleResponse)
+async def get_schedule_by_id(
+    schedule_id: str, user: dict = Depends(get_current_user)
+):
+    schedule = await schedule_store.get_schedule(user["id"], schedule_id)
+    if not schedule:
+        raise HTTPException(status_code=404, detail="Schedule not found")
+    return _to_response(schedule)
+
+
 @router.post("", response_model=ScheduleResponse, status_code=201)
 async def create_schedule(body: ScheduleCreate, user: dict = Depends(get_current_user)):
     # Require Pro+ plan

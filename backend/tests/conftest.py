@@ -8,7 +8,8 @@ import pytest_asyncio
 from httpx import AsyncClient, ASGITransport
 
 # Set test database before importing app
-_tmp = tempfile.mktemp(suffix=".db")
+_fd, _tmp = tempfile.mkstemp(suffix=".db")
+os.close(_fd)
 os.environ["DATABASE_PATH"] = _tmp
 
 from backend.main import app  # noqa: E402
@@ -22,7 +23,9 @@ limiter.enabled = False
 @pytest_asyncio.fixture(autouse=True)
 async def setup_db():
     """Create a fresh database for each test."""
-    os.environ["DATABASE_PATH"] = tempfile.mktemp(suffix=".db")
+    fd, tmp_path = tempfile.mkstemp(suffix=".db")
+    os.close(fd)
+    os.environ["DATABASE_PATH"] = tmp_path
     from backend.config import settings
     settings.DATABASE_PATH = os.environ["DATABASE_PATH"]
     await init_db()

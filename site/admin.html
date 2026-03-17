@@ -129,13 +129,13 @@
     </div>
 
     <div id="mainContent" class="container" style="display:none;">
-        <div class="tabs">
-            <div class="tab active" onclick="switchTab('stats')">Stats</div>
-            <div class="tab" onclick="switchTab('users')">Users</div>
-            <div class="tab" onclick="switchTab('robots')">Robots</div>
-            <div class="tab" onclick="switchTab('assignments')">Assignments</div>
-            <div class="tab" onclick="switchTab('waitlist')">Waitlist</div>
-            <div class="tab" onclick="switchTab('audit')">Audit Log</div>
+        <div class="tabs" role="tablist">
+            <button class="tab active" onclick="switchTab('stats')" role="tab">Stats</button>
+            <button class="tab" onclick="switchTab('users')" role="tab">Users</button>
+            <button class="tab" onclick="switchTab('robots')" role="tab">Robots</button>
+            <button class="tab" onclick="switchTab('assignments')" role="tab">Assignments</button>
+            <button class="tab" onclick="switchTab('waitlist')" role="tab">Waitlist</button>
+            <button class="tab" onclick="switchTab('audit')" role="tab">Audit Log</button>
         </div>
 
         <!-- Stats Panel -->
