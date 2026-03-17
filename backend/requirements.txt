@@ -11,4 +11,4 @@ httpx==0.28.1
 pytest==8.4.2
 pytest-asyncio==1.2.0
 ezdxf==1.4.3
-svgpathtools==1.7.1
+svgpathtools==1.7.2
