@@ -8,7 +8,9 @@
     "example": "examples"
   },
   "scripts": {
-    "test": "echo \"Error: no test specified\" && exit 1"
+    "test": "echo \"Error: no test specified\" && exit 1",
+    "test:e2e": "python scripts/run_playwright.py",
+    "test:e2e:headed": "python scripts/run_playwright.py --headed"
   },
   "keywords": [],
   "author": "",

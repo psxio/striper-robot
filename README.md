@@ -42,11 +42,11 @@ tests/e2e/           Playwright E2E tests (22 tests)
 pip install -r backend/requirements.txt
 pip install -e striper_pathgen/
 cp .env.example .env  # edit with your keys
-python -m uvicorn backend.main:app --reload
+python scripts/run_backend.py --reload
 
 # Tests
 python -m pytest backend/tests/ -v
-npx playwright test
+python scripts/run_playwright.py
 
 # Path generation
 python scripts/pathgen_cli.py --template parking_row --spaces 20 --output mission.waypoints

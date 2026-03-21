@@ -1,5 +1,8 @@
 import { defineConfig } from '@playwright/test';
 
+const port = Number(process.env.PLAYWRIGHT_PORT || process.env.PORT || '8111');
+const baseUrl = `http://127.0.0.1:${port}`;
+
 export default defineConfig({
   testDir: './tests/e2e',
   fullyParallel: false,
@@ -11,7 +14,7 @@ export default defineConfig({
     ['list'],
   ],
   use: {
-    baseURL: 'http://localhost:8111',
+    baseURL: baseUrl,
     trace: 'on-first-retry',
     screenshot: 'only-on-failure',
     video: 'on-first-retry',
@@ -23,8 +26,8 @@ export default defineConfig({
     },
   ],
   webServer: {
-    command: 'python -m uvicorn backend.main:app --host 0.0.0.0 --port 8111',
-    url: 'http://localhost:8111/api/health',
+    command: `python scripts/run_backend.py --host 0.0.0.0 --strict-port --start-port ${port}`,
+    url: `${baseUrl}/api/health`,
     reuseExistingServer: false,
     timeout: 30000,
   },
