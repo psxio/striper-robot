@@ -14,7 +14,7 @@ Required Railway service variables:
 
 - `ENV=production`
 - `DATABASE_URL=${{Postgres.DATABASE_URL}}`
-- `SECRET_KEY=<64+ random chars>`
+- `SECRET_KEY=<64+ random chars>` (example: `python -c "import secrets; print(secrets.token_urlsafe(64))"`)
 - `CORS_ORIGINS=https://your-frontend.example.com`
 - `FRONTEND_URL=https://your-frontend.example.com`
 
@@ -70,7 +70,7 @@ Optional but recommended:
 
 ## AWS Provisioning (Secondary Option)
 
-Terraform lives in [infra/terraform](/Users/mabou/Downloads/robot/infra/terraform).
+Terraform lives in [infra/terraform](../infra/terraform).
 
 The CI deploy workflow expects Terraform remote state in S3. Configure repository variables:
 
