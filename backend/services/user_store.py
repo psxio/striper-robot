@@ -28,9 +28,11 @@ async def create_user(email: str, password_hash: str, name: str = "") -> dict:
             (user_id, email, password_hash, name, now, now),
         )
         await db.commit()
-        cursor = await db.execute("SELECT * FROM users WHERE id = ?", (user_id,))
-        row = await cursor.fetchone()
-        return dict(row)
+    from .organization_store import ensure_personal_organization
+
+    await ensure_personal_organization(user_id, email, name)
+    user = await get_user_by_id(user_id)
+    return user or {}
 
 
 async def get_user_by_email(email: str) -> Optional[dict]:
@@ -152,9 +154,48 @@ async def update_profile(
 async def delete_user(user_id: str) -> bool:
     """Delete a user and all associated data (cascaded by FK)."""
     async for db in get_db():
-        cursor = await db.execute("DELETE FROM users WHERE id = ?", (user_id,))
-        await db.commit()
-        return cursor.rowcount > 0
+        await db.execute("BEGIN IMMEDIATE")
+        try:
+            # Personal workspaces should disappear with the user. Shared workspaces
+            # keep operating, so we null out creator references before deletion.
+            await db.execute(
+                "DELETE FROM organizations WHERE created_by_user_id = ? AND personal = 1",
+                (user_id,),
+            )
+            await db.execute(
+                "UPDATE organizations SET created_by_user_id = NULL WHERE created_by_user_id = ?",
+                (user_id,),
+            )
+            await db.execute(
+                "UPDATE sites SET created_by_user_id = NULL WHERE created_by_user_id = ?",
+                (user_id,),
+            )
+            await db.execute(
+                "UPDATE quotes SET created_by_user_id = NULL WHERE created_by_user_id = ?",
+                (user_id,),
+            )
+            await db.execute(
+                "UPDATE job_reports SET created_by_user_id = NULL WHERE created_by_user_id = ?",
+                (user_id,),
+            )
+            await db.execute(
+                "UPDATE maintenance_events SET created_by_user_id = NULL WHERE created_by_user_id = ?",
+                (user_id,),
+            )
+            await db.execute(
+                "UPDATE service_checklists SET created_by_user_id = NULL WHERE created_by_user_id = ?",
+                (user_id,),
+            )
+            await db.execute(
+                "UPDATE consumable_usage SET created_by_user_id = NULL WHERE created_by_user_id = ?",
+                (user_id,),
+            )
+            cursor = await db.execute("DELETE FROM users WHERE id = ?", (user_id,))
+            await db.execute("COMMIT")
+            return cursor.rowcount > 0
+        except Exception:
+            await db.execute("ROLLBACK")
+            raise
 
 
 # --- Password Reset Tokens ---

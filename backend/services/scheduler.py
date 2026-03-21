@@ -7,6 +7,12 @@ from . import schedule_store, job_store, user_store
 from ..config import settings
 
 logger = logging.getLogger("strype.scheduler")
+_scheduler_state = {
+    "running": False,
+    "last_tick_started_at": None,
+    "last_tick_completed_at": None,
+    "last_error": None,
+}
 
 
 async def process_due_schedules() -> int:
@@ -40,6 +46,8 @@ async def process_due_schedules() -> int:
                 schedule["lot_id"],
                 schedule["next_run"],
                 max_jobs=max_jobs,
+                time_preference=schedule.get("time_preference") or "morning",
+                recurring_schedule_id=schedule["id"],
             )
             if job is None:
                 logger.warning(
@@ -69,11 +77,20 @@ async def process_due_schedules() -> int:
 async def run_scheduler_loop() -> None:
     """Run an infinite loop that processes due schedules every 60 seconds."""
     logger.info("Scheduler loop started")
+    _scheduler_state["running"] = True
     while True:
         try:
+            _scheduler_state["last_tick_started_at"] = datetime.now(timezone.utc).isoformat()
             count = await process_due_schedules()
             if count:
                 logger.info("Scheduler tick: processed %d schedule(s)", count)
+            _scheduler_state["last_tick_completed_at"] = datetime.now(timezone.utc).isoformat()
+            _scheduler_state["last_error"] = None
         except Exception:
+            _scheduler_state["last_error"] = datetime.now(timezone.utc).isoformat()
             logger.exception("Scheduler tick failed")
         await asyncio.sleep(60)
+
+
+def get_scheduler_health() -> dict:
+    return dict(_scheduler_state)

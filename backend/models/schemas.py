@@ -40,9 +40,11 @@ class UserResponse(BaseModel):
     name: str
     plan: str
     active_lot_id: Optional[str] = None
+    active_organization_id: Optional[str] = None
     map_state: Optional[dict] = None  # {lat, lng, zoom}
     limits: Optional[dict] = None  # {max_lots, max_jobs}
     email_verified: bool = False
+    organizations: Optional[list[dict]] = None
 
 
 class AuthResponse(BaseModel):

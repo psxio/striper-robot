@@ -3,6 +3,7 @@
 import asyncio
 import json
 import logging
+from pathlib import Path
 
 __version__ = "0.5.1"
 from contextlib import asynccontextmanager
@@ -21,8 +22,25 @@ from .rate_limit import limiter
 from .routers import (
     auth_router, lots_router, jobs_router, waitlist_router, user_router,
     billing_router, admin_router, robot_router, schedule_router,
-    estimate_router, telemetry_router,
+    estimate_router, telemetry_router, organization_router, sites_router,
+    quotes_router, operations_router, reporting_router, fleet_router,
 )
+from .services import storage_service
+
+if settings.SENTRY_DSN:
+    try:
+        import sentry_sdk
+        from sentry_sdk.integrations.fastapi import FastApiIntegration
+
+        sentry_sdk.init(
+            dsn=settings.SENTRY_DSN,
+            integrations=[FastApiIntegration()],
+            environment=settings.ENV,
+            release=__version__,
+            traces_sample_rate=0.0,
+        )
+    except ImportError:
+        logging.getLogger("strype").warning("sentry-sdk is not installed; Sentry disabled")
 
 
 class JSONFormatter(logging.Formatter):
@@ -58,6 +76,8 @@ logger = logging.getLogger("strype")
 async def lifespan(app: FastAPI):
     logger.info("Strype Cloud Platform starting up (env=%s)", settings.ENV)
     await init_db()
+    storage_health = await storage_service.check_storage_health()
+    logger.info("Storage backend ready: %s", storage_health["backend"])
     # Start background scheduler (skip in test)
     scheduler_task = None
     if settings.ENV != "test":
@@ -112,9 +132,26 @@ async def csrf_protection(request: Request, call_next):
             secrets.token_urlsafe(32),
             httponly=False,
             samesite="strict",
+            secure=settings.ENV != "dev",
         )
 
     return response
+
+
+@app.middleware("http")
+async def request_size_limit(request: Request, call_next):
+    if request.method in ("POST", "PUT", "PATCH"):
+        content_length = request.headers.get("content-length")
+        if content_length:
+            try:
+                if int(content_length) > settings.MAX_UPLOAD_BYTES:
+                    return JSONResponse(
+                        status_code=413,
+                        content={"detail": f"Request body exceeds {settings.MAX_UPLOAD_BYTES} bytes"},
+                    )
+            except ValueError:
+                return JSONResponse(status_code=400, content={"detail": "Invalid Content-Length header"})
+    return await call_next(request)
 
 
 @app.middleware("http")
@@ -162,6 +199,37 @@ async def health():
         )
 
 
+@app.get("/api/ready")
+async def readiness():
+    """Readiness check with DB, storage, and scheduler state."""
+    try:
+        async for db in get_db():
+            await db.execute("SELECT 1")
+            break
+        storage = await storage_service.check_storage_health()
+        scheduler_health = {"running": False}
+        if settings.ENV != "test":
+            from .services.scheduler import get_scheduler_health
+
+            scheduler_health = get_scheduler_health()
+        return {
+            "status": "ready",
+            "version": __version__,
+            "storage": storage,
+            "scheduler": scheduler_health,
+        }
+    except Exception as exc:
+        logger.exception("Readiness check failed")
+        return JSONResponse(
+            status_code=503,
+            content={
+                "status": "error",
+                "version": __version__,
+                "detail": str(exc) if settings.ENV in ("dev", "test") else "Readiness check failed",
+            },
+        )
+
+
 app.include_router(auth_router.router)
 app.include_router(lots_router.router)
 app.include_router(jobs_router.router)
@@ -173,6 +241,13 @@ app.include_router(robot_router.router)
 app.include_router(schedule_router.router)
 app.include_router(estimate_router.router)
 app.include_router(telemetry_router.router)
+app.include_router(organization_router.router)
+app.include_router(sites_router.router)
+app.include_router(quotes_router.router)
+app.include_router(operations_router.router)
+app.include_router(reporting_router.router)
+app.include_router(fleet_router.router)
 
 # Serve frontend -- must be LAST (catch-all)
-app.mount("/", StaticFiles(directory="site", html=True), name="site")
+site_dir = Path(__file__).resolve().parent.parent / "site"
+app.mount("/", StaticFiles(directory=str(site_dir), html=True), name="site")

@@ -47,6 +47,7 @@ select{-webkit-appearance:none;appearance:none;background-image:url("data:image/
 .wordmark{font-family:var(--font-display);font-weight:800;font-size:1.1rem;letter-spacing:-.02em;color:var(--text);white-space:nowrap;text-decoration:none}
 .wordmark span{color:var(--green)}
 .topbar-divider{width:1px;height:28px;background:var(--border);flex-shrink:0}
+.view-nav{display:flex;align-items:center;gap:8px}
 .search-wrapper{position:relative;flex:1;max-width:420px}
 .search-wrapper svg{position:absolute;left:10px;top:50%;transform:translateY(-50%);width:15px;height:15px;color:var(--text-3);pointer-events:none}
 .search-input{width:100%;padding:7px 12px 7px 32px;font-size:.8125rem;background:var(--bg);border:1px solid var(--border);border-radius:var(--radius);color:var(--text)}
@@ -339,6 +340,11 @@ select{-webkit-appearance:none;appearance:none;background-image:url("data:image/
 <header class="topbar">
   <a href="index.html" class="wordmark">Stryp<span>e</span></a>
   <div class="topbar-divider"></div>
+  <nav class="view-nav" aria-label="Platform Views">
+    <a href="platform.html" class="topbar-btn active">Designer</a>
+    <a href="operations.html" class="topbar-btn">Operations</a>
+    <a href="reports.html" class="topbar-btn">Reporting</a>
+  </nav>
   <div class="search-wrapper">
     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.3-4.3"/></svg>
     <input type="text" class="search-input" id="addressSearch" placeholder="Search address or coordinates..." autocomplete="off">

@@ -5,6 +5,7 @@ from datetime import datetime, timezone, timedelta
 from typing import Optional
 
 from ..database import get_db
+from . import organization_store, site_store
 
 
 def _now() -> str:
@@ -66,14 +67,17 @@ async def create_schedule(
     schedule_id = str(uuid.uuid4())
     now = _now()
     next_run = calculate_next_run(frequency, day_of_week, day_of_month)
+    organization_id = await organization_store.get_default_organization_id(user_id)
+    site = await site_store.get_site_by_lot(lot_id)
+    site_id = site["id"] if site else None
 
     async for db in get_db():
         await db.execute(
             """INSERT INTO recurring_schedules
-               (id, user_id, lot_id, frequency, day_of_week, day_of_month,
+               (id, user_id, organization_id, site_id, lot_id, frequency, day_of_week, day_of_month,
                 time_preference, active, next_run, created_at, updated_at)
-               VALUES (?, ?, ?, ?, ?, ?, ?, 1, ?, ?, ?)""",
-            (schedule_id, user_id, lot_id, frequency, day_of_week,
+               VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, 1, ?, ?, ?)""",
+            (schedule_id, user_id, organization_id, site_id, lot_id, frequency, day_of_week,
              day_of_month, time_preference, next_run, now, now),
         )
         await db.commit()
@@ -82,6 +86,49 @@ async def create_schedule(
         )
         row = await cursor.fetchone()
         return dict(row)
+
+
+async def list_schedules_by_org(
+    organization_id: str,
+    page: int = 1,
+    limit: int = 50,
+    site_id: Optional[str] = None,
+) -> tuple[list[dict], int]:
+    """Return paginated active schedules for an organization."""
+    async for db in get_db():
+        where = "WHERE organization_id = ? AND active = 1"
+        params: list[object] = [organization_id]
+        if site_id:
+            where += " AND site_id = ?"
+            params.append(site_id)
+
+        cursor = await db.execute(
+            f"SELECT COUNT(*) FROM recurring_schedules {where}",
+            tuple(params),
+        )
+        total = (await cursor.fetchone())[0]
+
+        offset = (page - 1) * limit
+        cursor = await db.execute(
+            f"""SELECT * FROM recurring_schedules
+               {where}
+               ORDER BY next_run ASC
+               LIMIT ? OFFSET ?""",
+            tuple(params + [limit, offset]),
+        )
+        rows = await cursor.fetchall()
+        return [dict(row) for row in rows], total
+
+
+async def get_schedule_by_org(organization_id: str, schedule_id: str) -> Optional[dict]:
+    """Get a single schedule by ID, scoped to an organization."""
+    async for db in get_db():
+        cursor = await db.execute(
+            "SELECT * FROM recurring_schedules WHERE id = ? AND organization_id = ?",
+            (schedule_id, organization_id),
+        )
+        row = await cursor.fetchone()
+        return dict(row) if row else None
 
 
 async def list_schedules(

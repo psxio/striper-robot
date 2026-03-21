@@ -7,6 +7,7 @@ from typing import Optional
 
 from ..database import get_db
 from ..models.schemas import LotCreate, LotUpdate
+from . import organization_store, site_store
 
 
 def _now() -> str:
@@ -64,6 +65,7 @@ async def create_lot_atomic(user_id: str, data: LotCreate, max_lots: int) -> Opt
     lot_id = str(uuid.uuid4())
     now = _now()
     features_json = json.dumps(data.features)
+    organization_id = await organization_store.get_default_organization_id(user_id)
     async for db in get_db():
         await db.execute("BEGIN IMMEDIATE")
         try:
@@ -75,9 +77,9 @@ async def create_lot_atomic(user_id: str, data: LotCreate, max_lots: int) -> Opt
                 await db.execute("ROLLBACK")
                 return None
             await db.execute(
-                """INSERT INTO lots (id, user_id, name, center_lat, center_lng, zoom, features, created_at, updated_at)
-                   VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)""",
-                (lot_id, user_id, data.name, data.center.lat, data.center.lng,
+                """INSERT INTO lots (id, user_id, organization_id, name, center_lat, center_lng, zoom, features, created_at, updated_at)
+                   VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
+                (lot_id, user_id, organization_id, data.name, data.center.lat, data.center.lng,
                  data.zoom, features_json, now, now),
             )
             await db.execute("COMMIT")
@@ -86,7 +88,10 @@ async def create_lot_atomic(user_id: str, data: LotCreate, max_lots: int) -> Opt
             raise
         cursor = await db.execute("SELECT * FROM lots WHERE id = ?", (lot_id,))
         row = await cursor.fetchone()
-        return _row_to_dict(row)
+        lot = _row_to_dict(row)
+    if organization_id:
+        await site_store.ensure_site_for_lot(organization_id, user_id, lot)
+    return lot
 
 
 async def create_lot(user_id: str, data: LotCreate) -> dict:
@@ -94,17 +99,21 @@ async def create_lot(user_id: str, data: LotCreate) -> dict:
     lot_id = str(uuid.uuid4())
     now = _now()
     features_json = json.dumps(data.features)
+    organization_id = await organization_store.get_default_organization_id(user_id)
     async for db in get_db():
         await db.execute(
-            """INSERT INTO lots (id, user_id, name, center_lat, center_lng, zoom, features, created_at, updated_at)
-               VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)""",
-            (lot_id, user_id, data.name, data.center.lat, data.center.lng,
+            """INSERT INTO lots (id, user_id, organization_id, name, center_lat, center_lng, zoom, features, created_at, updated_at)
+               VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
+            (lot_id, user_id, organization_id, data.name, data.center.lat, data.center.lng,
              data.zoom, features_json, now, now),
         )
         await db.commit()
         cursor = await db.execute("SELECT * FROM lots WHERE id = ?", (lot_id,))
         row = await cursor.fetchone()
-        return _row_to_dict(row)
+        lot = _row_to_dict(row)
+    if organization_id:
+        await site_store.ensure_site_for_lot(organization_id, user_id, lot)
+    return lot
 
 
 async def get_lot(user_id: str, lot_id: str) -> Optional[dict]:
@@ -163,6 +172,7 @@ async def update_lot(user_id: str, lot_id: str, data: LotUpdate) -> Optional[dic
 async def delete_lot(user_id: str, lot_id: str) -> bool:
     """Soft-delete a lot and cascade-delete its jobs. Returns True if it existed."""
     now = _now()
+    site = await site_store.get_site_by_lot(lot_id)
     async for db in get_db():
         cursor = await db.execute(
             "UPDATE lots SET deleted_at = ? WHERE id = ? AND user_id = ? AND deleted_at IS NULL",
@@ -183,6 +193,8 @@ async def delete_lot(user_id: str, lot_id: str) -> bool:
             (user_id, lot_id),
         )
         await db.commit()
+        if site:
+            await site_store.update_site(site["organization_id"], site["id"], status="archived")
         return True
 
 
@@ -196,15 +208,19 @@ async def duplicate_lot(user_id: str, lot_id: str) -> Optional[dict]:
     now = _now()
     features_json = json.dumps(original["features"])
     new_name = original["name"] + " (Copy)"
+    organization_id = await organization_store.get_default_organization_id(user_id)
 
     async for db in get_db():
         await db.execute(
-            """INSERT INTO lots (id, user_id, name, center_lat, center_lng, zoom, features, created_at, updated_at)
-               VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)""",
-            (new_id, user_id, new_name, original["center"]["lat"],
+            """INSERT INTO lots (id, user_id, organization_id, name, center_lat, center_lng, zoom, features, created_at, updated_at)
+               VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
+            (new_id, user_id, organization_id, new_name, original["center"]["lat"],
              original["center"]["lng"], original["zoom"], features_json, now, now),
         )
         await db.commit()
         cursor = await db.execute("SELECT * FROM lots WHERE id = ?", (new_id,))
         row = await cursor.fetchone()
-        return _row_to_dict(row)
+        lot = _row_to_dict(row)
+    if organization_id:
+        await site_store.ensure_site_for_lot(organization_id, user_id, lot)
+    return lot

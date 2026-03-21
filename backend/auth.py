@@ -54,7 +54,7 @@ async def block_token(jti: str, user_id: str, expires_at: str) -> None:
     now = datetime.now(timezone.utc).isoformat()
     async for db in get_db():
         await db.execute(
-            "INSERT OR IGNORE INTO token_blocklist (jti, user_id, expires_at, created_at) VALUES (?, ?, ?, ?)",
+            "INSERT INTO token_blocklist (jti, user_id, expires_at, created_at) VALUES (?, ?, ?, ?) ON CONFLICT(jti) DO NOTHING",
             (jti, user_id, expires_at, now),
         )
         await db.commit()

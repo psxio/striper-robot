@@ -1,101 +1,116 @@
-# Strype Cloud — Deployment Guide
+# Strype Cloud Enterprise Deployment
 
-## Architecture
+## Target Shape
 
-- **Backend**: FastAPI + aiosqlite (single-file SQLite DB)
-- **Frontend**: Static HTML/JS/CSS served from `site/`
-- **Auth**: JWT Bearer tokens with refresh token rotation
-- **Billing**: Stripe Checkout + webhooks
-- **Email**: SendGrid transactional email
+- FastAPI monolith on ECS Fargate
+- PostgreSQL on RDS
+- Private S3 buckets for media and reports
+- Secrets in AWS Secrets Manager
+- ALB with `/api/health` and `/api/ready` health gates
+- Terraform as the only supported infrastructure path
 
-## Railway Deployment
+## Required Environment
 
-### 1. Create a Railway Project
+Production now treats `DATABASE_URL` as canonical. `DATABASE_PATH` is only for local development and tests.
 
-1. Create a new project at [railway.app](https://railway.app)
-2. Connect your GitHub repo (`psxio/striper-robot`)
-3. Railway auto-detects the Dockerfile in the repo root
+Core variables:
 
-### 2. Configure Environment Variables
+- `ENV=production`
+- `DATABASE_URL`
+- `SECRET_KEY`
+- `CORS_ORIGINS`
+- `FRONTEND_URL`
+- `OBJECT_STORAGE_BACKEND=s3`
+- `AWS_REGION`
+- `S3_PRIVATE_BUCKET`
+- `S3_REPORTS_BUCKET`
+- `ACCESS_TOKEN_EXPIRE_MINUTES=60`
+- `MAX_UPLOAD_BYTES`
 
-Set all variables from `.env.example` in the Railway dashboard under **Variables**. Critical ones:
+Optional but recommended:
 
-| Variable | Notes |
-|----------|-------|
-| `ENV` | Set to `production` |
-| `SECRET_KEY` | Generate: `python -c "import secrets; print(secrets.token_urlsafe(64))"` |
-| `CORS_ORIGINS` | Your domain, e.g. `https://strype.io` |
-| `FRONTEND_URL` | Same as above |
-| `ADMIN_EMAIL` | Your admin email |
-| `STRIPE_SECRET_KEY` | From Stripe dashboard |
-| `STRIPE_WEBHOOK_SECRET` | From webhook endpoint config |
-| `SENDGRID_API_KEY` | From SendGrid dashboard |
-| `FROM_EMAIL` | Verified sender in SendGrid |
+- `SENTRY_DSN`
+- `STRIPE_SECRET_KEY`
+- `STRIPE_WEBHOOK_SECRET`
+- `SENDGRID_API_KEY`
+- `FROM_EMAIL`
 
-### 3. Persistent Storage
+## AWS Provisioning
 
-Railway provides ephemeral disks by default. For SQLite persistence:
+Terraform lives in [infra/terraform](/Users/mabou/Downloads/robot/infra/terraform).
 
-1. Add a **Volume** to the service
-2. Mount at `/data`
-3. Set `DATABASE_PATH=/data/strype.db`
+Provisioning covers:
 
-### 4. Custom Domain
+- VPC, public/private subnets, NAT
+- ALB and target group
+- ECS cluster, task definition, service
+- ECR repository
+- RDS PostgreSQL
+- Private S3 buckets with versioning
+- CloudWatch log group and baseline alarms
 
-1. In Railway service settings, add your domain
-2. Point DNS CNAME to the Railway-provided hostname
-3. Railway auto-provisions TLS certificates
+Use:
 
-## Stripe Setup
+```bash
+cd infra/terraform
+terraform init
+terraform apply \
+  -var="image_url=<ecr-image-uri>" \
+  -var="database_username=<db-user>" \
+  -var="database_password=<db-password>" \
+  -var="database_url_secret_arn=<secret-arn>" \
+  -var="secret_key_secret_arn=<secret-arn>" \
+  -var="frontend_url=https://app.example.com" \
+  -var="cors_origins=https://app.example.com"
+```
 
-### Products & Prices
+## Database Migration
 
-Create two products in Stripe Dashboard:
+The one-time SQLite to PostgreSQL migration tool is [scripts/migrate_sqlite_to_postgres.py](/Users/mabou/Downloads/robot/scripts/migrate_sqlite_to_postgres.py).
 
-1. **Strype Pro** — $99/month recurring
-   - Copy the Price ID → `STRIPE_PRICE_ID`
-2. **Strype Robot** — $299/month recurring
-   - Copy the Price ID → `STRIPE_ROBOT_PRICE_ID`
+Example:
 
-### Webhook Endpoint
+```bash
+python scripts/migrate_sqlite_to_postgres.py ^
+  --sqlite-path backend/data/strype.db ^
+  --database-url postgresql+asyncpg://user:pass@host:5432/strype
+```
 
-1. In Stripe Dashboard → Developers → Webhooks → Add endpoint
-2. URL: `https://your-domain.com/api/webhooks/stripe`
-3. Events to listen for:
-   - `checkout.session.completed`
-   - `customer.subscription.updated`
-   - `customer.subscription.deleted`
-   - `invoice.paid`
-   - `invoice.payment_failed`
-4. Copy the signing secret → `STRIPE_WEBHOOK_SECRET`
+Run order:
 
-## SendGrid Setup
+1. Apply Terraform and create the target RDS instance.
+2. Generate the final PostgreSQL `DATABASE_URL`.
+3. Run the migration script against a staging copy first.
+4. Deploy the ECS task with the PostgreSQL secret.
+5. Verify `/api/ready` before sending external traffic.
 
-1. Create a SendGrid account and verify your sender domain
-2. Create an API key with Mail Send permissions
-3. Set `SENDGRID_API_KEY` and `FROM_EMAIL` in environment
+## CI/CD
 
-Email is used for:
-- Email verification on signup
-- Password reset links
-- Subscription confirmations
+GitHub Actions now includes:
 
-## NTRIP / RTK Base Station Options
+- [`.github/workflows/test.yml`](/Users/mabou/Downloads/robot/.github/workflows/test.yml) for tests
+- [`.github/workflows/security.yml`](/Users/mabou/Downloads/robot/.github/workflows/security.yml) for dependency audit, Trivy, and secret scanning
+- [`.github/workflows/deploy-aws.yml`](/Users/mabou/Downloads/robot/.github/workflows/deploy-aws.yml) for build, push, and Terraform apply
 
-For field deployment, the robot needs RTK corrections. Options:
+The deploy workflow assumes the repo has these secrets:
 
-| Option | Cost | Setup |
-|--------|------|-------|
-| **Network NTRIP** (recommended) | $0–50/mo | Use state DOT CORS or commercial NTRIP (e.g., Point One Nav). Configure UM982 with NTRIP client credentials via Mission Planner. No hardware needed. |
-| **Own Base Station** | $200–500 one-time | Second UM982 or u-blox F9P on a survey point. Run `str2str` or SNIP to serve corrections. |
-| **Phone NTRIP Relay** | Free w/ phone plan | Android app (e.g., Lefebure NTRIP Client) relays corrections via Bluetooth to UM982. |
+- `AWS_DEPLOY_ROLE_ARN`
+- `AWS_REGION`
+- `AWS_CERTIFICATE_ARN`
+- `ECR_REPOSITORY_URL`
+- `DB_USERNAME`
+- `DB_PASSWORD`
+- `DATABASE_URL_SECRET_ARN`
+- `SECRET_KEY_SECRET_ARN`
+- `FRONTEND_URL`
+- `CORS_ORIGINS`
 
-## Health Check
+## Cutover Checklist
 
-The app exposes a health endpoint at `GET /api/health` which returns `{"status": "ok"}` with HTTP 200. Use this for Railway health checks: set the Health Check Path to `/api/health`. The Docker HEALTHCHECK is already configured to probe this endpoint.
-
-## Monitoring
-
-- Logs: Railway dashboard → Deployments → Logs
-- Errors: The app returns structured JSON for all errors (global exception handler)
-- Metrics: Check `GET /api/admin/stats` for user/lot/job counts
+1. Run backend tests and smoke tests against staging.
+2. Snapshot the SQLite file.
+3. Run the SQLite to PostgreSQL migration.
+4. Deploy the new ECS task definition.
+5. Verify `/api/health` and `/api/ready`.
+6. Exercise login, org switching, work-order verification, report download, and media upload.
+7. Keep the pre-cutover task definition and the RDS snapshot as rollback anchors.

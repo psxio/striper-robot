@@ -45,7 +45,7 @@ async def _mark_event_processed(event_id: str) -> None:
     now = datetime.now(timezone.utc).isoformat()
     async for db in get_db():
         await db.execute(
-            "INSERT OR IGNORE INTO webhook_events (event_id, processed_at) VALUES (?, ?)",
+            "INSERT INTO webhook_events (event_id, processed_at) VALUES (?, ?) ON CONFLICT(event_id) DO NOTHING",
             (event_id, now),
         )
         await db.commit()

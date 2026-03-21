@@ -27,6 +27,7 @@ env/
 .DS_Store
 Thumbs.db
 desktop.ini
+*.out
 
 # ArduPilot SITL
 eeprom.bin
@@ -36,6 +37,7 @@ terrain/
 # Database
 *.db
 *.sqlite3
+backend/data/media/
 
 # Node / Playwright
 node_modules/

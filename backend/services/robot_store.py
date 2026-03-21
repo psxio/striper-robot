@@ -94,6 +94,11 @@ async def update_robot(
     status: Optional[str] = None,
     firmware_version: Optional[str] = None,
     notes: Optional[str] = None,
+    maintenance_status: Optional[str] = None,
+    battery_health_pct: Optional[int] = None,
+    service_due_at: Optional[str] = None,
+    last_successful_mission_at: Optional[str] = None,
+    issue_state: Optional[str] = None,
 ) -> Optional[dict]:
     """Partial update of a robot. Returns updated dict or None if not found."""
     fields: list[str] = []
@@ -108,6 +113,21 @@ async def update_robot(
     if notes is not None:
         fields.append("notes = ?")
         values.append(notes)
+    if maintenance_status is not None:
+        fields.append("maintenance_status = ?")
+        values.append(maintenance_status)
+    if battery_health_pct is not None:
+        fields.append("battery_health_pct = ?")
+        values.append(battery_health_pct)
+    if service_due_at is not None:
+        fields.append("service_due_at = ?")
+        values.append(service_due_at)
+    if last_successful_mission_at is not None:
+        fields.append("last_successful_mission_at = ?")
+        values.append(last_successful_mission_at)
+    if issue_state is not None:
+        fields.append("issue_state = ?")
+        values.append(issue_state)
 
     if not fields:
         return await get_robot(robot_id)

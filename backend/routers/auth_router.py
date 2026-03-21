@@ -57,7 +57,7 @@ async def register(request: Request, body: RegisterRequest):
     except Exception:
         logger.warning("Failed to send verification email to %s", body.email)
 
-    return AuthResponse(token=token, user=user_to_response(user))
+    return AuthResponse(token=token, user=await user_to_response(user))
 
 
 @router.post("/login", response_model=AuthResponse)
@@ -92,7 +92,7 @@ async def login(request: Request, body: LoginRequest):
     refresh_token = await user_store.create_refresh_token(
         user["id"], expire_days=settings.REFRESH_TOKEN_EXPIRE_DAYS
     )
-    auth_resp = AuthResponse(token=token, user=user_to_response(user))
+    auth_resp = AuthResponse(token=token, user=await user_to_response(user))
     response = Response(
         content=auth_resp.model_dump_json(),
         media_type="application/json",
@@ -110,7 +110,7 @@ async def login(request: Request, body: LoginRequest):
 
 @router.get("/me", response_model=UserResponse)
 async def me(user: dict = Depends(get_current_user)):
-    return user_to_response(user)
+    return await user_to_response(user)
 
 
 @router.post("/logout")

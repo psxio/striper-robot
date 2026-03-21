@@ -11,6 +11,7 @@ from httpx import AsyncClient, ASGITransport
 _fd, _tmp = tempfile.mkstemp(suffix=".db")
 os.close(_fd)
 os.environ["DATABASE_PATH"] = _tmp
+os.environ["DATABASE_URL"] = ""
 
 from backend.main import app  # noqa: E402
 from backend.database import init_db  # noqa: E402
@@ -26,8 +27,10 @@ async def setup_db():
     fd, tmp_path = tempfile.mkstemp(suffix=".db")
     os.close(fd)
     os.environ["DATABASE_PATH"] = tmp_path
+    os.environ["DATABASE_URL"] = ""
     from backend.config import settings
     settings.DATABASE_PATH = os.environ["DATABASE_PATH"]
+    settings.DATABASE_URL = ""
     await init_db()
     yield
     try:

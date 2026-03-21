@@ -36,7 +36,7 @@ async def update_preferences(
         active_lot_id=body.active_lot_id,
         map_state=body.map_state.model_dump() if body.map_state else None,
     )
-    return user_to_response(updated)
+    return await user_to_response(updated)
 
 
 @router.put("/profile", response_model=UserResponse)
@@ -53,7 +53,7 @@ async def update_profile(
         user["id"], name=body.name, email=body.email,
         company_name=body.company_name, phone=body.phone,
     )
-    return user_to_response(updated)
+    return await user_to_response(updated)
 
 
 @router.delete("/account")
