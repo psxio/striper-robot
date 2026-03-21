@@ -1,6 +1,6 @@
 """Organization and membership routes."""
 
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, HTTPException, Request
 
 from ..auth import get_current_user
 from ..models.commercial_schemas import (
@@ -13,6 +13,7 @@ from ..models.commercial_schemas import (
     SetActiveOrganizationRequest,
 )
 from ..orgs import require_organization_role
+from ..rate_limit import limiter
 from ..services import organization_audit_store, organization_store, user_store
 from ..shared import user_to_response
 
@@ -63,7 +64,9 @@ async def list_memberships(context: dict = Depends(require_organization_role("ma
 
 
 @router.post("/invites", response_model=OrganizationInviteResponse, status_code=201)
+@limiter.limit("10/minute")
 async def create_invite(
+    request: Request,
     body: OrganizationInviteCreateRequest,
     context: dict = Depends(require_organization_role("manager")),
 ):

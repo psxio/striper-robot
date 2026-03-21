@@ -108,6 +108,11 @@ class Settings:
                 )
             if not self.DATABASE_URL and self.DATABASE_PATH:
                 log.warning("DATABASE_URL is not set - production will fall back to DATABASE_PATH")
+            if not self.SENDGRID_API_KEY:
+                log.warning(
+                    "SENDGRID_API_KEY is not set — transactional emails (welcome, "
+                    "password reset, verification) will be silently skipped"
+                )
         else:
             if self.SECRET_KEY == "dev-secret-key-change-in-production":
                 log.warning("SECRET_KEY is using the default value — set a secure key for production")

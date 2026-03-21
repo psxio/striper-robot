@@ -72,20 +72,41 @@ else:
 logger = logging.getLogger("strype")
 
 
+async def _blocklist_cleanup_loop() -> None:
+    """Purge expired JWT blocklist entries every 24 hours."""
+    while True:
+        try:
+            await asyncio.sleep(86400)  # 24 h
+            now = datetime.now(timezone.utc).isoformat()
+            async for db in get_db():
+                await db.execute("DELETE FROM token_blocklist WHERE expires_at < ?", (now,))
+                await db.commit()
+                break
+            logger.info("Token blocklist cleanup complete")
+        except asyncio.CancelledError:
+            break
+        except Exception:
+            logger.exception("Token blocklist cleanup failed")
+
+
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     logger.info("Strype Cloud Platform starting up (env=%s)", settings.ENV)
     await init_db()
     storage_health = await storage_service.check_storage_health()
     logger.info("Storage backend ready: %s", storage_health["backend"])
-    # Start background scheduler (skip in test)
+    # Start background tasks (skip in test)
     scheduler_task = None
+    blocklist_task = None
     if settings.ENV != "test":
         from .services.scheduler import run_scheduler_loop
         scheduler_task = asyncio.create_task(run_scheduler_loop())
+        blocklist_task = asyncio.create_task(_blocklist_cleanup_loop())
     yield
     if scheduler_task:
         scheduler_task.cancel()
+    if blocklist_task:
+        blocklist_task.cancel()
     logger.info("Strype Cloud Platform shutting down gracefully")
 
 

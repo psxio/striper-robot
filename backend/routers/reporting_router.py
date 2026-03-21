@@ -1,10 +1,39 @@
 """Media asset and report routes."""
 
 import json
+import os
 from typing import Optional
 
-from fastapi import APIRouter, Depends, File, Form, HTTPException, Query, UploadFile
+from fastapi import APIRouter, Depends, File, Form, HTTPException, Query, Request, UploadFile
 from fastapi.responses import Response
+
+from ..rate_limit import limiter
+
+# Allowed MIME types and their expected file extensions.
+_ALLOWED_UPLOADS: dict[str, set[str]] = {
+    "image/jpeg": {".jpg", ".jpeg"},
+    "image/png": {".png"},
+    "image/gif": {".gif"},
+    "image/webp": {".webp"},
+    "application/pdf": {".pdf"},
+}
+
+
+def _validate_upload(file: UploadFile) -> None:
+    """Raise HTTPException if the upload MIME type or extension is not whitelisted."""
+    content_type = (file.content_type or "").split(";")[0].strip().lower()
+    if content_type not in _ALLOWED_UPLOADS:
+        raise HTTPException(
+            status_code=422,
+            detail=f"File type '{content_type}' is not allowed. "
+                   f"Allowed types: {', '.join(sorted(_ALLOWED_UPLOADS))}",
+        )
+    ext = os.path.splitext(file.filename or "")[1].lower()
+    if ext and ext not in _ALLOWED_UPLOADS[content_type]:
+        raise HTTPException(
+            status_code=422,
+            detail=f"File extension '{ext}' does not match content type '{content_type}'",
+        )
 
 from ..models.commercial_schemas import JobReportResponse, MediaAssetResponse
 from ..orgs import get_organization_context, require_organization_role
@@ -34,7 +63,9 @@ async def list_media_assets(
 
 
 @router.post("/api/media-assets", response_model=MediaAssetResponse, status_code=201)
+@limiter.limit("30/minute")
 async def upload_media_asset(
+    request: Request,
     asset_type: str = Form(...),
     file: UploadFile = File(...),
     site_id: Optional[str] = Form(default=None),
@@ -43,6 +74,7 @@ async def upload_media_asset(
     report_id: Optional[str] = Form(default=None),
     context: dict = Depends(require_organization_role("technician")),
 ):
+    _validate_upload(file)
     content = await file.read()
     if not content:
         raise HTTPException(status_code=400, detail="Uploaded file is empty")

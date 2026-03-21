@@ -29,9 +29,9 @@ RUN addgroup --system appgroup && \
 
 USER appuser
 
-# NOTE: Mount a persistent volume at /app/backend/data to preserve the database.
-# Example: docker run -v strype_data:/app/backend/data ...
-# Without a volume, ALL DATA IS LOST on container restart.
+# Declare the persistent data volume. In Railway: add a volume mounted at /app/backend/data.
+# Without a persistent volume ALL DATA IS LOST on redeploy.
+VOLUME ["/app/backend/data"]
 
 HEALTHCHECK --interval=30s --timeout=5s --start-period=10s --retries=3 \
     CMD python -c "import os, urllib.request; urllib.request.urlopen(f'http://localhost:{os.environ.get(\"PORT\", \"8000\")}/api/health')"

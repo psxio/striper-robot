@@ -1,0 +1,240 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Strype — Billing</title>
+<link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+<style>
+  *{margin:0;padding:0;box-sizing:border-box}
+  :root{
+    --bg:#0d1117;--card:#161b22;--border:#30363d;
+    --text:#e6edf3;--text2:#8b949e;--green:#3fb950;
+    --blue:#58a6ff;--red:#f85149;--yellow:#d29922;--orange:#f0883e;
+    --radius:8px;
+  }
+  body{font-family:'DM Sans',sans-serif;background:var(--bg);color:var(--text);min-height:100vh}
+  a{color:var(--blue);text-decoration:none}
+  .topbar{display:flex;align-items:center;justify-content:space-between;padding:12px 24px;border-bottom:1px solid var(--border);background:var(--card)}
+  .topbar h1{font-size:18px;font-weight:700}
+  .topbar-links{display:flex;gap:16px;align-items:center;font-size:14px}
+  .container{max-width:900px;margin:0 auto;padding:32px 24px}
+  h2{font-size:20px;font-weight:700;margin-bottom:4px}
+  .sub{color:var(--text2);font-size:14px;margin-bottom:28px}
+  .plan-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:16px;margin-bottom:40px}
+  .plan-card{background:var(--card);border:2px solid var(--border);border-radius:12px;padding:24px;position:relative;transition:border-color .2s}
+  .plan-card.current{border-color:var(--green)}
+  .plan-card.current::after{content:'Current plan';position:absolute;top:-12px;left:16px;background:var(--green);color:#0d1117;font-size:11px;font-weight:700;padding:2px 8px;border-radius:6px}
+  .plan-name{font-size:18px;font-weight:700;margin-bottom:4px}
+  .plan-price{font-size:30px;font-weight:700;margin-bottom:4px}
+  .plan-price span{font-size:14px;font-weight:400;color:var(--text2)}
+  .plan-features{list-style:none;margin:16px 0;padding:0;font-size:13px;color:var(--text2)}
+  .plan-features li{padding:4px 0;display:flex;align-items:center;gap:8px}
+  .plan-features li::before{content:'✓';color:var(--green);font-weight:700;flex-shrink:0}
+  .btn{display:inline-flex;align-items:center;justify-content:center;padding:9px 20px;border-radius:var(--radius);font-size:14px;font-weight:600;cursor:pointer;border:none;transition:opacity .15s;text-decoration:none}
+  .btn:hover{opacity:.85}
+  .btn:disabled{opacity:.4;cursor:default}
+  .btn-primary{background:var(--green);color:#0d1117}
+  .btn-outline{background:transparent;border:1px solid var(--border);color:var(--text)}
+  .btn-outline:hover{border-color:var(--text2)}
+  .btn-full{width:100%;margin-top:16px}
+  .section{background:var(--card);border:1px solid var(--border);border-radius:var(--radius);padding:24px;margin-bottom:20px}
+  .section-title{font-size:16px;font-weight:600;margin-bottom:16px}
+  .info-row{display:flex;justify-content:space-between;align-items:center;padding:10px 0;border-bottom:1px solid var(--border);font-size:14px}
+  .info-row:last-child{border-bottom:none;padding-bottom:0}
+  .info-label{color:var(--text2)}
+  .badge{display:inline-block;padding:2px 8px;border-radius:12px;font-size:12px;font-weight:600}
+  .badge-active{background:rgba(63,185,80,.2);color:var(--green)}
+  .badge-canceled{background:rgba(248,81,73,.2);color:var(--red)}
+  .badge-trialing{background:rgba(210,153,34,.2);color:var(--yellow)}
+  .flash{display:none;padding:10px 16px;border-radius:var(--radius);font-size:14px;margin-bottom:16px}
+  .flash.show{display:block}
+  .flash-ok{background:rgba(63,185,80,.15);border:1px solid var(--green);color:var(--green)}
+  .flash-err{background:rgba(248,81,73,.15);border:1px solid var(--red);color:var(--red)}
+  #loadingSpinner{text-align:center;padding:48px;color:var(--text2)}
+</style>
+</head>
+<body>
+<div class="topbar">
+  <h1>Strype Billing</h1>
+  <div class="topbar-links">
+    <a href="/platform.html">← Platform</a>
+    <a href="/settings.html">Settings</a>
+    <a id="logoutLink" href="#" style="color:var(--text2)">Sign out</a>
+  </div>
+</div>
+
+<div class="container">
+  <div id="loadingSpinner">Loading billing information…</div>
+  <div id="billingContent" style="display:none">
+    <h2>Billing &amp; Plan</h2>
+    <p class="sub">Manage your subscription and upgrade for unlimited access.</p>
+
+    <div id="flashMsg" class="flash"></div>
+
+    <!-- Current subscription info -->
+    <div class="section" id="subscriptionSection" style="display:none">
+      <div class="section-title">Active Subscription</div>
+      <div class="info-row">
+        <span class="info-label">Plan</span>
+        <strong id="subPlan">—</strong>
+      </div>
+      <div class="info-row">
+        <span class="info-label">Status</span>
+        <span id="subStatus" class="badge">—</span>
+      </div>
+      <div class="info-row">
+        <span class="info-label">Renews</span>
+        <span id="subRenews">—</span>
+      </div>
+      <button class="btn btn-outline" id="manageBtn" style="margin-top:16px">
+        Manage subscription
+      </button>
+    </div>
+
+    <!-- Plan comparison -->
+    <div class="plan-grid" id="planGrid"></div>
+  </div>
+</div>
+
+<script type="module">
+import { apiFetch, getToken, redirectToPlatform, showVerificationBannerIfNeeded } from '/assets/app-shell.js';
+
+const token = getToken();
+if (!token) redirectToPlatform();
+
+function flash(msg, type = 'ok') {
+  const el = document.getElementById('flashMsg');
+  el.textContent = msg;
+  el.className = 'flash show flash-' + type;
+  setTimeout(() => el.classList.remove('show'), 4000);
+}
+
+const PLANS = [
+  {
+    id: 'free',
+    name: 'Free',
+    price: '$0',
+    period: '',
+    features: ['1 lot design', '5 jobs/month', 'Basic reporting'],
+    action: null,
+  },
+  {
+    id: 'pro',
+    name: 'Pro',
+    price: '$149',
+    period: '/mo',
+    features: ['Unlimited lots', 'Unlimited jobs', 'Advanced reporting', 'Priority support'],
+    action: 'upgrade',
+  },
+  {
+    id: 'enterprise',
+    name: 'Enterprise',
+    price: 'Custom',
+    period: '',
+    features: ['Everything in Pro', 'Dedicated CSM', 'SLA guarantee', 'Custom integrations'],
+    action: 'contact',
+  },
+];
+
+function renderPlans(currentPlan) {
+  const grid = document.getElementById('planGrid');
+  grid.innerHTML = PLANS.map(plan => {
+    const isCurrent = plan.id === currentPlan;
+    let btnHtml = '';
+    if (isCurrent) {
+      btnHtml = `<button class="btn btn-outline btn-full" disabled>Current plan</button>`;
+    } else if (plan.action === 'upgrade') {
+      btnHtml = `<button class="btn btn-primary btn-full" onclick="startCheckout('${plan.id}')">Upgrade to ${plan.name}</button>`;
+    } else if (plan.action === 'contact') {
+      btnHtml = `<a class="btn btn-outline btn-full" href="mailto:sales@strype.io">Contact sales</a>`;
+    }
+    return `
+      <div class="plan-card ${isCurrent ? 'current' : ''}">
+        <div class="plan-name">${plan.name}</div>
+        <div class="plan-price">${plan.price}<span>${plan.period}</span></div>
+        <ul class="plan-features">
+          ${plan.features.map(f => `<li>${f}</li>`).join('')}
+        </ul>
+        ${btnHtml}
+      </div>
+    `;
+  }).join('');
+}
+
+window.startCheckout = async (planId) => {
+  try {
+    const data = await apiFetch('/api/billing/create-checkout', {
+      method: 'POST',
+      body: JSON.stringify({ plan: planId }),
+    });
+    if (data?.url) {
+      window.location.href = data.url;
+    } else {
+      flash('Checkout unavailable — Stripe is not configured yet.', 'err');
+    }
+  } catch (e) {
+    flash(e.message || 'Could not start checkout', 'err');
+  }
+};
+
+async function openPortal() {
+  try {
+    const data = await apiFetch('/api/billing/portal');
+    if (data?.url) {
+      window.location.href = data.url;
+    } else {
+      flash('Billing portal unavailable — Stripe is not configured yet.', 'err');
+    }
+  } catch (e) {
+    flash(e.message || 'Could not open portal', 'err');
+  }
+}
+
+document.getElementById('manageBtn').addEventListener('click', openPortal);
+
+document.getElementById('logoutLink').addEventListener('click', async (e) => {
+  e.preventDefault();
+  await apiFetch('/api/auth/logout', { method: 'POST' }).catch(() => {});
+  localStorage.removeItem('strype_token');
+  localStorage.removeItem('strype_user');
+  window.location.href = '/';
+});
+
+(async () => {
+  try {
+    const me = await apiFetch('/api/auth/me');
+    if (!me) return;
+    showVerificationBannerIfNeeded(me);
+
+    // Try to load subscription info
+    let sub = null;
+    try {
+      sub = await apiFetch('/api/billing/status');
+    } catch (_) {
+      // endpoint may not exist yet — graceful degradation
+    }
+
+    if (sub?.plan) {
+      const secEl = document.getElementById('subscriptionSection');
+      secEl.style.display = 'block';
+      document.getElementById('subPlan').textContent = sub.plan.charAt(0).toUpperCase() + sub.plan.slice(1);
+      const statusEl = document.getElementById('subStatus');
+      statusEl.textContent = sub.status || 'active';
+      statusEl.className = 'badge badge-' + (sub.status === 'active' ? 'active' : sub.status === 'trialing' ? 'trialing' : 'canceled');
+      if (sub.current_period_end) {
+        document.getElementById('subRenews').textContent = new Date(sub.current_period_end).toLocaleDateString();
+      }
+    }
+
+    renderPlans(me.plan || 'free');
+
+    document.getElementById('loadingSpinner').style.display = 'none';
+    document.getElementById('billingContent').style.display = 'block';
+  } catch (e) {
+    document.getElementById('loadingSpinner').textContent = 'Failed to load billing information.';
+  }
+})();
+</script>
+</body>
+</html>

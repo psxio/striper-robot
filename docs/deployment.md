@@ -26,6 +26,18 @@ Deploy from local CLI:
 railway up --service backend --environment production --detach
 ```
 
+### Persistent Storage (Railway Volume)
+
+SQLite databases are ephemeral by default in Railway containers. To persist data across deploys:
+
+1. In the Railway dashboard, open your **backend** service → **Volumes** tab.
+2. Click **Add Volume** and set the mount path to `/app/backend/data`.
+3. Railway will mount a persistent volume at that path for every deployment.
+
+The `Dockerfile` already declares `VOLUME ["/app/backend/data"]` so Railway recognises the mount point automatically.
+
+If you are using PostgreSQL (recommended for production), skip the Volume — set `DATABASE_URL` to your Postgres connection string instead and leave `DATABASE_PATH` unset.
+
 Deploy from GitHub Actions:
 
 - Workflow: `.github/workflows/deploy-railway.yml`

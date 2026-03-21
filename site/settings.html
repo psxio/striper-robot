@@ -1,0 +1,240 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Strype — Account Settings</title>
+<link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+<style>
+  *{margin:0;padding:0;box-sizing:border-box}
+  :root{
+    --bg:#0d1117;--card:#161b22;--border:#30363d;
+    --text:#e6edf3;--text2:#8b949e;--green:#3fb950;
+    --blue:#58a6ff;--red:#f85149;--yellow:#d29922;
+    --radius:8px;
+  }
+  body{font-family:'DM Sans',sans-serif;background:var(--bg);color:var(--text);min-height:100vh}
+  a{color:var(--blue);text-decoration:none}
+  .topbar{display:flex;align-items:center;justify-content:space-between;padding:12px 24px;border-bottom:1px solid var(--border);background:var(--card)}
+  .topbar h1{font-size:18px;font-weight:700}
+  .topbar-links{display:flex;gap:16px;align-items:center;font-size:14px}
+  .container{max-width:640px;margin:0 auto;padding:32px 24px}
+  .section{background:var(--card);border:1px solid var(--border);border-radius:var(--radius);padding:24px;margin-bottom:20px}
+  .section-title{font-size:16px;font-weight:600;margin-bottom:20px}
+  .field{margin-bottom:16px}
+  label{display:block;font-size:13px;color:var(--text2);margin-bottom:6px}
+  input{width:100%;background:var(--bg);border:1px solid var(--border);color:var(--text);padding:9px 12px;border-radius:var(--radius);font-size:14px;font-family:inherit;outline:none;transition:border-color .2s}
+  input:focus{border-color:var(--blue)}
+  input:read-only{opacity:.6;cursor:default}
+  .btn{display:inline-flex;align-items:center;justify-content:center;padding:9px 20px;border-radius:var(--radius);font-size:14px;font-weight:600;cursor:pointer;border:none;transition:opacity .15s;font-family:inherit}
+  .btn:hover{opacity:.85}
+  .btn:disabled{opacity:.4;cursor:default}
+  .btn-primary{background:var(--green);color:#0d1117}
+  .btn-danger{background:var(--red);color:#fff}
+  .btn-outline{background:transparent;border:1px solid var(--border);color:var(--text)}
+  .flash{display:none;padding:10px 16px;border-radius:var(--radius);font-size:14px;margin-bottom:16px}
+  .flash.show{display:block}
+  .flash-ok{background:rgba(63,185,80,.15);border:1px solid var(--green);color:var(--green)}
+  .flash-err{background:rgba(248,81,73,.15);border:1px solid var(--red);color:var(--red)}
+  .delete-zone{border-color:rgba(248,81,73,.5)}
+  .meta{font-size:12px;color:var(--text2);margin-top:4px}
+  #loadingSpinner{text-align:center;padding:48px;color:var(--text2)}
+</style>
+</head>
+<body>
+<div class="topbar">
+  <h1>Account Settings</h1>
+  <div class="topbar-links">
+    <a href="/platform.html">← Platform</a>
+    <a href="/billing.html">Billing</a>
+    <a id="logoutLink" href="#" style="color:var(--text2)">Sign out</a>
+  </div>
+</div>
+
+<div class="container">
+  <div id="loadingSpinner">Loading account…</div>
+  <div id="settingsContent" style="display:none">
+
+    <!-- Profile section -->
+    <div class="section">
+      <div class="section-title">Profile</div>
+      <div id="profileFlash" class="flash"></div>
+      <form id="profileForm">
+        <div class="field">
+          <label for="fieldEmail">Email address</label>
+          <input id="fieldEmail" type="email" readonly>
+          <p class="meta" id="verifiedStatus"></p>
+        </div>
+        <div class="field">
+          <label for="fieldName">Display name</label>
+          <input id="fieldName" type="text" placeholder="Your name" maxlength="120">
+        </div>
+        <div class="field">
+          <label for="fieldCompany">Company name (optional)</label>
+          <input id="fieldCompany" type="text" placeholder="Acme Parking Solutions" maxlength="120">
+        </div>
+        <div class="field">
+          <label for="fieldPhone">Phone (optional)</label>
+          <input id="fieldPhone" type="tel" placeholder="+1 555 000 1234" maxlength="40">
+        </div>
+        <button type="submit" class="btn btn-primary" id="profileSaveBtn">Save profile</button>
+      </form>
+    </div>
+
+    <!-- Change password section -->
+    <div class="section">
+      <div class="section-title">Change Password</div>
+      <div id="pwFlash" class="flash"></div>
+      <form id="passwordForm">
+        <div class="field">
+          <label for="fieldCurrentPw">Current password</label>
+          <input id="fieldCurrentPw" type="password" autocomplete="current-password" required>
+        </div>
+        <div class="field">
+          <label for="fieldNewPw">New password</label>
+          <input id="fieldNewPw" type="password" autocomplete="new-password" minlength="8" required>
+          <p class="meta">At least 8 characters, including a letter and a number.</p>
+        </div>
+        <div class="field">
+          <label for="fieldConfirmPw">Confirm new password</label>
+          <input id="fieldConfirmPw" type="password" autocomplete="new-password" minlength="8" required>
+        </div>
+        <button type="submit" class="btn btn-primary" id="pwSaveBtn">Update password</button>
+      </form>
+    </div>
+
+    <!-- Danger zone -->
+    <div class="section delete-zone">
+      <div class="section-title" style="color:var(--red)">Danger Zone</div>
+      <p style="font-size:14px;color:var(--text2);margin-bottom:16px">
+        Permanently delete your account and all associated data. This action cannot be undone.
+      </p>
+      <div id="deleteFlash" class="flash"></div>
+      <button class="btn btn-danger" id="deleteAccountBtn">Delete my account</button>
+    </div>
+
+  </div>
+</div>
+
+<script type="module">
+import { apiFetch, getToken, redirectToPlatform, showVerificationBannerIfNeeded } from '/assets/app-shell.js';
+
+const token = getToken();
+if (!token) redirectToPlatform();
+
+function flash(sectionId, msg, type = 'ok') {
+  const el = document.getElementById(sectionId + 'Flash');
+  if (!el) return;
+  el.textContent = msg;
+  el.className = 'flash show flash-' + type;
+  setTimeout(() => el.classList.remove('show'), 5000);
+}
+
+function setLoading(btnId, loading, label) {
+  const btn = document.getElementById(btnId);
+  if (!btn) return;
+  btn.disabled = loading;
+  btn.textContent = loading ? 'Saving…' : label;
+}
+
+(async () => {
+  try {
+    const me = await apiFetch('/api/auth/me');
+    if (!me) return;
+    showVerificationBannerIfNeeded(me);
+
+    document.getElementById('fieldEmail').value = me.email || '';
+    document.getElementById('fieldName').value = me.name || '';
+    document.getElementById('fieldCompany').value = me.company_name || '';
+    document.getElementById('fieldPhone').value = me.phone || '';
+
+    const verifiedEl = document.getElementById('verifiedStatus');
+    if (me.email_verified) {
+      verifiedEl.textContent = '✓ Email verified';
+      verifiedEl.style.color = 'var(--green)';
+    } else {
+      verifiedEl.textContent = '⚠ Email not verified — check your inbox or use the banner above to resend.';
+      verifiedEl.style.color = 'var(--yellow)';
+    }
+
+    document.getElementById('loadingSpinner').style.display = 'none';
+    document.getElementById('settingsContent').style.display = 'block';
+  } catch (e) {
+    document.getElementById('loadingSpinner').textContent = 'Failed to load account settings.';
+  }
+})();
+
+document.getElementById('profileForm').addEventListener('submit', async (e) => {
+  e.preventDefault();
+  setLoading('profileSaveBtn', true, 'Save profile');
+  try {
+    await apiFetch('/api/user/profile', {
+      method: 'PUT',
+      body: JSON.stringify({
+        name: document.getElementById('fieldName').value.trim(),
+        company_name: document.getElementById('fieldCompany').value.trim(),
+        phone: document.getElementById('fieldPhone').value.trim(),
+      }),
+    });
+    flash('profile', 'Profile updated successfully');
+  } catch (err) {
+    flash('profile', err.message || 'Failed to update profile', 'err');
+  } finally {
+    setLoading('profileSaveBtn', false, 'Save profile');
+  }
+});
+
+document.getElementById('passwordForm').addEventListener('submit', async (e) => {
+  e.preventDefault();
+  const newPw = document.getElementById('fieldNewPw').value;
+  const confirmPw = document.getElementById('fieldConfirmPw').value;
+  if (newPw !== confirmPw) {
+    flash('pw', 'New passwords do not match', 'err');
+    return;
+  }
+  setLoading('pwSaveBtn', true, 'Update password');
+  try {
+    await apiFetch('/api/auth/password', {
+      method: 'PUT',
+      body: JSON.stringify({
+        current_password: document.getElementById('fieldCurrentPw').value,
+        new_password: newPw,
+      }),
+    });
+    flash('pw', 'Password updated successfully');
+    document.getElementById('passwordForm').reset();
+  } catch (err) {
+    flash('pw', err.message || 'Failed to update password', 'err');
+  } finally {
+    setLoading('pwSaveBtn', false, 'Update password');
+  }
+});
+
+document.getElementById('deleteAccountBtn').addEventListener('click', async () => {
+  if (!confirm('Are you absolutely sure? This will permanently delete your account, all lots, jobs, and data. This cannot be undone.')) return;
+  if (!confirm('Final confirmation: delete my Strype account permanently?')) return;
+  const btn = document.getElementById('deleteAccountBtn');
+  btn.disabled = true;
+  btn.textContent = 'Deleting…';
+  try {
+    await apiFetch('/api/user/account', { method: 'DELETE' });
+    localStorage.removeItem('strype_token');
+    localStorage.removeItem('strype_user');
+    window.location.href = '/';
+  } catch (err) {
+    flash('delete', err.message || 'Failed to delete account', 'err');
+    btn.disabled = false;
+    btn.textContent = 'Delete my account';
+  }
+});
+
+document.getElementById('logoutLink').addEventListener('click', async (e) => {
+  e.preventDefault();
+  await apiFetch('/api/auth/logout', { method: 'POST' }).catch(() => {});
+  localStorage.removeItem('strype_token');
+  localStorage.removeItem('strype_user');
+  window.location.href = '/';
+});
+</script>
+</body>
+</html>
