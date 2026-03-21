@@ -12,10 +12,14 @@ jobs:
       - uses: actions/checkout@v4
 
       - name: Validate Railway token
-        if: ${{ secrets.RAILWAY_TOKEN == '' }}
+        shell: bash
+        env:
+          RAILWAY_TOKEN: ${{ secrets.RAILWAY_TOKEN }}
         run: |
-          echo "Missing required secret: RAILWAY_TOKEN"
-          exit 1
+          if [ -z "$RAILWAY_TOKEN" ]; then
+            echo "Missing required secret: RAILWAY_TOKEN"
+            exit 1
+          fi
 
       - name: Preflight Railway configuration
         shell: bash
