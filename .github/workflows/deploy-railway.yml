@@ -11,10 +11,23 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
+      - name: Preflight Railway configuration
+        shell: bash
+        run: |
+          set -euo pipefail
+          if [ -z "${{ secrets.RAILWAY_TOKEN }}" ]; then
+            echo "Missing required secret: RAILWAY_TOKEN"
+            exit 1
+          fi
+          if [ ! -f "railway.toml" ]; then
+            echo "Missing railway.toml in repository root"
+            exit 1
+          fi
+
       - name: Install Railway CLI
         run: npm install -g @railway/cli
 
       - name: Deploy to Railway
-        run: railway up --service backend --detach
+        run: railway up --service backend --environment production --detach
         env:
           RAILWAY_TOKEN: ${{ secrets.RAILWAY_TOKEN }}

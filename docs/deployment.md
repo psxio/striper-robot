@@ -1,5 +1,36 @@
 # Strype Cloud Enterprise Deployment
 
+## Railway (Primary)
+
+The production backend is live on Railway and should be the default deployment path.
+
+Live service:
+
+- Project: `strype`
+- Service: `backend`
+- Environment: `production`
+
+Required Railway service variables:
+
+- `ENV=production`
+- `DATABASE_URL=${{Postgres.DATABASE_URL}}`
+- `SECRET_KEY=<64+ random chars>`
+- `CORS_ORIGINS=https://backend-production-8dd7.up.railway.app,http://localhost:5173`
+- `FRONTEND_URL=https://backend-production-8dd7.up.railway.app`
+
+Deploy from local CLI:
+
+```bash
+railway up --service backend --environment production --detach
+```
+
+Deploy from GitHub Actions:
+
+- Workflow: `.github/workflows/deploy-railway.yml`
+- Required secret: `RAILWAY_TOKEN`
+
+The repo already includes `railway.toml` and Docker-based deploy settings. Health checks use `/api/ready`.
+
 ## Target Shape
 
 - FastAPI monolith on ECS Fargate
@@ -35,7 +66,7 @@ Optional but recommended:
 - `SENDGRID_API_KEY`
 - `FROM_EMAIL`
 
-## AWS Provisioning
+## AWS Provisioning (Secondary Option)
 
 Terraform lives in [infra/terraform](/Users/mabou/Downloads/robot/infra/terraform).
 
