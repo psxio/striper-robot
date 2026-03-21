@@ -39,6 +39,11 @@ Optional but recommended:
 
 Terraform lives in [infra/terraform](/Users/mabou/Downloads/robot/infra/terraform).
 
+The CI deploy workflow expects Terraform remote state in S3. Configure repository variables:
+
+- `TF_STATE_BUCKET` (required)
+- `TF_STATE_LOCK_TABLE` (optional, recommended for state locking)
+
 Provisioning covers:
 
 - VPC, public/private subnets, NAT
@@ -94,16 +99,29 @@ GitHub Actions now includes:
 
 The deploy workflow assumes the repo has these secrets:
 
-- `AWS_DEPLOY_ROLE_ARN`
-- `AWS_REGION`
+- `AWS_DEPLOY_ROLE_ARN` (recommended) or `AWS_ACCESS_KEY_ID` + `AWS_SECRET_ACCESS_KEY`
 - `AWS_CERTIFICATE_ARN`
-- `ECR_REPOSITORY_URL`
 - `DB_USERNAME`
 - `DB_PASSWORD`
 - `DATABASE_URL_SECRET_ARN`
 - `SECRET_KEY_SECRET_ARN`
 - `FRONTEND_URL`
 - `CORS_ORIGINS`
+
+Optional secrets:
+
+- `STRIPE_SECRET_KEY_SECRET_ARN`
+- `STRIPE_WEBHOOK_SECRET_ARN`
+- `SENDGRID_API_KEY_SECRET_ARN`
+- `SENTRY_DSN_SECRET_ARN`
+
+Repository variables used by the workflow:
+
+- `AWS_REGION` (defaults to `us-east-1`)
+- `PROJECT_NAME` (defaults to `strype`)
+- `ENVIRONMENT` (defaults to `production`)
+- `TF_STATE_BUCKET` (required)
+- `TF_STATE_LOCK_TABLE` (optional)
 
 ## Cutover Checklist
 

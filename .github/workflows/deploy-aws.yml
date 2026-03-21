@@ -8,42 +8,176 @@ on:
 jobs:
   deploy:
     runs-on: ubuntu-latest
+    env:
+      TF_IN_AUTOMATION: "1"
+      AWS_REGION: ${{ secrets.AWS_REGION || vars.AWS_REGION || 'us-east-1' }}
+      PROJECT_NAME: ${{ vars.PROJECT_NAME || 'strype' }}
+      ENVIRONMENT: ${{ vars.ENVIRONMENT || 'production' }}
     permissions:
       contents: read
       id-token: write
     steps:
       - uses: actions/checkout@v4
-      - uses: aws-actions/configure-aws-credentials@v4
+
+      - id: preflight
+        name: Preflight deployment configuration
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          has_role="false"
+          if [ -n "${{ secrets.AWS_DEPLOY_ROLE_ARN }}" ]; then
+            has_role="true"
+          fi
+
+          has_keys="false"
+          if [ -n "${{ secrets.AWS_ACCESS_KEY_ID }}" ] && [ -n "${{ secrets.AWS_SECRET_ACCESS_KEY }}" ]; then
+            has_keys="true"
+          fi
+
+          if [ "$has_role" != "true" ] && [ "$has_keys" != "true" ]; then
+            echo "Missing AWS auth config. Set either AWS_DEPLOY_ROLE_ARN (recommended OIDC) or AWS_ACCESS_KEY_ID + AWS_SECRET_ACCESS_KEY."
+            exit 1
+          fi
+
+          if [ "$has_role" = "true" ]; then
+            echo "auth_mode=role" >> "$GITHUB_OUTPUT"
+          else
+            echo "auth_mode=keys" >> "$GITHUB_OUTPUT"
+          fi
+
+          missing=0
+          if [ -z "${{ secrets.DB_USERNAME }}" ]; then echo "Missing required secret: DB_USERNAME"; missing=1; fi
+          if [ -z "${{ secrets.DB_PASSWORD }}" ]; then echo "Missing required secret: DB_PASSWORD"; missing=1; fi
+          if [ -z "${{ secrets.DATABASE_URL_SECRET_ARN }}" ]; then echo "Missing required secret: DATABASE_URL_SECRET_ARN"; missing=1; fi
+          if [ -z "${{ secrets.SECRET_KEY_SECRET_ARN }}" ]; then echo "Missing required secret: SECRET_KEY_SECRET_ARN"; missing=1; fi
+          if [ -z "${{ secrets.FRONTEND_URL }}" ]; then echo "Missing required secret: FRONTEND_URL"; missing=1; fi
+          if [ -z "${{ secrets.CORS_ORIGINS }}" ]; then echo "Missing required secret: CORS_ORIGINS"; missing=1; fi
+          if [ -z "${{ vars.TF_STATE_BUCKET }}" ]; then echo "Missing required repo variable: TF_STATE_BUCKET"; missing=1; fi
+
+          if [ "$missing" -ne 0 ]; then
+            exit 1
+          fi
+
+      - name: Configure AWS credentials (OIDC role)
+        if: steps.preflight.outputs.auth_mode == 'role'
+        uses: aws-actions/configure-aws-credentials@v4
         with:
           role-to-assume: ${{ secrets.AWS_DEPLOY_ROLE_ARN }}
-          aws-region: ${{ secrets.AWS_REGION || vars.AWS_REGION || 'us-east-1' }}
+          aws-region: ${{ env.AWS_REGION }}
+
+      - name: Configure AWS credentials (access keys)
+        if: steps.preflight.outputs.auth_mode == 'keys'
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-region: ${{ env.AWS_REGION }}
+
+      - uses: hashicorp/setup-terraform@v3
+
+      - name: Terraform init
+        working-directory: infra/terraform
+        env:
+          TF_STATE_BUCKET: ${{ vars.TF_STATE_BUCKET }}
+          TF_STATE_LOCK_TABLE: ${{ vars.TF_STATE_LOCK_TABLE }}
+        run: |
+          set -euo pipefail
+
+          BACKEND_ARGS=(
+            "-backend-config=bucket=${TF_STATE_BUCKET}"
+            "-backend-config=key=${PROJECT_NAME}/${ENVIRONMENT}/terraform.tfstate"
+            "-backend-config=region=${AWS_REGION}"
+            "-backend-config=encrypt=true"
+          )
+
+          if [ -n "${TF_STATE_LOCK_TABLE}" ]; then
+            BACKEND_ARGS+=("-backend-config=dynamodb_table=${TF_STATE_LOCK_TABLE}")
+          fi
+
+          terraform init -reconfigure "${BACKEND_ARGS[@]}"
+
+      - name: Bootstrap ECR repository
+        working-directory: infra/terraform
+        env:
+          TF_VAR_database_username: ${{ secrets.DB_USERNAME }}
+          TF_VAR_database_password: ${{ secrets.DB_PASSWORD }}
+          TF_VAR_database_url_secret_arn: ${{ secrets.DATABASE_URL_SECRET_ARN }}
+          TF_VAR_secret_key_secret_arn: ${{ secrets.SECRET_KEY_SECRET_ARN }}
+          TF_VAR_stripe_secret_key_secret_arn: ${{ secrets.STRIPE_SECRET_KEY_SECRET_ARN }}
+          TF_VAR_stripe_webhook_secret_arn: ${{ secrets.STRIPE_WEBHOOK_SECRET_ARN }}
+          TF_VAR_sendgrid_api_key_secret_arn: ${{ secrets.SENDGRID_API_KEY_SECRET_ARN }}
+          TF_VAR_sentry_dsn_secret_arn: ${{ secrets.SENTRY_DSN_SECRET_ARN }}
+          TF_VAR_frontend_url: ${{ secrets.FRONTEND_URL }}
+          TF_VAR_cors_origins: ${{ secrets.CORS_ORIGINS }}
+          TF_VAR_certificate_arn: ${{ secrets.AWS_CERTIFICATE_ARN }}
+          TF_VAR_image_url: public.ecr.aws/docker/library/python:3.12-slim
+        run: |
+          terraform apply -auto-approve -target=aws_ecr_repository.app \
+            -var="aws_region=${AWS_REGION}" \
+            -var="project_name=${PROJECT_NAME}" \
+            -var="environment=${ENVIRONMENT}"
+
+      - name: Resolve ECR repository URL
+        working-directory: infra/terraform
+        run: |
+          ECR_REPOSITORY_URL=$(terraform output -raw ecr_repository_url)
+          if [ -z "$ECR_REPOSITORY_URL" ]; then
+            echo "Failed to resolve ECR repository URL"
+            exit 1
+          fi
+          echo "ECR_REPOSITORY_URL=$ECR_REPOSITORY_URL" >> "$GITHUB_ENV"
+
       - id: login-ecr
         uses: aws-actions/amazon-ecr-login@v2
+
       - name: Build and push image
         env:
-          ECR_REGISTRY: ${{ steps.login-ecr.outputs.registry }}
           IMAGE_TAG: ${{ github.sha }}
         run: |
-          IMAGE_URI=${{ secrets.ECR_REPOSITORY_URL }}:${IMAGE_TAG}
+          IMAGE_URI=${ECR_REPOSITORY_URL}:${IMAGE_TAG}
           docker build -t $IMAGE_URI -f backend/Dockerfile .
           docker push $IMAGE_URI
           echo "IMAGE_URI=$IMAGE_URI" >> $GITHUB_ENV
-      - uses: hashicorp/setup-terraform@v3
+
       - name: Terraform apply
         working-directory: infra/terraform
+        env:
+          TF_VAR_database_username: ${{ secrets.DB_USERNAME }}
+          TF_VAR_database_password: ${{ secrets.DB_PASSWORD }}
+          TF_VAR_database_url_secret_arn: ${{ secrets.DATABASE_URL_SECRET_ARN }}
+          TF_VAR_secret_key_secret_arn: ${{ secrets.SECRET_KEY_SECRET_ARN }}
+          TF_VAR_stripe_secret_key_secret_arn: ${{ secrets.STRIPE_SECRET_KEY_SECRET_ARN }}
+          TF_VAR_stripe_webhook_secret_arn: ${{ secrets.STRIPE_WEBHOOK_SECRET_ARN }}
+          TF_VAR_sendgrid_api_key_secret_arn: ${{ secrets.SENDGRID_API_KEY_SECRET_ARN }}
+          TF_VAR_sentry_dsn_secret_arn: ${{ secrets.SENTRY_DSN_SECRET_ARN }}
+          TF_VAR_frontend_url: ${{ secrets.FRONTEND_URL }}
+          TF_VAR_cors_origins: ${{ secrets.CORS_ORIGINS }}
+          TF_VAR_certificate_arn: ${{ secrets.AWS_CERTIFICATE_ARN }}
         run: |
-          terraform init
+          export TF_VAR_image_url="${IMAGE_URI}"
           terraform apply -auto-approve \
-            -var="aws_region=${{ secrets.AWS_REGION || vars.AWS_REGION || 'us-east-1' }}" \
-            -var="image_url=${IMAGE_URI}" \
-            -var="certificate_arn=${{ secrets.AWS_CERTIFICATE_ARN }}" \
-            -var="database_username=${{ secrets.DB_USERNAME }}" \
-            -var="database_password=${{ secrets.DB_PASSWORD }}" \
-            -var="database_url_secret_arn=${{ secrets.DATABASE_URL_SECRET_ARN }}" \
-            -var="secret_key_secret_arn=${{ secrets.SECRET_KEY_SECRET_ARN }}" \
-            -var="stripe_secret_key_secret_arn=${{ secrets.STRIPE_SECRET_KEY_SECRET_ARN }}" \
-            -var="stripe_webhook_secret_arn=${{ secrets.STRIPE_WEBHOOK_SECRET_ARN }}" \
-            -var="sendgrid_api_key_secret_arn=${{ secrets.SENDGRID_API_KEY_SECRET_ARN }}" \
-            -var="sentry_dsn_secret_arn=${{ secrets.SENTRY_DSN_SECRET_ARN }}" \
-            -var="frontend_url=${{ secrets.FRONTEND_URL }}" \
-            -var="cors_origins=${{ secrets.CORS_ORIGINS }}"
+            -var="aws_region=${AWS_REGION}" \
+            -var="project_name=${PROJECT_NAME}" \
+            -var="environment=${ENVIRONMENT}"
+
+      - name: Verify readiness endpoint
+        working-directory: infra/terraform
+        run: |
+          ALB_DNS=$(terraform output -raw alb_dns_name)
+          if [ -z "$ALB_DNS" ]; then
+            echo "Failed to resolve ALB DNS"
+            exit 1
+          fi
+
+          READY_URL="http://${ALB_DNS}/api/ready"
+          for i in {1..30}; do
+            if curl -fsS "$READY_URL" > /dev/null; then
+              echo "Deployment ready at $READY_URL"
+              exit 0
+            fi
+            sleep 10
+          done
+
+          echo "Readiness check failed for $READY_URL"
+          exit 1
