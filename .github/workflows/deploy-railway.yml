@@ -11,14 +11,16 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
+      - name: Validate Railway token
+        if: ${{ secrets.RAILWAY_TOKEN == '' }}
+        run: |
+          echo "Missing required secret: RAILWAY_TOKEN"
+          exit 1
+
       - name: Preflight Railway configuration
         shell: bash
         run: |
           set -euo pipefail
-          if [ -z "${{ secrets.RAILWAY_TOKEN }}" ]; then
-            echo "Missing required secret: RAILWAY_TOKEN"
-            exit 1
-          fi
           if [ ! -f "railway.toml" ]; then
             echo "Missing railway.toml in repository root"
             exit 1

@@ -15,8 +15,10 @@ Required Railway service variables:
 - `ENV=production`
 - `DATABASE_URL=${{Postgres.DATABASE_URL}}`
 - `SECRET_KEY=<64+ random chars>`
-- `CORS_ORIGINS=https://backend-production-8dd7.up.railway.app,http://localhost:5173`
-- `FRONTEND_URL=https://backend-production-8dd7.up.railway.app`
+- `CORS_ORIGINS=https://your-frontend.example.com`
+- `FRONTEND_URL=https://your-frontend.example.com`
+
+For local development only, you may add localhost origins in non-production environments.
 
 Deploy from local CLI:
 
