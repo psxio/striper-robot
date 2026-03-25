@@ -630,6 +630,7 @@ async def _sqlite_init_db():
             ("jobs", "verified_at TEXT"),
             ("jobs", "notes TEXT DEFAULT ''"),
             ("subscriptions", "cancel_at_period_end INTEGER DEFAULT 0"),
+            ("subscriptions", "renewal_reminder_sent_at TEXT"),
             ("robots", "api_key_last4 TEXT"),
             ("robots", "maintenance_status TEXT DEFAULT 'ready'"),
             ("robots", "battery_health_pct INTEGER"),

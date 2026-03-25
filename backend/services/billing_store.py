@@ -1,7 +1,7 @@
 """Billing/subscription persistence layer using aiosqlite."""
 
 import uuid
-from datetime import datetime, timezone
+from datetime import datetime, timezone, timedelta
 from typing import Optional
 
 from ..database import get_db
@@ -113,6 +113,40 @@ async def set_user_plan(user_id: str, plan: str) -> bool:
         )
         await db.commit()
         return cursor.rowcount > 0
+
+
+async def get_subscriptions_expiring_soon(days: int = 7) -> list[dict]:
+    """Return active subscriptions expiring within `days` that haven't been reminded recently."""
+    now = datetime.now(timezone.utc)
+    cutoff = (now + timedelta(days=days)).isoformat()
+    now_iso = now.isoformat()
+    # Only include subs not already reminded in the last 6 days
+    reminder_cutoff = (now - timedelta(days=6)).isoformat()
+    async for db in get_db():
+        cursor = await db.execute(
+            """SELECT s.*, u.email, u.name
+               FROM subscriptions s
+               JOIN users u ON u.id = s.user_id
+               WHERE s.status = 'active'
+                 AND s.current_period_end IS NOT NULL
+                 AND s.current_period_end BETWEEN ? AND ?
+                 AND s.cancel_at_period_end = 0
+                 AND (s.renewal_reminder_sent_at IS NULL OR s.renewal_reminder_sent_at < ?)""",
+            (now_iso, cutoff, reminder_cutoff),
+        )
+        rows = await cursor.fetchall()
+        return [dict(r) for r in rows]
+
+
+async def mark_renewal_reminder_sent(subscription_id: str) -> None:
+    """Record that a renewal reminder was sent for this subscription."""
+    now = _now()
+    async for db in get_db():
+        await db.execute(
+            "UPDATE subscriptions SET renewal_reminder_sent_at = ?, updated_at = ? WHERE id = ?",
+            (now, now, subscription_id),
+        )
+        await db.commit()
 
 
 async def is_billing_active(user_id: str) -> bool:

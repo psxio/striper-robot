@@ -97,6 +97,30 @@ async def _blocklist_cleanup_loop() -> None:
             logger.exception("Cleanup loop failed")
 
 
+async def _renewal_reminder_loop() -> None:
+    """Check for subscriptions expiring within 7 days and send reminder emails every 6 hours."""
+    from .services import billing_store, email_service
+    while True:
+        try:
+            await asyncio.sleep(21600)  # 6 hours
+            expiring = await billing_store.get_subscriptions_expiring_soon(7)
+            for sub in expiring:
+                try:
+                    renewal_date = sub.get("current_period_end", "")[:10]  # YYYY-MM-DD
+                    await email_service.send_renewal_reminder_email(
+                        sub["email"], sub["plan"], renewal_date,
+                    )
+                    await billing_store.mark_renewal_reminder_sent(sub["id"])
+                except Exception:
+                    logger.exception("Failed to send renewal reminder for subscription %s", sub["id"])
+            if expiring:
+                logger.info("Sent %d renewal reminder(s)", len(expiring))
+        except asyncio.CancelledError:
+            break
+        except Exception:
+            logger.exception("Renewal reminder loop failed")
+
+
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     logger.info("Strype Cloud Platform starting up (env=%s)", settings.ENV)
@@ -106,15 +130,19 @@ async def lifespan(app: FastAPI):
     # Start background tasks (skip in test)
     scheduler_task = None
     blocklist_task = None
+    renewal_task = None
+    telemetry_monitor_task = None
     if settings.ENV != "test":
         from .services.scheduler import run_scheduler_loop
+        from .services.telemetry_monitor import run_telemetry_monitor_loop
         scheduler_task = asyncio.create_task(run_scheduler_loop())
         blocklist_task = asyncio.create_task(_blocklist_cleanup_loop())
+        renewal_task = asyncio.create_task(_renewal_reminder_loop())
+        telemetry_monitor_task = asyncio.create_task(run_telemetry_monitor_loop())
     yield
-    if scheduler_task:
-        scheduler_task.cancel()
-    if blocklist_task:
-        blocklist_task.cancel()
+    for task in (scheduler_task, blocklist_task, renewal_task, telemetry_monitor_task):
+        if task:
+            task.cancel()
     logger.info("Strype Cloud Platform shutting down gracefully")
 
 
