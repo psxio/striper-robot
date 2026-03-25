@@ -587,6 +587,18 @@ async def _sqlite_init_db():
         """)
 
         await db.execute("""
+            CREATE TABLE IF NOT EXISTS email_events (
+                id TEXT PRIMARY KEY,
+                email TEXT NOT NULL,
+                event_type TEXT NOT NULL,
+                reason TEXT DEFAULT '',
+                sg_event_id TEXT UNIQUE,
+                sg_message_id TEXT DEFAULT '',
+                created_at TEXT NOT NULL
+            )
+        """)
+
+        await db.execute("""
             CREATE TABLE IF NOT EXISTS consumable_usage (
                 id TEXT PRIMARY KEY,
                 organization_id TEXT NOT NULL,
@@ -684,6 +696,8 @@ async def _sqlite_init_db():
             "CREATE INDEX IF NOT EXISTS idx_maintenance_robot ON maintenance_events(robot_id, created_at)",
             "CREATE INDEX IF NOT EXISTS idx_consumables_org ON consumables_inventory(organization_id)",
             "CREATE INDEX IF NOT EXISTS idx_lots_user_deleted ON lots(user_id, deleted_at)",
+            "CREATE INDEX IF NOT EXISTS idx_email_events_email ON email_events(email, event_type)",
+            "CREATE INDEX IF NOT EXISTS idx_email_events_sg ON email_events(sg_event_id)",
             "CREATE INDEX IF NOT EXISTS idx_jobs_recurring_schedule ON jobs(recurring_schedule_id)",
             "CREATE INDEX IF NOT EXISTS idx_jobs_assigned_user ON jobs(assigned_user_id)",
             "CREATE INDEX IF NOT EXISTS idx_robot_claims_claimed_by ON robot_claims(claimed_by_user_id)",

@@ -296,6 +296,40 @@ async def billing_portal(request: Request, user: dict = Depends(get_current_user
     return {"url": session.url}
 
 
+@router.get("/invoices")
+async def list_invoices(user: dict = Depends(get_current_user)):
+    """List recent invoices for the current user from Stripe."""
+    if not _stripe_configured():
+        raise HTTPException(status_code=501, detail="Stripe not configured")
+
+    customer_id = user.get("stripe_customer_id")
+    if not customer_id:
+        return {"items": []}
+
+    try:
+        import stripe
+        stripe.api_key = settings.STRIPE_SECRET_KEY
+        invoices = stripe.Invoice.list(customer=customer_id, limit=20)
+        items = []
+        for inv in invoices.get("data", []):
+            items.append({
+                "id": inv["id"],
+                "number": inv.get("number"),
+                "amount": round((inv.get("amount_paid") or 0) / 100, 2),
+                "currency": inv.get("currency", "usd"),
+                "status": inv.get("status"),
+                "period_start": inv.get("period_start"),
+                "period_end": inv.get("period_end"),
+                "invoice_url": inv.get("hosted_invoice_url"),
+                "pdf": inv.get("invoice_pdf"),
+                "created": inv.get("created"),
+            })
+        return {"items": items}
+    except Exception as e:
+        logger.error("Stripe invoice listing error: %s", e)
+        raise HTTPException(status_code=502, detail="Payment service unavailable")
+
+
 @router.post("/change-plan")
 async def change_plan(
     body: ChangePlanRequest, request: Request, user: dict = Depends(get_current_user)

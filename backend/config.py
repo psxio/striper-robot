@@ -78,6 +78,15 @@ class Settings:
         # Metrics
         self.METRICS_TOKEN: str = os.environ.get("METRICS_TOKEN", "")
 
+        # Per-plan API rate limits (requests per minute)
+        self.RATE_LIMITS: dict = {
+            "free": "30/minute",
+            "pro": "100/minute",
+            "robot": "100/minute",
+            "enterprise": "300/minute",
+            "default": "30/minute",
+        }
+
         # Plan limits
         self.PLAN_LIMITS: dict = {
             "free": {"max_lots": 1, "max_jobs": 5, "robots": 0},

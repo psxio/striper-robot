@@ -29,6 +29,7 @@ from .routers import (
     billing_router, admin_router, robot_router, schedule_router,
     estimate_router, telemetry_router, organization_router, sites_router,
     quotes_router, operations_router, reporting_router, fleet_router, cloud_router,
+    email_webhook_router,
     robot_claim_router,
 )
 from .services import storage_service
@@ -201,6 +202,7 @@ async def csrf_protection(request: Request, call_next):
     _csrf_exempt = {
         "/api/auth/login", "/api/auth/register", "/api/auth/forgot-password",
         "/api/auth/reset-password", "/api/billing/webhook",
+        "/api/webhooks/email/sendgrid",
     }
     if (
         request.method in ("POST", "PUT", "PATCH", "DELETE")
@@ -371,6 +373,7 @@ app.include_router(reporting_router.router)
 app.include_router(fleet_router.router)
 app.include_router(cloud_router.router)
 app.include_router(robot_claim_router.router)
+app.include_router(email_webhook_router.router)
 
 # Serve frontend -- must be LAST (catch-all)
 site_dir = Path(__file__).resolve().parent.parent / "site"

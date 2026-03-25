@@ -9,7 +9,21 @@ logger = logging.getLogger("strype.email")
 
 
 async def send_email(to: str, subject: str, html_body: str) -> bool:
-    """Send a transactional email. Returns True if sent or logged successfully."""
+    """Send a transactional email. Returns True if sent or logged successfully.
+
+    Checks suppression list before sending — bounced/unsubscribed addresses
+    are silently skipped.
+    """
+    # Check suppression list (skip in dev mode to avoid DB dependency in simple tests)
+    if to and settings.ENV != "dev":
+        try:
+            from .email_store import is_email_suppressed
+            if await is_email_suppressed(to):
+                logger.info("Email suppressed (bounce/unsubscribe): to=%s subject=%s", to, subject)
+                return False
+        except Exception:
+            pass  # Don't block email sending if suppression check fails
+
     api_key = getattr(settings, "SENDGRID_API_KEY", "")
     from_email = getattr(settings, "FROM_EMAIL", "")
 

@@ -92,6 +92,12 @@
       </button>
     </div>
 
+    <!-- Invoice History -->
+    <div class="section" id="invoiceSection" style="display:none">
+      <div class="section-title">Invoice History</div>
+      <div id="invoiceList" style="font-size:14px"></div>
+    </div>
+
     <!-- Plan comparison -->
     <div class="plan-grid" id="planGrid"></div>
   </div>
@@ -233,6 +239,23 @@ document.getElementById('logoutLink').addEventListener('click', async (e) => {
     }
 
     renderPlans(me.plan || 'free');
+
+    // Load invoice history
+    try {
+      const invoiceData = await apiFetch('/api/billing/invoices');
+      const invoices = invoiceData?.items || [];
+      if (invoices.length) {
+        document.getElementById('invoiceSection').style.display = 'block';
+        document.getElementById('invoiceList').innerHTML = invoices.map(inv => {
+          const date = inv.created ? new Date(inv.created * 1000).toLocaleDateString() : '—';
+          const status = inv.status === 'paid' ? '<span style="color:var(--green)">Paid</span>' : inv.status || '—';
+          const viewLink = inv.invoice_url ? `<a href="${inv.invoice_url}" target="_blank" rel="noopener" style="color:var(--blue)">View</a>` : '';
+          return `<div style="display:flex;justify-content:space-between;padding:8px 0;border-bottom:1px solid var(--border)">
+            <span>${date}</span><span>$${inv.amount.toFixed(2)}</span><span>${status}</span><span>${viewLink}</span>
+          </div>`;
+        }).join('');
+      }
+    } catch (_) { /* invoices endpoint may not exist or Stripe not configured — hide silently */ }
 
     document.getElementById('loadingSpinner').style.display = 'none';
     document.getElementById('billingContent').style.display = 'block';

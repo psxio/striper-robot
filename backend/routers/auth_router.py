@@ -37,7 +37,7 @@ async def register(request: Request, body: RegisterRequest):
 
     password_hash = hash_password(body.password)
     user = await user_store.create_user(body.email, password_hash, body.name)
-    token = create_access_token(user["id"])
+    token = create_access_token(user["id"], plan=user.get("plan") or "free")
     logger.info("User registered: %s", body.email)
 
     # Generate email verification token
@@ -85,7 +85,7 @@ async def login(request: Request, body: LoginRequest):
         await set_admin(user["id"], True)
         user["is_admin"] = 1
 
-    token = create_access_token(user["id"])
+    token = create_access_token(user["id"], plan=user.get("plan") or "free")
     logger.info("User logged in: %s", body.email)
 
     # Issue refresh token as httpOnly cookie
@@ -191,7 +191,7 @@ async def refresh_token(request: Request):
     if not user:
         raise HTTPException(status_code=401, detail="User not found")
 
-    new_access = create_access_token(user_id)
+    new_access = create_access_token(user_id, plan=user.get("plan") or "free")
     new_refresh = await user_store.create_refresh_token(
         user_id, expire_days=settings.REFRESH_TOKEN_EXPIRE_DAYS
     )
