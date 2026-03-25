@@ -16,7 +16,7 @@ from ..auth import require_active_billing
 from ..config import settings
 from ..models.schemas import LotCreate, LotUpdate, LotResponse, PaginatedLotResponse
 from ..orgs import get_organization_context
-from ..services import lot_store
+from ..services import lot_store, organization_audit_store
 
 router = APIRouter(prefix="/api/lots", tags=["lots"])
 logger = logging.getLogger("strype.lots")
@@ -87,6 +87,10 @@ async def create_lot(body: LotCreate, _billing=Depends(require_active_billing), 
                    + ("s" if limits["max_lots"] != 1 else ""),
         )
     logger.info("Lot created: %s by user %s", lot["id"], user["id"])
+    await organization_audit_store.log_event(
+        context["organization"]["id"], "lot.created",
+        actor_user_id=user["id"], target_type="lot", target_id=lot["id"],
+    )
     return _to_response(lot)
 
 
@@ -114,6 +118,10 @@ async def update_lot(
     )
     if not lot:
         raise HTTPException(status_code=404, detail="Lot not found")
+    await organization_audit_store.log_event(
+        context["organization"]["id"], "lot.updated",
+        actor_user_id=context["user"]["id"], target_type="lot", target_id=lot_id,
+    )
     return _to_response(lot)
 
 
@@ -126,6 +134,10 @@ async def delete_lot(lot_id: str, context: dict = Depends(get_organization_conte
     )
     if not deleted:
         raise HTTPException(status_code=404, detail="Lot not found")
+    await organization_audit_store.log_event(
+        context["organization"]["id"], "lot.deleted",
+        actor_user_id=context["user"]["id"], target_type="lot", target_id=lot_id,
+    )
     return {"ok": True}
 
 

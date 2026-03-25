@@ -1,0 +1,67 @@
+name: Deploy Staging
+
+on:
+  push:
+    branches: ["staging"]
+  workflow_dispatch:
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install dependencies
+        run: |
+          pip install -r requirements.txt
+          pip install pytest pytest-asyncio httpx
+
+      - name: Run tests
+        env:
+          ENV: test
+          DATABASE_PATH: ":memory:"
+        run: python -m pytest backend/tests/ -q --tb=short
+
+  deploy:
+    needs: test
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Validate staging token
+        shell: bash
+        env:
+          RAILWAY_TOKEN: ${{ secrets.RAILWAY_STAGING_TOKEN }}
+        run: |
+          if [ -z "$RAILWAY_TOKEN" ]; then
+            echo "Missing required secret: RAILWAY_STAGING_TOKEN"
+            exit 1
+          fi
+
+      - name: Install Railway CLI
+        run: npm install -g @railway/cli@4.33.0
+
+      - name: Deploy to Railway (staging)
+        run: railway up --service backend --environment staging --detach
+        env:
+          RAILWAY_TOKEN: ${{ secrets.RAILWAY_STAGING_TOKEN }}
+
+      - name: Post-deploy health check
+        run: |
+          sleep 15
+          STAGING_URL="${{ vars.STAGING_URL }}"
+          if [ -n "$STAGING_URL" ]; then
+            STATUS=$(curl -s -o /dev/null -w "%{http_code}" "$STAGING_URL/api/health" || echo "000")
+            if [ "$STATUS" != "200" ]; then
+              echo "Health check failed: HTTP $STATUS"
+              exit 1
+            fi
+            echo "Staging health check passed"
+          else
+            echo "STAGING_URL not set, skipping health check"
+          fi

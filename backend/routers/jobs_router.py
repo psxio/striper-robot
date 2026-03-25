@@ -8,7 +8,7 @@ from typing import Literal, Optional
 from ..auth import get_current_user, require_active_billing
 from ..config import settings
 from ..models.schemas import JobCreate, JobUpdate, JobResponse, PaginatedJobResponse
-from ..services import job_store, lot_store
+from ..services import job_store, lot_store, organization_audit_store
 
 router = APIRouter(prefix="/api/jobs", tags=["jobs"])
 logger = logging.getLogger("strype.jobs")
@@ -64,6 +64,11 @@ async def create_job(body: JobCreate, user: dict = Depends(require_active_billin
             detail=f"Plan limited to {limits['max_jobs']} jobs",
         )
     logger.info("Job created: %s for lot %s", job["id"], body.lotId)
+    if user.get("active_organization_id"):
+        await organization_audit_store.log_event(
+            user["active_organization_id"], "job.created",
+            actor_user_id=user["id"], target_type="job", target_id=job["id"],
+        )
     return _to_response(job)
 
 
@@ -86,4 +91,9 @@ async def delete_job(job_id: str, user: dict = Depends(get_current_user)):
     deleted = await job_store.delete_job(user["id"], job_id)
     if not deleted:
         raise HTTPException(status_code=404, detail="Job not found")
+    if user.get("active_organization_id"):
+        await organization_audit_store.log_event(
+            user["active_organization_id"], "job.deleted",
+            actor_user_id=user["id"], target_type="job", target_id=job_id,
+        )
     return {"ok": True}

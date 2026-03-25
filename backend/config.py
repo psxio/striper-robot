@@ -75,6 +75,9 @@ class Settings:
         # Robot deposit (0 = no deposit)
         self.ROBOT_DEPOSIT: float = float(os.environ.get("ROBOT_DEPOSIT", "0"))
 
+        # Metrics
+        self.METRICS_TOKEN: str = os.environ.get("METRICS_TOKEN", "")
+
         # Plan limits
         self.PLAN_LIMITS: dict = {
             "free": {"max_lots": 1, "max_jobs": 5, "robots": 0},

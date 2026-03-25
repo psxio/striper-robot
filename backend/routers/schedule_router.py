@@ -7,7 +7,7 @@ from fastapi import APIRouter, Depends, HTTPException, Query
 from ..auth import get_current_user, require_active_billing
 from ..config import settings
 from ..models.schemas import ScheduleCreate, ScheduleUpdate, ScheduleResponse
-from ..services import schedule_store, lot_store
+from ..services import schedule_store, lot_store, organization_audit_store
 
 router = APIRouter(prefix="/api/schedules", tags=["schedules"])
 logger = logging.getLogger("strype.schedules")
@@ -67,6 +67,11 @@ async def create_schedule(body: ScheduleCreate, user: dict = Depends(require_act
         body.time_preference,
     )
     logger.info("Schedule created: %s for lot %s", schedule["id"], body.lot_id)
+    if user.get("active_organization_id"):
+        await organization_audit_store.log_event(
+            user["active_organization_id"], "schedule.created",
+            actor_user_id=user["id"], target_type="schedule", target_id=schedule["id"],
+        )
     return _to_response(schedule)
 
 
@@ -90,6 +95,11 @@ async def update_schedule(
     )
     if not updated:
         raise HTTPException(status_code=404, detail="Schedule not found")
+    if user.get("active_organization_id"):
+        await organization_audit_store.log_event(
+            user["active_organization_id"], "schedule.updated",
+            actor_user_id=user["id"], target_type="schedule", target_id=schedule_id,
+        )
     return _to_response(updated)
 
 
@@ -98,4 +108,9 @@ async def delete_schedule(schedule_id: str, user: dict = Depends(get_current_use
     deleted = await schedule_store.delete_schedule(user["id"], schedule_id)
     if not deleted:
         raise HTTPException(status_code=404, detail="Schedule not found")
+    if user.get("active_organization_id"):
+        await organization_audit_store.log_event(
+            user["active_organization_id"], "schedule.deleted",
+            actor_user_id=user["id"], target_type="schedule", target_id=schedule_id,
+        )
     return {"ok": True}

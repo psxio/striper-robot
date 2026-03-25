@@ -19,6 +19,7 @@ from slowapi.errors import RateLimitExceeded
 
 from .config import settings
 from .database import init_db, get_db
+from .metrics import record_request, format_prometheus
 from .rate_limit import limiter
 
 # Telemetry retention: keep 7 days of data by default
@@ -141,6 +142,20 @@ async def request_id_middleware(request: Request, call_next):
     request.state.request_id = request_id
     response = await call_next(request)
     response.headers["X-Request-ID"] = request_id
+    return response
+
+
+@app.middleware("http")
+async def metrics_middleware(request: Request, call_next):
+    """Record request count and latency for Prometheus metrics."""
+    import time as _time
+    start = _time.monotonic()
+    response = await call_next(request)
+    duration = _time.monotonic() - start
+    # Skip metrics and static file paths to reduce noise
+    path = request.url.path
+    if path.startswith("/api/") and path != "/api/metrics":
+        record_request(request.method, path, response.status_code, duration)
     return response
 
 
@@ -280,6 +295,33 @@ async def readiness():
                 "detail": str(exc) if settings.ENV in ("dev", "test") else "Readiness check failed",
             },
         )
+
+
+@app.get("/api/metrics")
+async def prometheus_metrics(request: Request):
+    """Prometheus-compatible metrics endpoint.
+
+    Protected by METRICS_TOKEN env var (Bearer auth) or admin JWT.
+    """
+    metrics_token = settings.METRICS_TOKEN
+    if metrics_token:
+        auth = request.headers.get("Authorization", "")
+        if auth != f"Bearer {metrics_token}":
+            # Fall back to admin JWT check
+            from .auth import get_admin_user
+            try:
+                await get_admin_user(request)
+            except Exception:
+                return JSONResponse(status_code=403, content={"detail": "Forbidden"})
+    else:
+        # No METRICS_TOKEN set — require admin JWT
+        from .auth import get_admin_user
+        try:
+            await get_admin_user(request)
+        except Exception:
+            return JSONResponse(status_code=403, content={"detail": "Forbidden"})
+
+    return Response(content=format_prometheus(), media_type="text/plain; charset=utf-8")
 
 
 app.include_router(auth_router.router)
