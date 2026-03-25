@@ -3,11 +3,12 @@
 import asyncio
 import json
 import logging
+import uuid as _uuid
 from pathlib import Path
 
-__version__ = "0.5.1"
+__version__ = "0.5.2"
 from contextlib import asynccontextmanager
-from datetime import datetime, timezone
+from datetime import datetime, timezone, timedelta
 
 from fastapi import FastAPI, Request, Response
 from fastapi.middleware.cors import CORSMiddleware
@@ -19,11 +20,15 @@ from slowapi.errors import RateLimitExceeded
 from .config import settings
 from .database import init_db, get_db
 from .rate_limit import limiter
+
+# Telemetry retention: keep 7 days of data by default
+TELEMETRY_RETENTION_DAYS = 7
 from .routers import (
     auth_router, lots_router, jobs_router, waitlist_router, user_router,
     billing_router, admin_router, robot_router, schedule_router,
     estimate_router, telemetry_router, organization_router, sites_router,
-    quotes_router, operations_router, reporting_router, fleet_router,
+    quotes_router, operations_router, reporting_router, fleet_router, cloud_router,
+    robot_claim_router,
 )
 from .services import storage_service
 
@@ -73,20 +78,22 @@ logger = logging.getLogger("strype")
 
 
 async def _blocklist_cleanup_loop() -> None:
-    """Purge expired JWT blocklist entries every 24 hours."""
+    """Purge expired JWT blocklist entries and old telemetry every 24 hours."""
     while True:
         try:
             await asyncio.sleep(86400)  # 24 h
             now = datetime.now(timezone.utc).isoformat()
+            cutoff = (datetime.now(timezone.utc) - timedelta(days=TELEMETRY_RETENTION_DAYS)).isoformat()
             async for db in get_db():
                 await db.execute("DELETE FROM token_blocklist WHERE expires_at < ?", (now,))
+                result = await db.execute("DELETE FROM robot_telemetry WHERE created_at < ?", (cutoff,))
                 await db.commit()
                 break
-            logger.info("Token blocklist cleanup complete")
+            logger.info("Cleanup complete: blocklist purged, telemetry older than %d days removed", TELEMETRY_RETENTION_DAYS)
         except asyncio.CancelledError:
             break
         except Exception:
-            logger.exception("Token blocklist cleanup failed")
+            logger.exception("Cleanup loop failed")
 
 
 @asynccontextmanager
@@ -128,12 +135,36 @@ app.add_middleware(
 
 
 @app.middleware("http")
+async def request_id_middleware(request: Request, call_next):
+    """Attach a unique request ID for log correlation."""
+    request_id = request.headers.get("X-Request-ID") or str(_uuid.uuid4())
+    request.state.request_id = request_id
+    response = await call_next(request)
+    response.headers["X-Request-ID"] = request_id
+    return response
+
+
+@app.middleware("http")
 async def csrf_protection(request: Request, call_next):
-    """CSRF double-submit validation for refresh-cookie auth."""
+    """CSRF double-submit validation for cookie-authenticated state-changing requests.
+
+    Enforced when the request has a refresh_token cookie (i.e. an active session)
+    and no Bearer token — this covers the /refresh endpoint and any future
+    cookie-authed routes.  Public endpoints (register, login, forgot-password)
+    and robot heartbeat (X-Robot-Key) are not affected.
+    """
+    # CSRF-exempt paths: auth login/register/forgot/reset are public forms,
+    # webhook is server-to-server, heartbeat uses X-Robot-Key.
+    _csrf_exempt = {
+        "/api/auth/login", "/api/auth/register", "/api/auth/forgot-password",
+        "/api/auth/reset-password", "/api/billing/webhook",
+    }
     if (
         request.method in ("POST", "PUT", "PATCH", "DELETE")
-        and request.url.path == "/api/auth/refresh"
         and "Authorization" not in request.headers
+        and not request.headers.get("X-Robot-Key")
+        and request.url.path not in _csrf_exempt
+        and "refresh_token" in request.cookies
     ):
         csrf_cookie = request.cookies.get("csrf_token")
         csrf_header = request.headers.get("X-CSRF-Token")
@@ -186,11 +217,11 @@ async def security_headers(request: Request, call_next):
     response.headers["Content-Security-Policy"] = (
         "default-src 'self'; "
         "script-src 'self' 'unsafe-inline' https://unpkg.com; "
-        "style-src 'self' 'unsafe-inline' https://unpkg.com; "
+        "style-src 'self' 'unsafe-inline' https://unpkg.com https://fonts.googleapis.com; "
         "img-src 'self' data: https://*.tile.openstreetmap.org; "
-        "connect-src 'self' https://api.stripe.com; "
+        "connect-src 'self' https://api.stripe.com https://nominatim.openstreetmap.org; "
         "frame-src https://js.stripe.com; "
-        "font-src 'self'"
+        "font-src 'self' https://fonts.gstatic.com"
     )
     return response
 
@@ -268,6 +299,8 @@ app.include_router(quotes_router.router)
 app.include_router(operations_router.router)
 app.include_router(reporting_router.router)
 app.include_router(fleet_router.router)
+app.include_router(cloud_router.router)
+app.include_router(robot_claim_router.router)
 
 # Serve frontend -- must be LAST (catch-all)
 site_dir = Path(__file__).resolve().parent.parent / "site"

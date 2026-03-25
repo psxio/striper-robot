@@ -68,6 +68,12 @@ async function tryRefresh() {
 /** @type {Promise<boolean>|null} — in-flight refresh deduplicate */
 let _refreshPromise = null;
 
+/** Pending requests waiting for token refresh to complete. */
+let _pendingRetries = [];
+
+/** Default request timeout in milliseconds. */
+const REQUEST_TIMEOUT_MS = 30_000;
+
 export async function apiFetch(path, options = {}) {
   const token = getToken();
   if (!token) {
@@ -87,17 +93,41 @@ export async function apiFetch(path, options = {}) {
     return headers;
   };
 
-  let resp = await fetch(path, { ...options, headers: buildHeaders(token) });
+  const fetchWithTimeout = (url, opts) => {
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), REQUEST_TIMEOUT_MS);
+    return fetch(url, { ...opts, signal: controller.signal }).finally(() => clearTimeout(timeoutId));
+  };
 
-  // On 401, try a single silent token refresh then retry the original request.
+  let resp;
+  try {
+    resp = await fetchWithTimeout(path, { ...options, headers: buildHeaders(token) });
+  } catch (err) {
+    if (err.name === "AbortError") throw new Error("Request timed out");
+    throw err;
+  }
+
+  // On 401, queue this request and wait for a single shared refresh.
   if (resp.status === 401) {
     if (!_refreshPromise) {
-      _refreshPromise = tryRefresh().finally(() => { _refreshPromise = null; });
+      _refreshPromise = tryRefresh().finally(() => {
+        // Notify all waiting requests
+        const waiters = _pendingRetries.splice(0);
+        const ok = !!getToken();
+        waiters.forEach((resolve) => resolve(ok));
+        _refreshPromise = null;
+      });
     }
-    const refreshed = await _refreshPromise;
+    // Wait for refresh to complete
+    const refreshed = await new Promise((resolve) => _pendingRetries.push(resolve));
     if (refreshed) {
       const newToken = getToken();
-      resp = await fetch(path, { ...options, headers: buildHeaders(newToken) });
+      try {
+        resp = await fetchWithTimeout(path, { ...options, headers: buildHeaders(newToken) });
+      } catch (err) {
+        if (err.name === "AbortError") throw new Error("Request timed out");
+        throw err;
+      }
     }
   }
 
@@ -201,9 +231,4 @@ export function showVerificationBannerIfNeeded(user, containerId) {
       btn.disabled = false;
     }
   });
-}
-
-  link.click();
-  link.remove();
-  URL.revokeObjectURL(objectUrl);
 }

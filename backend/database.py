@@ -335,6 +335,29 @@ async def _sqlite_init_db():
         """)
 
         await db.execute("""
+            CREATE TABLE IF NOT EXISTS robot_claims (
+                id TEXT PRIMARY KEY,
+                robot_id TEXT NOT NULL,
+                organization_id TEXT,
+                claim_code_hash TEXT NOT NULL UNIQUE,
+                status TEXT DEFAULT 'pending',
+                commissioning_status TEXT DEFAULT 'unclaimed',
+                friendly_name TEXT DEFAULT '',
+                deployment_notes TEXT DEFAULT '',
+                created_by_user_id TEXT,
+                claimed_by_user_id TEXT,
+                claimed_at TEXT,
+                commissioned_at TEXT,
+                created_at TEXT NOT NULL,
+                updated_at TEXT NOT NULL,
+                FOREIGN KEY (robot_id) REFERENCES robots(id) ON DELETE CASCADE,
+                FOREIGN KEY (organization_id) REFERENCES organizations(id) ON DELETE SET NULL,
+                FOREIGN KEY (created_by_user_id) REFERENCES users(id) ON DELETE SET NULL,
+                FOREIGN KEY (claimed_by_user_id) REFERENCES users(id) ON DELETE SET NULL
+            )
+        """)
+
+        await db.execute("""
             CREATE TABLE IF NOT EXISTS recurring_schedules (
                 id TEXT PRIMARY KEY,
                 user_id TEXT NOT NULL,
@@ -468,6 +491,54 @@ async def _sqlite_init_db():
         """)
 
         await db.execute("""
+            CREATE TABLE IF NOT EXISTS site_scans (
+                id TEXT PRIMARY KEY,
+                organization_id TEXT NOT NULL,
+                site_id TEXT NOT NULL,
+                lot_id TEXT,
+                source_media_asset_id TEXT,
+                scan_type TEXT NOT NULL,
+                notes TEXT DEFAULT '',
+                summary_json TEXT DEFAULT '{}',
+                geometry_snapshot_json TEXT DEFAULT '[]',
+                captured_at TEXT NOT NULL,
+                created_by_user_id TEXT,
+                created_at TEXT NOT NULL,
+                updated_at TEXT NOT NULL,
+                FOREIGN KEY (organization_id) REFERENCES organizations(id) ON DELETE CASCADE,
+                FOREIGN KEY (site_id) REFERENCES sites(id) ON DELETE CASCADE,
+                FOREIGN KEY (lot_id) REFERENCES lots(id) ON DELETE SET NULL,
+                FOREIGN KEY (source_media_asset_id) REFERENCES media_assets(id) ON DELETE SET NULL,
+                FOREIGN KEY (created_by_user_id) REFERENCES users(id) ON DELETE SET NULL
+            )
+        """)
+
+        await db.execute("""
+            CREATE TABLE IF NOT EXISTS simulation_runs (
+                id TEXT PRIMARY KEY,
+                organization_id TEXT NOT NULL,
+                site_id TEXT NOT NULL,
+                scan_id TEXT,
+                work_order_id TEXT,
+                robot_id TEXT,
+                status TEXT DEFAULT 'ready',
+                mode TEXT DEFAULT 'preview',
+                notes TEXT DEFAULT '',
+                config_json TEXT DEFAULT '{}',
+                result_json TEXT DEFAULT '{}',
+                created_by_user_id TEXT,
+                created_at TEXT NOT NULL,
+                updated_at TEXT NOT NULL,
+                FOREIGN KEY (organization_id) REFERENCES organizations(id) ON DELETE CASCADE,
+                FOREIGN KEY (site_id) REFERENCES sites(id) ON DELETE CASCADE,
+                FOREIGN KEY (scan_id) REFERENCES site_scans(id) ON DELETE SET NULL,
+                FOREIGN KEY (work_order_id) REFERENCES jobs(id) ON DELETE SET NULL,
+                FOREIGN KEY (robot_id) REFERENCES robots(id) ON DELETE SET NULL,
+                FOREIGN KEY (created_by_user_id) REFERENCES users(id) ON DELETE SET NULL
+            )
+        """)
+
+        await db.execute("""
             CREATE TABLE IF NOT EXISTS maintenance_events (
                 id TEXT PRIMARY KEY,
                 robot_id TEXT NOT NULL,
@@ -532,43 +603,6 @@ async def _sqlite_init_db():
             )
         """)
 
-        indexes = [
-            "CREATE INDEX IF NOT EXISTS idx_lots_user ON lots(user_id)",
-            "CREATE INDEX IF NOT EXISTS idx_lots_org ON lots(organization_id)",
-            "CREATE INDEX IF NOT EXISTS idx_jobs_user ON jobs(user_id)",
-            "CREATE INDEX IF NOT EXISTS idx_jobs_org ON jobs(organization_id, site_id)",
-            "CREATE INDEX IF NOT EXISTS idx_jobs_lot ON jobs(lot_id)",
-            "CREATE INDEX IF NOT EXISTS idx_users_email ON users(email)",
-            "CREATE INDEX IF NOT EXISTS idx_subs_user ON subscriptions(user_id)",
-            "CREATE INDEX IF NOT EXISTS idx_subs_stripe ON subscriptions(stripe_subscription_id)",
-            "CREATE INDEX IF NOT EXISTS idx_resets_token ON password_resets(token_hash)",
-            "CREATE INDEX IF NOT EXISTS idx_blocklist_expires ON token_blocklist(expires_at)",
-            "CREATE INDEX IF NOT EXISTS idx_jobs_user_lot ON jobs(user_id, lot_id)",
-            "CREATE INDEX IF NOT EXISTS idx_telemetry_robot ON robot_telemetry(robot_id, created_at)",
-            "CREATE INDEX IF NOT EXISTS idx_assignments_user ON robot_assignments(user_id)",
-            "CREATE INDEX IF NOT EXISTS idx_assignments_robot ON robot_assignments(robot_id)",
-            "CREATE INDEX IF NOT EXISTS idx_schedules_user ON recurring_schedules(user_id)",
-            "CREATE INDEX IF NOT EXISTS idx_schedules_next ON recurring_schedules(active, next_run)",
-            "CREATE INDEX IF NOT EXISTS idx_refresh_tokens_user ON refresh_tokens(user_id)",
-            "CREATE INDEX IF NOT EXISTS idx_assignments_robot_status ON robot_assignments(robot_id, status)",
-            "CREATE INDEX IF NOT EXISTS idx_memberships_user ON memberships(user_id)",
-            "CREATE INDEX IF NOT EXISTS idx_memberships_org ON memberships(organization_id)",
-            "CREATE INDEX IF NOT EXISTS idx_org_invites_org ON organization_invites(organization_id, status)",
-            "CREATE INDEX IF NOT EXISTS idx_org_invites_email ON organization_invites(email, status)",
-            "CREATE INDEX IF NOT EXISTS idx_org_invites_token ON organization_invites(token_hash)",
-            "CREATE INDEX IF NOT EXISTS idx_org_audit_org ON organization_audit_logs(organization_id, created_at)",
-            "CREATE INDEX IF NOT EXISTS idx_sites_org ON sites(organization_id, status)",
-            "CREATE INDEX IF NOT EXISTS idx_quotes_org ON quotes(organization_id, site_id)",
-            "CREATE INDEX IF NOT EXISTS idx_job_runs_job ON job_runs(job_id, created_at)",
-            "CREATE INDEX IF NOT EXISTS idx_media_assets_job ON media_assets(job_id, job_run_id)",
-            "CREATE INDEX IF NOT EXISTS idx_reports_job ON job_reports(job_id)",
-            "CREATE INDEX IF NOT EXISTS idx_maintenance_robot ON maintenance_events(robot_id, created_at)",
-            "CREATE INDEX IF NOT EXISTS idx_consumables_org ON consumables_inventory(organization_id)",
-            "CREATE INDEX IF NOT EXISTS idx_lots_user_deleted ON lots(user_id, deleted_at)",
-        ]
-        for statement in indexes:
-            await db.execute(statement)
-
         now = datetime.now(timezone.utc).isoformat()
         await db.execute("DELETE FROM password_resets WHERE expires_at < ?", (now,))
         await db.execute("DELETE FROM token_blocklist WHERE expires_at < ?", (now,))
@@ -610,6 +644,52 @@ async def _sqlite_init_db():
                 await db.execute(f"ALTER TABLE {table} ADD COLUMN {col_def}")
             except aiosqlite.OperationalError:
                 pass
+
+        indexes = [
+            "CREATE INDEX IF NOT EXISTS idx_lots_user ON lots(user_id)",
+            "CREATE INDEX IF NOT EXISTS idx_lots_org ON lots(organization_id)",
+            "CREATE INDEX IF NOT EXISTS idx_jobs_user ON jobs(user_id)",
+            "CREATE INDEX IF NOT EXISTS idx_jobs_org ON jobs(organization_id, site_id)",
+            "CREATE INDEX IF NOT EXISTS idx_jobs_lot ON jobs(lot_id)",
+            "CREATE INDEX IF NOT EXISTS idx_users_email ON users(email)",
+            "CREATE INDEX IF NOT EXISTS idx_subs_user ON subscriptions(user_id)",
+            "CREATE INDEX IF NOT EXISTS idx_subs_stripe ON subscriptions(stripe_subscription_id)",
+            "CREATE INDEX IF NOT EXISTS idx_resets_token ON password_resets(token_hash)",
+            "CREATE INDEX IF NOT EXISTS idx_blocklist_expires ON token_blocklist(expires_at)",
+            "CREATE INDEX IF NOT EXISTS idx_jobs_user_lot ON jobs(user_id, lot_id)",
+            "CREATE INDEX IF NOT EXISTS idx_telemetry_robot ON robot_telemetry(robot_id, created_at)",
+            "CREATE INDEX IF NOT EXISTS idx_assignments_user ON robot_assignments(user_id)",
+            "CREATE INDEX IF NOT EXISTS idx_assignments_robot ON robot_assignments(robot_id)",
+            "CREATE INDEX IF NOT EXISTS idx_schedules_user ON recurring_schedules(user_id)",
+            "CREATE INDEX IF NOT EXISTS idx_schedules_next ON recurring_schedules(active, next_run)",
+            "CREATE INDEX IF NOT EXISTS idx_refresh_tokens_user ON refresh_tokens(user_id)",
+            "CREATE INDEX IF NOT EXISTS idx_assignments_robot_status ON robot_assignments(robot_id, status)",
+            "CREATE INDEX IF NOT EXISTS idx_robot_claims_robot ON robot_claims(robot_id, status)",
+            "CREATE INDEX IF NOT EXISTS idx_robot_claims_org ON robot_claims(organization_id, status)",
+            "CREATE INDEX IF NOT EXISTS idx_robot_claims_code ON robot_claims(claim_code_hash)",
+            "CREATE INDEX IF NOT EXISTS idx_memberships_user ON memberships(user_id)",
+            "CREATE INDEX IF NOT EXISTS idx_memberships_org ON memberships(organization_id)",
+            "CREATE INDEX IF NOT EXISTS idx_org_invites_org ON organization_invites(organization_id, status)",
+            "CREATE INDEX IF NOT EXISTS idx_org_invites_email ON organization_invites(email, status)",
+            "CREATE INDEX IF NOT EXISTS idx_org_invites_token ON organization_invites(token_hash)",
+            "CREATE INDEX IF NOT EXISTS idx_org_audit_org ON organization_audit_logs(organization_id, created_at)",
+            "CREATE INDEX IF NOT EXISTS idx_sites_org ON sites(organization_id, status)",
+            "CREATE INDEX IF NOT EXISTS idx_quotes_org ON quotes(organization_id, site_id)",
+            "CREATE INDEX IF NOT EXISTS idx_job_runs_job ON job_runs(job_id, created_at)",
+            "CREATE INDEX IF NOT EXISTS idx_media_assets_job ON media_assets(job_id, job_run_id)",
+            "CREATE INDEX IF NOT EXISTS idx_reports_job ON job_reports(job_id)",
+            "CREATE INDEX IF NOT EXISTS idx_site_scans_site ON site_scans(site_id, captured_at)",
+            "CREATE INDEX IF NOT EXISTS idx_simulation_runs_site ON simulation_runs(site_id, created_at)",
+            "CREATE INDEX IF NOT EXISTS idx_maintenance_robot ON maintenance_events(robot_id, created_at)",
+            "CREATE INDEX IF NOT EXISTS idx_consumables_org ON consumables_inventory(organization_id)",
+            "CREATE INDEX IF NOT EXISTS idx_lots_user_deleted ON lots(user_id, deleted_at)",
+            "CREATE INDEX IF NOT EXISTS idx_jobs_recurring_schedule ON jobs(recurring_schedule_id)",
+            "CREATE INDEX IF NOT EXISTS idx_jobs_assigned_user ON jobs(assigned_user_id)",
+            "CREATE INDEX IF NOT EXISTS idx_robot_claims_claimed_by ON robot_claims(claimed_by_user_id)",
+            "CREATE INDEX IF NOT EXISTS idx_telemetry_created ON robot_telemetry(created_at)",
+        ]
+        for statement in indexes:
+            await db.execute(statement)
 
         # Backfill personal organizations and active organization pointers.
         cursor = await db.execute("SELECT id, email, name, active_organization_id FROM users")

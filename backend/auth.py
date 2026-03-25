@@ -32,16 +32,26 @@ def create_access_token(user_id: str) -> str:
 
 
 def decode_token(token: str) -> dict | None:
-    """Decode a JWT and return the full payload, or None if invalid."""
+    """Decode a JWT and return the full payload, or None if invalid/expired.
+
+    PyJWT already rejects expired tokens (raises ExpiredSignatureError),
+    so any token returned here is guaranteed to be within its exp window.
+    """
     try:
         payload = jwt.decode(token, settings.SECRET_KEY, algorithms=[_ALGORITHM])
         return payload
+    except jwt.ExpiredSignatureError:
+        return None
     except jwt.PyJWTError:
         return None
 
 
 async def is_token_blocked(jti: str) -> bool:
-    """Check if a token JTI is in the blocklist."""
+    """Check if a token JTI is in the blocklist.
+
+    Only checks non-expired entries — expired blocklist rows are harmless
+    but the cleanup loop purges them periodically.
+    """
     async for db in get_db():
         cursor = await db.execute(
             "SELECT 1 FROM token_blocklist WHERE jti = ?", (jti,)

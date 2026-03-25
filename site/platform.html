@@ -9,7 +9,7 @@
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=DM+Sans:ital,opsz,wght@0,9..40,300;0,9..40,400;0,9..40,500;0,9..40,600;0,9..40,700;1,9..40,400&family=Syne:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
 <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" integrity="sha256-p4NxAoJBhIIN+hmNHrzRCf9tD/miZyoHS5obTRR9BMY=" crossorigin="anonymous">
-<link rel="stylesheet" href="https://unpkg.com/leaflet-draw@1.0.4/dist/leaflet.draw.css" integrity="sha256-JTFa/MaVzgMPoSvZWqB7FmeaIBYu8U0ykfVPEJSruFA=" crossorigin="anonymous">
+<link rel="stylesheet" href="https://unpkg.com/leaflet-draw@1.0.4/dist/leaflet.draw.css" crossorigin="anonymous">
 <style>
 /*═══════════════════════════════════════════════════════════════════════
   STRYPE PLATFORM — CSS
@@ -76,6 +76,8 @@ select{-webkit-appearance:none;appearance:none;background-image:url("data:image/
 .export-dropdown button svg{width:16px;height:16px;flex-shrink:0}
 .user-avatar{width:30px;height:30px;border-radius:50%;background:var(--border);display:flex;align-items:center;justify-content:center;font-size:.75rem;font-weight:600;color:var(--text-2);cursor:pointer;transition:border-color .15s;border:2px solid transparent}
 .user-avatar:hover{border-color:var(--green)}
+.workspace-select{display:none;align-items:center;gap:8px;padding:4px 10px;border:1px solid var(--border);border-radius:var(--radius);background:var(--bg);color:var(--text-2);font-size:.75rem;font-weight:600}
+.workspace-select select{min-width:180px;padding:4px 24px 4px 8px;font-size:.75rem;border:none;background:transparent;color:var(--text)}
 
 /*═══ MAIN CONTAINER ═══*/
 .main-container{display:flex;flex:1;overflow:hidden;position:relative}
@@ -196,7 +198,7 @@ select{-webkit-appearance:none;appearance:none;background-image:url("data:image/
 /*═══ MODAL ═══*/
 .modal-overlay{position:fixed;inset:0;background:rgba(0,0,0,.6);z-index:5000;display:none;align-items:center;justify-content:center;backdrop-filter:blur(4px)}
 .modal-overlay.visible{display:flex}
-.modal{background:var(--bg-card);border:1px solid var(--border);border-radius:var(--radius-lg);padding:24px;min-width:340px;max-width:440px;width:90%}
+.modal{background:var(--bg-card);border:1px solid var(--border);border-radius:var(--radius-lg);padding:24px;min-width:340px;max-width:440px;width:90%;max-height:90vh;overflow-y:auto}
 .modal h3{font-family:var(--font-display);font-size:1rem;font-weight:700;margin-bottom:16px}
 .modal-field{display:flex;flex-direction:column;gap:4px;margin-bottom:14px}
 .modal-field label{font-size:.75rem;font-weight:500;color:var(--text-2)}
@@ -386,6 +388,9 @@ select{-webkit-appearance:none;appearance:none;background-image:url("data:image/
   <button class="topbar-icon-btn" id="helpBtn" title="Help (?)">
     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><path d="M9.09 9a3 3 0 0 1 5.83 1c0 2-3 3-3 3"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>
   </button>
+  <label class="workspace-select" id="workspaceSelectWrap">Workspace
+    <select id="workspaceSelect"></select>
+  </label>
   <div class="user-avatar" id="userAvatar" title="Account" onclick="openAuthModal()">&#x1F464;</div>
 </header>
 
@@ -427,6 +432,24 @@ select{-webkit-appearance:none;appearance:none;background-image:url("data:image/
             </button>
           </div>
           <div class="lot-list" id="lotList"></div>
+        </div>
+
+        <div class="panel-section">
+          <div class="panel-header">
+            <span class="panel-title">Site Context</span>
+            <button class="panel-action-btn" id="refreshContextBtn">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 12a9 9 0 1 1-2.64-6.36"/><polyline points="21 3 21 9 15 9"/></svg>
+              Refresh
+            </button>
+          </div>
+          <div id="siteContextPanel" style="display:flex;flex-direction:column;gap:8px;font-size:.75rem;color:var(--text-2)">
+            <div>Select a lot to view linked site, quotes, work orders, and cloud rehearsal.</div>
+          </div>
+          <div class="add-job-form" style="margin-top:12px">
+            <button class="add-job-btn" id="runScanBtn" type="button">Run Site Scan</button>
+            <button class="add-job-btn" id="runSimulationBtn" type="button" style="background:var(--blue);color:#0d1117">Run Simulation</button>
+            <button class="add-job-btn" id="openOperationsBtn" type="button" style="background:var(--bg);color:var(--text);border:1px solid var(--border)">Open Operations</button>
+          </div>
         </div>
 
         <!-- Tools -->
@@ -730,7 +753,7 @@ select{-webkit-appearance:none;appearance:none;background-image:url("data:image/
 
 <!-- ═══════════════════════════════════════════════ SCRIPTS ═══════════════════════════════════════════════ -->
 <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo=" crossorigin="anonymous"></script>
-<script src="https://unpkg.com/leaflet-draw@1.0.4/dist/leaflet.draw.js" integrity="sha256-elFLmBMv9el3wdpXGhH7OwnnQfMKakZ7OLh/6v7qCrk=" crossorigin="anonymous"></script>
+<script src="https://unpkg.com/leaflet-draw@1.0.4/dist/leaflet.draw.js" crossorigin="anonymous"></script>
 <script>
 (function() {
 'use strict';
@@ -763,6 +786,14 @@ const EARTH_RADIUS = 6378137;    // meters
 ═══════════════════════════════════════════════════════════════════ */
 let lots = [];
 let jobs = [];
+let currentUser = null;
+let organizations = [];
+let activeOrganizationId = '';
+let organizationSites = [];
+let organizationQuotes = [];
+let organizationWorkOrders = [];
+let organizationScans = [];
+let organizationSimulations = [];
 let activeLotId = null;
 let activeTool = 'pan';
 let selectedFeatureId = null;
@@ -800,11 +831,16 @@ const api = {
     setToken(t) { localStorage.setItem('strype_token', t); },
     removeToken() { localStorage.removeItem('strype_token'); },
     isLoggedIn() { return !!this.getToken(); },
+    getActiveOrganizationId() {
+        return activeOrganizationId || (currentUser && currentUser.active_organization_id) || '';
+    },
 
     async _fetch(method, path, body) {
         var headers = { 'Content-Type': 'application/json' };
         var token = this.getToken();
         if (token) headers['Authorization'] = 'Bearer ' + token;
+        var orgId = this.getActiveOrganizationId();
+        if (orgId) headers['X-Organization-ID'] = orgId;
 
         try {
             var resp = await fetch(this.baseUrl + path, {
@@ -987,6 +1023,100 @@ function updateAuthUI() {
     if (banner) {
         var bannerUserData = JSON.parse(localStorage.getItem('strype_user') || '{}');
         banner.style.display = (api.isLoggedIn() && !bannerUserData.email_verified) ? 'block' : 'none';
+    }
+    syncWorkspaceUI();
+}
+
+function syncWorkspaceUI() {
+    var wrap = document.getElementById('workspaceSelectWrap');
+    var select = document.getElementById('workspaceSelect');
+    if (!wrap || !select) return;
+    if (!api.isLoggedIn() || !organizations.length) {
+        wrap.style.display = 'none';
+        return;
+    }
+    wrap.style.display = 'inline-flex';
+    select.innerHTML = organizations.map(function(org) {
+        return '<option value="' + org.id + '">' + escapeHtml(org.name) + ' (' + escapeHtml(org.role || 'viewer') + ')</option>';
+    }).join('');
+    select.value = api.getActiveOrganizationId() || organizations[0].id;
+}
+
+async function loadCommercialContext() {
+    if (!api.isLoggedIn() || !api.getActiveOrganizationId()) {
+        organizationSites = [];
+        organizationQuotes = [];
+        organizationWorkOrders = [];
+        organizationScans = [];
+        organizationSimulations = [];
+        renderSiteContext();
+        return;
+    }
+    try {
+        var sites = await api.get('/api/sites');
+        var quotes = await api.get('/api/quotes');
+        var workOrders = await api.get('/api/work-orders');
+        var scans = await api.get('/api/site-scans');
+        var simulations = await api.get('/api/site-simulations');
+        organizationSites = (sites && sites.items) ? sites.items : [];
+        organizationQuotes = (quotes && quotes.items) ? quotes.items : [];
+        organizationWorkOrders = (workOrders && workOrders.items) ? workOrders.items : [];
+        organizationScans = (scans && scans.items) ? scans.items : [];
+        organizationSimulations = (simulations && simulations.items) ? simulations.items : [];
+    } catch (e) {
+        organizationSites = [];
+        organizationQuotes = [];
+        organizationWorkOrders = [];
+        organizationScans = [];
+        organizationSimulations = [];
+    }
+    renderSiteContext();
+}
+
+function renderSiteContext() {
+    var panel = document.getElementById('siteContextPanel');
+    if (!panel) return;
+    if (!activeLotId) {
+        panel.innerHTML = '<div>Select a lot to view linked site, quotes, work orders, and cloud rehearsal.</div>';
+        return;
+    }
+    var lot = lots.find(function(item) { return item.id === activeLotId; });
+    var site = organizationSites.find(function(item) { return item.lot_id === activeLotId; });
+    if (!site) {
+        panel.innerHTML = '<div><strong style="color:var(--text)">No linked site yet.</strong></div><div>The designer saves the lot, but the site context will appear after the lot syncs into the active workspace.</div>';
+        return;
+    }
+    var quoteCount = organizationQuotes.filter(function(item) { return item.site_id === site.id; }).length;
+    var workOrderCount = organizationWorkOrders.filter(function(item) { return item.site_id === site.id; }).length;
+    var latestScan = organizationScans.find(function(item) { return item.site_id === site.id; });
+    var latestSimulation = organizationSimulations.find(function(item) { return item.site_id === site.id; });
+    panel.innerHTML =
+        '<div><strong style="color:var(--text)">' + escapeHtml(site.name) + '</strong><div style="margin-top:2px;color:var(--text-3)">' + escapeHtml(site.address || 'No site address yet') + '</div></div>' +
+        '<div style="display:grid;grid-template-columns:1fr 1fr;gap:8px">' +
+            '<div style="padding:8px;border:1px solid var(--border);border-radius:var(--radius)"><div style="color:var(--text-3)">Quotes</div><div style="font-family:var(--font-display);font-size:1rem;color:var(--text)">' + quoteCount + '</div></div>' +
+            '<div style="padding:8px;border:1px solid var(--border);border-radius:var(--radius)"><div style="color:var(--text-3)">Work Orders</div><div style="font-family:var(--font-display);font-size:1rem;color:var(--text)">' + workOrderCount + '</div></div>' +
+        '</div>' +
+        '<div style="padding:8px;border:1px solid var(--border);border-radius:var(--radius)"><div style="color:var(--text-3)">Latest Site Scan</div><div style="color:var(--text)">' + (latestScan ? escapeHtml(latestScan.scan_type + ' on ' + latestScan.captured_at.slice(0, 10)) : 'No scan yet') + '</div></div>' +
+        '<div style="padding:8px;border:1px solid var(--border);border-radius:var(--radius)"><div style="color:var(--text-3)">Latest Simulation</div><div style="color:var(--text)">' + (latestSimulation ? escapeHtml((latestSimulation.mode || 'preview') + ' â€” ' + (latestSimulation.status || 'ready')) : 'No simulation yet') + '</div></div>' +
+        '<div style="color:var(--text-3)">Design lot <span style="color:var(--text)">' + escapeHtml(lot ? lot.name : site.design_name || 'Current lot') + '</span> is linked to workspace <span style="color:var(--text)">' + escapeHtml(site.organization_id.slice(0, 8)) + '</span>.</div>';
+}
+
+async function changeWorkspace(organizationId) {
+    if (!organizationId) return;
+    try {
+        await api.post('/api/organizations/active', { organization_id: organizationId });
+        activeOrganizationId = organizationId;
+        if (currentUser) currentUser.active_organization_id = organizationId;
+        await loadState();
+        renderLotList();
+        renderJobsList();
+        updateJobLotSelect();
+        updateScheduleLotSelect();
+        await loadSchedules();
+        updateAuthUI();
+        showToast('Workspace switched');
+    } catch (e) {
+        showToast(e.message || 'Failed to switch workspace', 'error');
     }
 }
 
@@ -1171,9 +1301,9 @@ function openSettingsModal() {
     var userData = JSON.parse(localStorage.getItem('strype_user') || '{}');
     var modal = document.createElement('div');
     modal.id = 'settingsModal';
-    modal.style.cssText = 'position:fixed; top:0; left:0; width:100%; height:100%; background:rgba(0,0,0,0.5); z-index:10000; display:flex; justify-content:center; align-items:center;';
+    modal.style.cssText = 'position:fixed; top:0; left:0; width:100%; height:100%; background:rgba(0,0,0,0.5); z-index:10000; display:flex; justify-content:center; align-items:flex-start; overflow-y:auto; padding:24px 0;';
     modal.innerHTML =
-        '<div style="background:var(--bg-card); border:1px solid var(--border); border-radius:12px; padding:32px; width:440px; max-width:90vw; position:relative;">' +
+        '<div style="background:var(--bg-card); border:1px solid var(--border); border-radius:12px; padding:32px; width:440px; max-width:90vw; max-height:calc(100vh - 48px); overflow-y:auto; position:relative; margin:auto 0;">' +
             '<button onclick="document.getElementById(\'settingsModal\').remove()" style="position:absolute; top:12px; right:16px; background:none; border:none; font-size:20px; cursor:pointer; color:var(--text-2);">&times;</button>' +
             '<h3 style="font-size:18px; margin-bottom:20px;">Account Settings</h3>' +
             '<div id="settingsMsg" style="display:none; padding:8px 12px; border-radius:6px; margin-bottom:12px; font-size:13px;"></div>' +
@@ -1362,7 +1492,11 @@ async function changePlan(plan) {
     }
 
     // For all other changes (downgrade or paid-to-paid), use change-plan
-    if (!confirm('Change plan from ' + currentPlan + ' to ' + plan + '?')) return;
+    showModal('<h3 style="margin-bottom:12px">Confirm Plan Change</h3><p style="margin-bottom:16px">Change plan from <strong>' + currentPlan + '</strong> to <strong>' + plan + '</strong>?</p><div style="display:flex;gap:8px;justify-content:flex-end"><button onclick="hideModal()" class="map-btn" style="background:var(--card-bg)">Cancel</button><button id="__plan_confirm" class="map-btn" style="background:var(--accent)">Confirm</button></div>');
+    var planConfirmed = await new Promise(function(resolve) {
+        document.getElementById('__plan_confirm').onclick = function() { hideModal(); resolve(true); };
+    });
+    if (!planConfirmed) return;
     try {
         var resp2 = await fetch('/api/billing/change-plan', {
             method: 'POST',
@@ -1434,6 +1568,29 @@ async function withLoading(btn, asyncFn) {
     }
 }
 
+function getCurrentMapState() {
+    var savedState = null;
+    try {
+        savedState = JSON.parse(localStorage.getItem(STORAGE_KEYS.mapState));
+    } catch (e) {}
+
+    if (map && typeof map.getCenter === 'function') {
+        var liveCenter = map.getCenter();
+        return {
+            center: { lat: liveCenter.lat, lng: liveCenter.lng },
+            zoom: map.getZoom()
+        };
+    }
+
+    return {
+        center: {
+            lat: savedState && typeof savedState.lat === 'number' ? savedState.lat : 39.8,
+            lng: savedState && typeof savedState.lng === 'number' ? savedState.lng : -98.5
+        },
+        zoom: savedState && typeof savedState.zoom === 'number' ? savedState.zoom : 4
+    };
+}
+
 var debouncedSaveLot = debounce(async function(lot) {
     if (!api.isLoggedIn() || !lot) return;
     try {
@@ -1449,7 +1606,7 @@ var debouncedSaveLot = debounce(async function(lot) {
 }, 1000);
 
 var debouncedSaveMapState = debounce(async function() {
-    if (!api.isLoggedIn()) return;
+    if (!api.isLoggedIn() || !map || typeof map.getCenter !== 'function') return;
     try {
         var c = map.getCenter();
         await api.put('/api/user/preferences', {
@@ -1474,14 +1631,30 @@ function saveJobs() {
   localStorage.setItem(STORAGE_KEYS.jobs, JSON.stringify(jobs));
 }
 
+function upsertLot(localLot) {
+  var index = lots.findIndex(function(existingLot) {
+    return existingLot.id === localLot.id;
+  });
+  if (index >= 0) {
+    lots[index] = Object.assign({}, lots[index], localLot);
+  } else {
+    lots.push(localLot);
+  }
+}
+
 async function loadState() {
   // Try API first if logged in
   if (api.isLoggedIn()) {
     try {
       var me = await api.get('/api/auth/me');
       if (me) {
+        currentUser = me;
         localStorage.setItem('strype_user', JSON.stringify(me));
       }
+      var orgResp = await api.get('/api/organizations');
+      organizations = orgResp && orgResp.items ? orgResp.items : [];
+      activeOrganizationId = (orgResp && orgResp.active_organization_id) || (me && me.active_organization_id) || '';
+      syncWorkspaceUI();
 
       var apiLots = await api.get('/api/lots');
       if (apiLots && apiLots.items) {
@@ -1514,6 +1687,8 @@ async function loadState() {
         localStorage.setItem(STORAGE_KEYS.mapState, JSON.stringify(me.map_state));
       }
 
+      await loadCommercialContext();
+
       return;
     } catch (e) {
       console.warn('API load failed, falling back to localStorage:', e);
@@ -1521,9 +1696,13 @@ async function loadState() {
   }
 
   // Fallback to localStorage
+  currentUser = null;
+  organizations = [];
+  activeOrganizationId = '';
   try { lots = JSON.parse(localStorage.getItem(STORAGE_KEYS.lots)) || []; } catch(e) { lots = []; }
   try { jobs = JSON.parse(localStorage.getItem(STORAGE_KEYS.jobs)) || []; } catch(e) { jobs = []; }
   activeLotId = localStorage.getItem(STORAGE_KEYS.activeLot) || null;
+  renderSiteContext();
 }
 
 function escapeHtml(str) {
@@ -1838,7 +2017,7 @@ document.querySelectorAll('.map-style-toggle button').forEach(function(btn) {
 /* ═══════════════════════════════════════════════════════════════════
    ADDRESS SEARCH (Nominatim)
 ═══════════════════════════════════════════════════════════════════ */
-var searchTimeout;
+var searchTimeout = null;
 var searchInput = document.getElementById('addressSearch');
 var searchResults = document.getElementById('searchResults');
 
@@ -2026,12 +2205,13 @@ document.getElementById('lineType').addEventListener('change', function() {
    LOT MANAGEMENT
 ═══════════════════════════════════════════════════════════════════ */
 async function createLot(name) {
-  var center = map.getCenter();
+  var mapState = getCurrentMapState();
+  var center = mapState.center;
   var lot = {
     id: uid(),
     name: name || 'Untitled Lot',
     center: { lat: center.lat, lng: center.lng },
-    zoom: map.getZoom(),
+    zoom: mapState.zoom,
     features: [],
     created: new Date().toISOString(),
     modified: new Date().toISOString()
@@ -2056,7 +2236,7 @@ async function createLot(name) {
     }
   }
 
-  lots.push(lot);
+  upsertLot(lot);
   saveLots();
   setActiveLot(lot.id);
   renderLotList();
@@ -2070,6 +2250,7 @@ function setActiveLot(lotId) {
   loadLotFeatures(lotId);
   renderLotList();
   updateJobLotSelect();
+  renderSiteContext();
 
   // Sync active lot preference to API
   if (api.isLoggedIn()) {
@@ -2084,7 +2265,7 @@ function setActiveLot(lotId) {
 
   // Fly to lot center
   var lot = lots.find(function(l) { return l.id === lotId; });
-  if (lot && lot.center) {
+  if (lot && lot.center && map && typeof map.flyTo === 'function') {
     map.flyTo([lot.center.lat, lot.center.lng], lot.zoom || 18, { duration: 1 });
   }
 }
@@ -2095,9 +2276,10 @@ function saveCurrentLot() {
   if (!lot) return;
 
   // Save map position
-  var center = map.getCenter();
+  var mapState = getCurrentMapState();
+  var center = mapState.center;
   lot.center = { lat: center.lat, lng: center.lng };
-  lot.zoom = map.getZoom();
+  lot.zoom = mapState.zoom;
   lot.modified = new Date().toISOString();
 
   // Serialize features
@@ -2294,6 +2476,7 @@ function deleteLot(lotId) {
     renderJobsList();
     updateJobLotSelect();
     updateDashboard();
+    renderSiteContext();
     hideModal();
     showToast('Lot deleted');
   });
@@ -2320,6 +2503,7 @@ function renderLotList() {
       '<button class="lot-menu-btn" data-lot-menu="' + lot.id + '"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="5" r="1"/><circle cx="12" cy="12" r="1"/><circle cx="12" cy="19" r="1"/></svg></button>' +
     '</div>';
   }).join('');
+  renderSiteContext();
 }
 
 document.getElementById('lotList').addEventListener('click', function(e) {
@@ -3883,8 +4067,12 @@ function updateScheduleLotSelect() {
 }
 
 async function loadSchedules() {
+  if (!api.getActiveOrganizationId()) {
+    document.getElementById('schedulesList').innerHTML = '<div style="color:var(--text-3)">Log in to load schedules</div>';
+    return;
+  }
   try {
-    var data = await api.get('/api/schedules');
+    var data = await api.get('/api/schedules/organization');
     lastSchedules = data.items || [];
     var container = document.getElementById('schedulesList');
     if (!lastSchedules.length) {
@@ -3954,7 +4142,7 @@ function editSchedule(scheduleId) {
     }
     await withLoading(btn, async function() {
       try {
-        await api.put('/api/schedules/' + scheduleId, body);
+        await api.put('/api/schedules/organization/' + scheduleId, body);
         showToast('Schedule updated');
         hideModal();
         loadSchedules();
@@ -3967,7 +4155,7 @@ function editSchedule(scheduleId) {
 
 async function deleteSchedule(scheduleId) {
   try {
-    await api.del('/api/schedules/' + scheduleId);
+    await api.del('/api/schedules/organization/' + scheduleId);
     showToast('Schedule removed');
     loadSchedules();
   } catch(e) {
@@ -3986,11 +4174,64 @@ document.getElementById('addScheduleBtn').addEventListener('click', async functi
     try {
       var body = { lot_id: lotId, frequency: freq, day_of_week: dayOfWeek, time_preference: timePref };
       if (freq === 'monthly') { body.day_of_month = 1; delete body.day_of_week; }
-      await api.post('/api/schedules', body);
+      await api.post('/api/schedules/organization', body);
       showToast('Schedule created');
       loadSchedules();
     } catch(e) {
       showToast(e.message || 'Failed to create schedule', 'error');
+    }
+  });
+});
+
+document.getElementById('workspaceSelect').addEventListener('change', function() {
+  changeWorkspace(this.value);
+});
+
+document.getElementById('refreshContextBtn').addEventListener('click', function() {
+  loadCommercialContext();
+});
+
+document.getElementById('openOperationsBtn').addEventListener('click', function() {
+  window.location.href = 'operations.html';
+});
+
+document.getElementById('runScanBtn').addEventListener('click', async function() {
+  var site = organizationSites.find(function(item) { return item.lot_id === activeLotId; });
+  if (!site) {
+    showToast('Select a linked lot first', 'error');
+    return;
+  }
+  await withLoading(this, async function() {
+    try {
+      await api.post('/api/site-scans', { site_id: site.id, scan_type: 'manual_trace', notes: 'Designer-triggered site scan' });
+      await loadCommercialContext();
+      showToast('Site scan saved');
+    } catch (e) {
+      showToast(e.message || 'Failed to create site scan', 'error');
+    }
+  });
+});
+
+document.getElementById('runSimulationBtn').addEventListener('click', async function() {
+  var site = organizationSites.find(function(item) { return item.lot_id === activeLotId; });
+  if (!site) {
+    showToast('Select a linked lot first', 'error');
+    return;
+  }
+  var latestScan = organizationScans.find(function(item) { return item.site_id === site.id; });
+  await withLoading(this, async function() {
+    try {
+      await api.post('/api/site-simulations', {
+        site_id: site.id,
+        scan_id: latestScan ? latestScan.id : undefined,
+        mode: 'mission_rehearsal',
+        speed_mph: 2.0,
+        notes: 'Designer-triggered cloud rehearsal'
+      });
+      await loadCommercialContext();
+      showToast('Simulation completed');
+    } catch (e) {
+      showToast(e.message || 'Failed to run simulation', 'error');
     }
   });
 });

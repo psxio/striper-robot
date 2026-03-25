@@ -784,8 +784,11 @@ footer .footer-links a:hover{color:var(--text)}
       }
     } catch (err) {
       // Fallback: store in localStorage
-      const waitlist = JSON.parse(localStorage.getItem('strype_waitlist') || '[]');
+      let waitlist = [];
+      try { waitlist = JSON.parse(localStorage.getItem('strype_waitlist') || '[]'); } catch (_) { waitlist = []; }
       waitlist.push({ email: email, source: 'landing', date: new Date().toISOString() });
+      // Cap at 50 entries to avoid localStorage quota issues
+      if (waitlist.length > 50) waitlist = waitlist.slice(-50);
       localStorage.setItem('strype_waitlist', JSON.stringify(waitlist));
       form.style.display = 'none';
       confirm.style.display = 'block';

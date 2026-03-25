@@ -12,7 +12,7 @@ def _now() -> str:
     return datetime.now(timezone.utc).isoformat()
 
 
-def _row_to_dict(row) -> dict:
+def _row_to_dict(row: object) -> dict:
     data = dict(row)
     job = {
         "id": data["id"],
@@ -41,7 +41,7 @@ def _row_to_dict(row) -> dict:
     return job
 
 
-def _job_run_to_dict(row) -> dict:
+def _job_run_to_dict(row: object) -> dict:
     data = dict(row)
     data["telemetry_summary"] = json.loads(data.get("telemetry_summary") or "{}")
     return data
@@ -142,6 +142,25 @@ async def list_work_orders(
         )
         rows = await cursor.fetchall()
         return [_row_to_dict(row) for row in rows], total
+
+
+async def find_work_order_for_schedule(
+    organization_id: str,
+    recurring_schedule_id: str,
+    date: str,
+) -> Optional[dict]:
+    async for db in get_db():
+        cursor = await db.execute(
+            """SELECT j.*, l.name AS lot_name, s.name AS site_name
+               FROM jobs j
+               LEFT JOIN lots l ON l.id = j.lot_id
+               LEFT JOIN sites s ON s.id = j.site_id
+               WHERE j.organization_id = ? AND j.recurring_schedule_id = ? AND j.date = ?
+               LIMIT 1""",
+            (organization_id, recurring_schedule_id, date),
+        )
+        row = await cursor.fetchone()
+        return _row_to_dict(row) if row else None
 
 
 async def count_jobs(user_id: str) -> int:
@@ -257,6 +276,7 @@ async def create_work_order(
     assigned_robot_id: Optional[str] = None,
     assigned_user_id: Optional[str] = None,
     notes: str = "",
+    recurring_schedule_id: Optional[str] = None,
 ) -> dict:
     job_id = str(uuid.uuid4())
     now = _now()
@@ -271,8 +291,9 @@ async def create_work_order(
         await db.execute(
             """INSERT INTO jobs
                (id, user_id, organization_id, site_id, lot_id, quote_id, date, status, time_preference,
-                scheduled_start_at, scheduled_end_at, assigned_user_id, robot_id, notes, created_at, updated_at)
-               VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
+                scheduled_start_at, scheduled_end_at, assigned_user_id, robot_id, recurring_schedule_id,
+                notes, created_at, updated_at)
+               VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
             (
                 job_id,
                 user_id,
@@ -287,6 +308,7 @@ async def create_work_order(
                 scheduled_end_at,
                 assigned_user_id,
                 assigned_robot_id,
+                recurring_schedule_id,
                 notes or title,
                 now,
                 now,

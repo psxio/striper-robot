@@ -10,16 +10,51 @@ from ..database import get_db
 
 
 def _hash_api_key(key: str) -> str:
-    """Hash a robot API key for storage. Only the hash is persisted."""
+    """SHA-256 hash a robot API key for storage. Only the hash is persisted."""
     return hashlib.sha256(key.encode()).hexdigest()
 
 
+def _hash_claim_code(code: str) -> str:
+    """SHA-256 hash a claim code for storage."""
+    return hashlib.sha256(code.encode()).hexdigest()
+
+
 def _now() -> str:
+    """Current UTC time as ISO 8601 string."""
     return datetime.now(timezone.utc).isoformat()
 
 
 class RobotAssignmentConflict(ValueError):
     """Raised when a robot assignment would violate active-assignment rules."""
+
+
+async def _get_active_claim_for_robot(robot_id: str) -> Optional[dict]:
+    async for db in get_db():
+        cursor = await db.execute(
+            """SELECT rc.*, r.serial_number, r.firmware_version, r.maintenance_status,
+                      r.issue_state, r.last_seen_at
+               FROM robot_claims rc
+               JOIN robots r ON r.id = rc.robot_id
+               WHERE rc.robot_id = ? AND rc.status IN ('pending', 'claimed')
+               ORDER BY rc.created_at DESC
+               LIMIT 1""",
+            (robot_id,),
+        )
+        row = await cursor.fetchone()
+        return dict(row) if row else None
+
+
+async def _decorate_robot_with_claim(robot: dict) -> dict:
+    claim = await _get_active_claim_for_robot(robot["id"])
+    enriched = dict(robot)
+    enriched["claim_status"] = claim["status"] if claim else None
+    enriched["commissioning_status"] = claim["commissioning_status"] if claim else None
+    enriched["claimed_by_user_id"] = claim["claimed_by_user_id"] if claim else None
+    enriched["organization_id"] = claim["organization_id"] if claim else None
+    enriched["commissioned_at"] = claim["commissioned_at"] if claim else None
+    enriched["friendly_name"] = claim.get("friendly_name") if claim else ""
+    enriched["deployment_notes"] = claim.get("deployment_notes") if claim else ""
+    return enriched
 
 
 async def create_robot(
@@ -45,24 +80,36 @@ async def create_robot(
 
 
 async def list_robots(
-    page: int = 1, limit: int = 50, status: Optional[str] = None
+    page: int = 1,
+    limit: int = 50,
+    status: Optional[str] = None,
+    organization_id: Optional[str] = None,
 ) -> tuple[list[dict], int]:
     """List robots with optional status filter, paginated."""
     async for db in get_db():
         where = ""
         params: list = []
+        joins = ""
+        if organization_id:
+            joins = """
+                JOIN robot_claims rc
+                  ON rc.robot_id = robots.id
+                 AND rc.organization_id = ?
+                 AND rc.status = 'claimed'
+            """
+            params.append(organization_id)
         if status is not None:
-            where = "WHERE status = ?"
+            where = "WHERE robots.status = ?"
             params.append(status)
 
         cursor = await db.execute(
-            f"SELECT COUNT(*) FROM robots {where}", tuple(params)
+            f"SELECT COUNT(*) FROM robots {joins} {where}", tuple(params)
         )
         total = (await cursor.fetchone())[0]
 
         offset = (page - 1) * limit
         cursor = await db.execute(
-            f"SELECT * FROM robots {where} ORDER BY created_at DESC LIMIT ? OFFSET ?",
+            f"SELECT robots.* FROM robots {joins} {where} ORDER BY robots.created_at DESC LIMIT ? OFFSET ?",
             (*params, limit, offset),
         )
         rows = await cursor.fetchall()
@@ -77,7 +124,7 @@ async def list_robots(
             else:
                 d["has_api_key"] = False
                 d["api_key_last4"] = None
-            result.append(d)
+            result.append(await _decorate_robot_with_claim(d))
         return result, total
 
 
@@ -86,7 +133,177 @@ async def get_robot(robot_id: str) -> Optional[dict]:
     async for db in get_db():
         cursor = await db.execute("SELECT * FROM robots WHERE id = ?", (robot_id,))
         row = await cursor.fetchone()
+        return await _decorate_robot_with_claim(dict(row)) if row else None
+
+
+async def get_robot_for_organization(organization_id: str, robot_id: str) -> Optional[dict]:
+    async for db in get_db():
+        cursor = await db.execute(
+            """SELECT r.*
+               FROM robots r
+               JOIN robot_claims rc ON rc.robot_id = r.id
+               WHERE rc.organization_id = ? AND rc.status = 'claimed' AND r.id = ?
+               ORDER BY rc.created_at DESC
+               LIMIT 1""",
+            (organization_id, robot_id),
+        )
+        row = await cursor.fetchone()
+        return await _decorate_robot_with_claim(dict(row)) if row else None
+
+
+async def get_claim_by_code(code: str) -> Optional[dict]:
+    code_hash = _hash_claim_code(code)
+    async for db in get_db():
+        cursor = await db.execute(
+            """SELECT rc.*, r.serial_number, r.firmware_version, r.maintenance_status,
+                      r.issue_state, r.last_seen_at
+               FROM robot_claims rc
+               JOIN robots r ON r.id = rc.robot_id
+               WHERE rc.claim_code_hash = ?
+               LIMIT 1""",
+            (code_hash,),
+        )
+        row = await cursor.fetchone()
         return dict(row) if row else None
+
+
+async def create_robot_claim(robot_id: str, created_by_user_id: str) -> tuple[dict, str]:
+    robot = await get_robot(robot_id)
+    if robot is None:
+        raise ValueError("Robot not found")
+    active_claim = await _get_active_claim_for_robot(robot_id)
+    if active_claim and active_claim["status"] == "claimed":
+        raise ValueError("Robot is already claimed")
+
+    claim_id = str(uuid.uuid4())
+    now = _now()
+    raw_code = f"claim_{secrets.token_urlsafe(18)}"
+    code_hash = _hash_claim_code(raw_code)
+
+    async for db in get_db():
+        await db.execute(
+            """UPDATE robot_claims
+               SET status = 'revoked', updated_at = ?
+               WHERE robot_id = ? AND status = 'pending'""",
+            (now, robot_id),
+        )
+        await db.execute(
+            """INSERT INTO robot_claims
+               (id, robot_id, claim_code_hash, status, commissioning_status, created_by_user_id, created_at, updated_at)
+               VALUES (?, ?, ?, 'pending', 'unclaimed', ?, ?, ?)""",
+            (claim_id, robot_id, code_hash, created_by_user_id, now, now),
+        )
+        await db.commit()
+
+    claim = await get_claim_by_code(raw_code) or {}
+    claim["claim_code"] = raw_code
+    return claim, raw_code
+
+
+async def claim_robot_for_organization(
+    code: str,
+    organization_id: str,
+    user_id: str,
+    *,
+    friendly_name: str = "",
+    deployment_notes: str = "",
+) -> dict:
+    now = _now()
+    code_hash = _hash_claim_code(code)
+    generated_key = None
+    async for db in get_db():
+        await db.execute("BEGIN IMMEDIATE")
+        try:
+            cursor = await db.execute(
+                """SELECT * FROM robot_claims
+                   WHERE claim_code_hash = ? AND status = 'pending'
+                   LIMIT 1""",
+                (code_hash,),
+            )
+            row = await cursor.fetchone()
+            if not row:
+                await db.execute("ROLLBACK")
+                raise ValueError("Claim code is invalid or already used")
+            claim = dict(row)
+
+            cursor = await db.execute(
+                """SELECT 1 FROM robot_claims
+                   WHERE robot_id = ? AND status = 'claimed'
+                   LIMIT 1""",
+                (claim["robot_id"],),
+            )
+            if await cursor.fetchone():
+                await db.execute("ROLLBACK")
+                raise ValueError("Robot is already claimed")
+
+            cursor = await db.execute("SELECT api_key FROM robots WHERE id = ?", (claim["robot_id"],))
+            robot_row = await cursor.fetchone()
+            if robot_row is None:
+                await db.execute("ROLLBACK")
+                raise ValueError("Robot not found")
+            generated_key = None
+            if not robot_row["api_key"]:
+                generated_key = f"strk_{secrets.token_urlsafe(32)}"
+                await db.execute(
+                    "UPDATE robots SET api_key = ?, api_key_last4 = ?, updated_at = ? WHERE id = ?",
+                    (_hash_api_key(generated_key), generated_key[-4:], now, claim["robot_id"]),
+                )
+
+            await db.execute(
+                """UPDATE robot_claims
+                   SET organization_id = ?, status = 'claimed', commissioning_status = 'commissioned',
+                       friendly_name = ?, deployment_notes = ?, claimed_by_user_id = ?, claimed_at = ?,
+                       commissioned_at = ?, updated_at = ?
+                   WHERE id = ?""",
+                (
+                    organization_id,
+                    friendly_name,
+                    deployment_notes,
+                    user_id,
+                    now,
+                    now,
+                    now,
+                    claim["id"],
+                ),
+            )
+            await db.execute("COMMIT")
+        except ValueError:
+            raise
+        except Exception:
+            await db.execute("ROLLBACK")
+            raise
+
+    claimed = await get_claim_by_code(code) or {}
+    robot = await get_robot_for_organization(organization_id, claimed["robot_id"])
+    if robot and generated_key is not None:
+        robot["api_key"] = generated_key
+    claimed["robot"] = robot
+    if generated_key is not None:
+        claimed["api_key"] = generated_key
+    return claimed
+
+
+async def list_claimed_robots(organization_id: str) -> list[dict]:
+    items, _ = await list_robots(page=1, limit=500, organization_id=organization_id)
+    return items
+
+
+async def user_can_access_robot(user_id: str, robot_id: str) -> bool:
+    assignment = await get_user_robot(user_id)
+    if assignment and assignment["robot_id"] == robot_id:
+        return True
+    async for db in get_db():
+        cursor = await db.execute(
+            """SELECT 1
+               FROM robot_claims rc
+               JOIN memberships m ON m.organization_id = rc.organization_id
+               WHERE rc.robot_id = ? AND rc.status = 'claimed'
+                 AND m.user_id = ? AND m.status = 'active'
+               LIMIT 1""",
+            (robot_id, user_id),
+        )
+        return await cursor.fetchone() is not None
+    return False
 
 
 async def update_robot(
@@ -372,26 +589,38 @@ async def get_robot_history(robot_id: str) -> list[dict]:
         return [dict(row) for row in rows]
 
 
-async def generate_api_key(robot_id: str) -> Optional[str]:
-    """Generate a new API key for a robot. Returns the raw key, or None if robot not found.
-    Raises ValueError if robot already has a key.
-    """
-    robot = await get_robot(robot_id)
-    if robot is None:
-        return None
-    if robot.get("api_key"):
-        raise ValueError("Robot already has an API key")
+async def generate_api_key(robot_id: str, *, allow_rotate: bool = False) -> Optional[str]:
+    """Generate a new API key for a robot atomically.
 
+    Returns the raw key, or None if robot not found.
+    If allow_rotate is False, raises ValueError when robot already has a key.
+    If allow_rotate is True, replaces the existing key.
+    """
     key = f"strk_{secrets.token_urlsafe(32)}"
     key_hash = _hash_api_key(key)
     last4 = key[-4:]
     now = _now()
     async for db in get_db():
-        await db.execute(
-            "UPDATE robots SET api_key = ?, api_key_last4 = ?, updated_at = ? WHERE id = ?",
-            (key_hash, last4, now, robot_id),
-        )
-        await db.commit()
+        await db.execute("BEGIN IMMEDIATE")
+        try:
+            cursor = await db.execute("SELECT api_key FROM robots WHERE id = ?", (robot_id,))
+            row = await cursor.fetchone()
+            if row is None:
+                await db.execute("ROLLBACK")
+                return None
+            if row["api_key"] and not allow_rotate:
+                await db.execute("ROLLBACK")
+                raise ValueError("Robot already has an API key")
+            await db.execute(
+                "UPDATE robots SET api_key = ?, api_key_last4 = ?, updated_at = ? WHERE id = ?",
+                (key_hash, last4, now, robot_id),
+            )
+            await db.execute("COMMIT")
+        except ValueError:
+            raise
+        except Exception:
+            await db.execute("ROLLBACK")
+            raise
     return key
 
 

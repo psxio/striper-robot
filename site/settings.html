@@ -203,6 +203,8 @@ document.getElementById('passwordForm').addEventListener('submit', async (e) => 
     });
     flash('pw', 'Password updated successfully');
     document.getElementById('passwordForm').reset();
+    // Clear any previous error flash after successful update
+    setTimeout(() => { const el = document.getElementById('pwFlash'); if (el) el.classList.remove('show'); }, 3000);
   } catch (err) {
     flash('pw', err.message || 'Failed to update password', 'err');
   } finally {
@@ -211,8 +213,27 @@ document.getElementById('passwordForm').addEventListener('submit', async (e) => 
 });
 
 document.getElementById('deleteAccountBtn').addEventListener('click', async () => {
-  if (!confirm('Are you absolutely sure? This will permanently delete your account, all lots, jobs, and data. This cannot be undone.')) return;
-  if (!confirm('Final confirmation: delete my Strype account permanently?')) return;
+  // First confirmation modal
+  const overlay = document.createElement('div');
+  overlay.style.cssText = 'position:fixed;top:0;left:0;width:100%;height:100%;background:rgba(0,0,0,.5);z-index:9999;display:flex;align-items:center;justify-content:center';
+  overlay.innerHTML = `
+    <div style="background:var(--card);border:1px solid var(--red);border-radius:var(--radius);padding:24px;max-width:420px;width:90%">
+      <h3 style="color:var(--red);margin-bottom:8px">Delete Account</h3>
+      <p style="color:var(--text2);font-size:14px;margin-bottom:20px">
+        This will permanently delete your account, all lots, jobs, and data. This action cannot be undone.
+      </p>
+      <div style="display:flex;gap:8px;justify-content:flex-end">
+        <button id="__del_cancel" style="padding:9px 20px;border-radius:var(--radius);font-size:14px;font-weight:600;cursor:pointer;border:1px solid var(--border);background:var(--card);color:var(--text);font-family:inherit">Cancel</button>
+        <button id="__del_confirm" style="padding:9px 20px;border-radius:var(--radius);font-size:14px;font-weight:600;cursor:pointer;border:none;background:var(--red);color:#fff;font-family:inherit">Delete my account permanently</button>
+      </div>
+    </div>`;
+  document.body.appendChild(overlay);
+  const confirmed = await new Promise(resolve => {
+    overlay.querySelector('#__del_cancel').onclick = () => { overlay.remove(); resolve(false); };
+    overlay.querySelector('#__del_confirm').onclick = () => { overlay.remove(); resolve(true); };
+  });
+  if (!confirmed) return;
+
   const btn = document.getElementById('deleteAccountBtn');
   btn.disabled = true;
   btn.textContent = 'Deleting…';

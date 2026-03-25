@@ -145,7 +145,7 @@ function renderPlans(currentPlan) {
     if (isCurrent) {
       btnHtml = `<button class="btn btn-outline btn-full" disabled>Current plan</button>`;
     } else if (plan.action === 'upgrade') {
-      btnHtml = `<button class="btn btn-primary btn-full" onclick="startCheckout('${plan.id}')">Upgrade to ${plan.name}</button>`;
+      btnHtml = `<button class="btn btn-primary btn-full" data-checkout-plan="${plan.id}">Upgrade to ${plan.name}</button>`;
     } else if (plan.action === 'contact') {
       btnHtml = `<a class="btn btn-outline btn-full" href="mailto:sales@strype.io">Contact sales</a>`;
     }
@@ -162,7 +162,12 @@ function renderPlans(currentPlan) {
   }).join('');
 }
 
-window.startCheckout = async (planId) => {
+document.getElementById('planGrid').addEventListener('click', (e) => {
+  const btn = e.target.closest('[data-checkout-plan]');
+  if (btn) startCheckout(btn.dataset.checkoutPlan);
+});
+
+async function startCheckout(planId) {
   try {
     const data = await apiFetch('/api/billing/create-checkout', {
       method: 'POST',

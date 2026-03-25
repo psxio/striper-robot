@@ -216,10 +216,10 @@ async def update_assignment(
 
 
 @router.post("/robots/{robot_id}/api-key")
-async def generate_api_key(robot_id: str, admin: dict = Depends(get_admin_user)):
-    """Generate a new API key for a robot. Shown once, then masked."""
+async def generate_robot_api_key(robot_id: str, admin: dict = Depends(get_admin_user)):
+    """Generate or rotate an API key for a robot. Shown once, then masked."""
     try:
-        key = await robot_store.generate_api_key(robot_id)
+        key = await robot_store.generate_api_key(robot_id, allow_rotate=True)
     except ValueError as e:
         raise HTTPException(status_code=409, detail=str(e))
     if key is None:

@@ -585,18 +585,21 @@ async def test_admin_generate_api_key(admin_client):
 
 
 @pytest.mark.asyncio
-async def test_admin_generate_api_key_duplicate_409(admin_client):
-    """Generating a second API key without revoking the first returns 409."""
+async def test_admin_generate_api_key_rotation(admin_client):
+    """Generating a second API key rotates the existing one (returns new key)."""
     resp = await admin_client.post("/api/admin/robots", json={"serial_number": "KEY-002"})
     robot_id = resp.json()["id"]
 
     # First key
     resp = await admin_client.post(f"/api/admin/robots/{robot_id}/api-key")
     assert resp.status_code == 200
+    first_key = resp.json()["api_key"]
 
-    # Second attempt should 409
+    # Second attempt rotates — returns a new key
     resp = await admin_client.post(f"/api/admin/robots/{robot_id}/api-key")
-    assert resp.status_code == 409
+    assert resp.status_code == 200
+    second_key = resp.json()["api_key"]
+    assert second_key != first_key
 
 
 @pytest.mark.asyncio

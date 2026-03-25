@@ -55,6 +55,22 @@ def calculate_next_run(
     raise ValueError(f"Unknown frequency: {frequency}")
 
 
+def _validate_schedule_params(frequency: str, day_of_week: Optional[int], day_of_month: Optional[int]) -> None:
+    """Validate schedule frequency parameters."""
+    if frequency not in ("weekly", "biweekly", "monthly"):
+        raise ValueError(f"Unknown frequency: {frequency}")
+    if frequency in ("weekly", "biweekly"):
+        if day_of_week is None:
+            raise ValueError("day_of_week is required for weekly/biweekly schedules")
+        if not (0 <= day_of_week <= 6):
+            raise ValueError("day_of_week must be 0 (Monday) through 6 (Sunday)")
+    if frequency == "monthly":
+        if day_of_month is None:
+            raise ValueError("day_of_month is required for monthly schedules")
+        if not (1 <= day_of_month <= 28):
+            raise ValueError("day_of_month must be 1 through 28")
+
+
 async def create_schedule(
     user_id: str,
     lot_id: str,
@@ -62,14 +78,20 @@ async def create_schedule(
     day_of_week: Optional[int] = None,
     day_of_month: Optional[int] = None,
     time_preference: str = "morning",
+    *,
+    organization_id: Optional[str] = None,
+    site_id: Optional[str] = None,
 ) -> dict:
     """Create a new recurring schedule and return its dict representation."""
+    _validate_schedule_params(frequency, day_of_week, day_of_month)
     schedule_id = str(uuid.uuid4())
     now = _now()
     next_run = calculate_next_run(frequency, day_of_week, day_of_month)
-    organization_id = await organization_store.get_default_organization_id(user_id)
-    site = await site_store.get_site_by_lot(lot_id)
-    site_id = site["id"] if site else None
+    resolved_org_id = organization_id or await organization_store.get_default_organization_id(user_id)
+    resolved_site_id = site_id
+    if resolved_site_id is None:
+        site = await site_store.get_site_by_lot(lot_id)
+        resolved_site_id = site["id"] if site else None
 
     async for db in get_db():
         await db.execute(
@@ -77,7 +99,7 @@ async def create_schedule(
                (id, user_id, organization_id, site_id, lot_id, frequency, day_of_week, day_of_month,
                 time_preference, active, next_run, created_at, updated_at)
                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, 1, ?, ?, ?)""",
-            (schedule_id, user_id, organization_id, site_id, lot_id, frequency, day_of_week,
+            (schedule_id, user_id, resolved_org_id, resolved_site_id, lot_id, frequency, day_of_week,
              day_of_month, time_preference, next_run, now, now),
         )
         await db.commit()

@@ -130,21 +130,21 @@
 
     <div id="mainContent" class="container" style="display:none;">
         <div class="tabs" role="tablist">
-            <button class="tab active" onclick="switchTab('stats')" role="tab">Stats</button>
-            <button class="tab" onclick="switchTab('users')" role="tab">Users</button>
-            <button class="tab" onclick="switchTab('robots')" role="tab">Robots</button>
-            <button class="tab" onclick="switchTab('assignments')" role="tab">Assignments</button>
-            <button class="tab" onclick="switchTab('waitlist')" role="tab">Waitlist</button>
-            <button class="tab" onclick="switchTab('audit')" role="tab">Audit Log</button>
+            <button class="tab active" onclick="switchTab('stats')" role="tab" aria-selected="true" aria-controls="panel-stats">Stats</button>
+            <button class="tab" onclick="switchTab('users')" role="tab" aria-selected="false" aria-controls="panel-users">Users</button>
+            <button class="tab" onclick="switchTab('robots')" role="tab" aria-selected="false" aria-controls="panel-robots">Robots</button>
+            <button class="tab" onclick="switchTab('assignments')" role="tab" aria-selected="false" aria-controls="panel-assignments">Assignments</button>
+            <button class="tab" onclick="switchTab('waitlist')" role="tab" aria-selected="false" aria-controls="panel-waitlist">Waitlist</button>
+            <button class="tab" onclick="switchTab('audit')" role="tab" aria-selected="false" aria-controls="panel-audit">Audit Log</button>
         </div>
 
         <!-- Stats Panel -->
-        <div id="panel-stats" class="panel active">
+        <div id="panel-stats" class="panel active" role="tabpanel">
             <div class="stats-grid" id="statsGrid"></div>
         </div>
 
         <!-- Users Panel -->
-        <div id="panel-users" class="panel">
+        <div id="panel-users" class="panel" role="tabpanel">
             <table class="responsive-table">
                 <thead>
                     <tr><th>Email</th><th>Name</th><th>Plan</th><th>Lots</th><th>Jobs</th><th>Joined</th><th>Actions</th></tr>
@@ -155,7 +155,7 @@
         </div>
 
         <!-- Waitlist Panel -->
-        <div id="panel-waitlist" class="panel">
+        <div id="panel-waitlist" class="panel" role="tabpanel">
             <div style="margin-bottom:12px;text-align:right;">
                 <button class="btn btn-sm" onclick="exportWaitlistCSV()">Export CSV</button>
             </div>
@@ -169,7 +169,7 @@
         </div>
 
         <!-- Robots Panel -->
-        <div id="panel-robots" class="panel">
+        <div id="panel-robots" class="panel" role="tabpanel">
             <div style="margin-bottom:12px;text-align:right;">
                 <button class="btn btn-sm" onclick="showAddRobotForm()">+ Add Robot</button>
             </div>
@@ -191,7 +191,7 @@
         </div>
 
         <!-- Assignments Panel -->
-        <div id="panel-assignments" class="panel">
+        <div id="panel-assignments" class="panel" role="tabpanel">
             <table class="responsive-table">
                 <thead>
                     <tr><th>Robot</th><th>User</th><th>Status</th><th>Tracking</th><th>Shipped</th><th>Actions</th></tr>
@@ -202,7 +202,7 @@
         </div>
 
         <!-- Audit Log Panel -->
-        <div id="panel-audit" class="panel">
+        <div id="panel-audit" class="panel" role="tabpanel">
             <table class="responsive-table">
                 <thead>
                     <tr><th>Admin</th><th>Action</th><th>Target</th><th>Detail</th><th>Date</th></tr>
@@ -216,18 +216,29 @@
     <script>
     var API_BASE = window.location.origin + '/api';
     var token = localStorage.getItem('strype_token');
+    var PAGE_SIZE = 20;
 
     function escapeHtml(str) {
+        if (str == null) return '';
         var div = document.createElement('div');
-        div.appendChild(document.createTextNode(str));
+        div.appendChild(document.createTextNode(String(str)));
         return div.innerHTML;
     }
 
+    /** Read a cookie value by name. */
+    function getCookie(name) {
+        var match = document.cookie.match(new RegExp('(?:^|;\\s*)' + name + '=([^;]*)'));
+        return match ? decodeURIComponent(match[1]) : null;
+    }
+
     function api(method, path, body) {
-        var opts = {
-            method: method,
-            headers: { 'Authorization': 'Bearer ' + token, 'Content-Type': 'application/json' },
-        };
+        var headers = { 'Authorization': 'Bearer ' + token, 'Content-Type': 'application/json' };
+        // Include CSRF token for state-changing requests
+        if (method !== 'GET') {
+            var csrf = getCookie('csrf_token');
+            if (csrf) headers['X-CSRF-Token'] = csrf;
+        }
+        var opts = { method: method, headers: headers };
         if (body) opts.body = JSON.stringify(body);
         return fetch(API_BASE + path, opts).then(function(r) {
             if (!r.ok) throw { status: r.status };
@@ -236,9 +247,73 @@
         });
     }
 
+    /** Show a styled modal dialog. Returns a promise that resolves to true (confirm) or false (cancel). */
+    function showModal(title, message, confirmLabel, isDanger) {
+        return new Promise(function(resolve) {
+            var overlay = document.createElement('div');
+            overlay.style.cssText = 'position:fixed;top:0;left:0;width:100%;height:100%;background:rgba(0,0,0,.5);z-index:9999;display:flex;align-items:center;justify-content:center';
+            overlay.innerHTML = '<div style="background:var(--card);border:1px solid var(--border);border-radius:var(--radius);padding:24px;max-width:420px;width:90%">' +
+                '<h3 style="margin-bottom:8px">' + escapeHtml(title) + '</h3>' +
+                '<p style="color:var(--text2);font-size:14px;margin-bottom:20px;white-space:pre-wrap">' + escapeHtml(message) + '</p>' +
+                '<div style="display:flex;gap:8px;justify-content:flex-end">' +
+                '<button class="btn" id="__modal_cancel">Cancel</button>' +
+                '<button class="btn' + (isDanger ? ' btn-danger' : '') + '" id="__modal_confirm" style="' + (isDanger ? '' : 'background:var(--green);color:var(--bg);border-color:var(--green)') + '">' + escapeHtml(confirmLabel) + '</button>' +
+                '</div></div>';
+            document.body.appendChild(overlay);
+            overlay.querySelector('#__modal_cancel').onclick = function() { overlay.remove(); resolve(false); };
+            overlay.querySelector('#__modal_confirm').onclick = function() { overlay.remove(); resolve(true); };
+        });
+    }
+
+    /** Show a modal with copyable text content. */
+    function showCopyModal(title, text) {
+        var overlay = document.createElement('div');
+        overlay.style.cssText = 'position:fixed;top:0;left:0;width:100%;height:100%;background:rgba(0,0,0,.5);z-index:9999;display:flex;align-items:center;justify-content:center';
+        overlay.innerHTML = '<div style="background:var(--card);border:1px solid var(--border);border-radius:var(--radius);padding:24px;max-width:500px;width:90%">' +
+            '<h3 style="margin-bottom:8px">' + escapeHtml(title) + '</h3>' +
+            '<p style="color:var(--text2);font-size:13px;margin-bottom:12px">Copy this key now. It will not be shown again.</p>' +
+            '<div style="display:flex;gap:8px;margin-bottom:16px">' +
+            '<input id="__copy_input" readonly style="flex:1;background:var(--bg);color:var(--green);border:1px solid var(--border);border-radius:6px;padding:8px 12px;font-family:JetBrains Mono,monospace;font-size:13px" value="' + escapeHtml(text) + '">' +
+            '<button class="btn" id="__copy_btn" style="white-space:nowrap">Copy</button>' +
+            '</div>' +
+            '<div style="text-align:right"><button class="btn" id="__copy_close">Close</button></div>' +
+            '</div>';
+        document.body.appendChild(overlay);
+        overlay.querySelector('#__copy_btn').onclick = function() {
+            var input = overlay.querySelector('#__copy_input');
+            input.select();
+            navigator.clipboard.writeText(text).then(function() {
+                overlay.querySelector('#__copy_btn').textContent = 'Copied!';
+            });
+        };
+        overlay.querySelector('#__copy_close').onclick = function() { overlay.remove(); };
+    }
+
+    /** Show a prompt modal. Returns a promise that resolves to the input value or null. */
+    function showPromptModal(title, message, placeholder) {
+        return new Promise(function(resolve) {
+            var overlay = document.createElement('div');
+            overlay.style.cssText = 'position:fixed;top:0;left:0;width:100%;height:100%;background:rgba(0,0,0,.5);z-index:9999;display:flex;align-items:center;justify-content:center';
+            overlay.innerHTML = '<div style="background:var(--card);border:1px solid var(--border);border-radius:var(--radius);padding:24px;max-width:420px;width:90%">' +
+                '<h3 style="margin-bottom:8px">' + escapeHtml(title) + '</h3>' +
+                '<p style="color:var(--text2);font-size:14px;margin-bottom:12px">' + escapeHtml(message) + '</p>' +
+                '<input id="__prompt_input" style="width:100%;background:var(--bg);color:var(--text);border:1px solid var(--border);border-radius:6px;padding:8px 12px;font-size:14px;margin-bottom:16px" placeholder="' + escapeHtml(placeholder || '') + '">' +
+                '<div style="display:flex;gap:8px;justify-content:flex-end">' +
+                '<button class="btn" id="__prompt_cancel">Cancel</button>' +
+                '<button class="btn" id="__prompt_ok" style="background:var(--green);color:var(--bg);border-color:var(--green)">OK</button>' +
+                '</div></div>';
+            document.body.appendChild(overlay);
+            overlay.querySelector('#__prompt_cancel').onclick = function() { overlay.remove(); resolve(null); };
+            overlay.querySelector('#__prompt_ok').onclick = function() { var v = overlay.querySelector('#__prompt_input').value; overlay.remove(); resolve(v); };
+            overlay.querySelector('#__prompt_input').addEventListener('keydown', function(e) { if (e.key === 'Enter') overlay.querySelector('#__prompt_ok').click(); });
+        });
+    }
+
     function switchTab(name) {
         document.querySelectorAll('.tab').forEach(function(t, i) {
-            t.classList.toggle('active', ['stats','users','robots','assignments','waitlist','audit'][i] === name);
+            var isActive = ['stats','users','robots','assignments','waitlist','audit'][i] === name;
+            t.classList.toggle('active', isActive);
+            t.setAttribute('aria-selected', isActive ? 'true' : 'false');
         });
         document.querySelectorAll('.panel').forEach(function(p) {
             p.classList.toggle('active', p.id === 'panel-' + name);
@@ -279,7 +354,7 @@
     }
 
     function loadUsers(page) {
-        api('GET', '/admin/users?page=' + page + '&limit=20').then(function(data) {
+        api('GET', '/admin/users?page=' + page + '&limit=' + PAGE_SIZE).then(function(data) {
             var tbody = document.getElementById('usersBody');
             if (!data.items.length) { tbody.innerHTML = '<tr><td colspan="7" class="empty">No users</td></tr>'; return; }
             tbody.innerHTML = data.items.map(function(u) {
@@ -308,7 +383,7 @@
     }
 
     function loadWaitlist(page) {
-        api('GET', '/admin/waitlist?page=' + page + '&limit=20').then(function(data) {
+        api('GET', '/admin/waitlist?page=' + page + '&limit=' + PAGE_SIZE).then(function(data) {
             var tbody = document.getElementById('waitlistBody');
             if (!data.items.length) { tbody.innerHTML = '<tr><td colspan="4" class="empty">No entries</td></tr>'; return; }
             tbody.innerHTML = data.items.map(function(w) {
@@ -336,7 +411,7 @@
     }
 
     function loadAudit(page) {
-        api('GET', '/admin/audit-log?page=' + page + '&limit=20').then(function(data) {
+        api('GET', '/admin/audit-log?page=' + page + '&limit=' + PAGE_SIZE).then(function(data) {
             var tbody = document.getElementById('auditBody');
             if (!data.items.length) { tbody.innerHTML = '<tr><td colspan="5" class="empty">No audit entries</td></tr>'; return; }
             tbody.innerHTML = data.items.map(function(a) {
@@ -348,18 +423,22 @@
     }
 
     function deleteUser(userId, email) {
-        if (!confirm('Delete user ' + email + '? This cannot be undone.')) return;
-        api('DELETE', '/admin/users/' + userId).then(function() {
-            loadUsers(1);
-            loadStats();
+        showModal('Delete User', 'Delete user ' + email + '? This cannot be undone.', 'Delete', true).then(function(ok) {
+            if (!ok) return;
+            api('DELETE', '/admin/users/' + userId).then(function() {
+                loadUsers(1);
+                loadStats();
+            });
         });
     }
 
     function deleteWaitlistEntry(entryId) {
-        if (!confirm('Remove this waitlist entry?')) return;
-        api('DELETE', '/admin/waitlist/' + entryId).then(function() {
-            loadWaitlist(1);
-            loadStats();
+        showModal('Remove Entry', 'Remove this waitlist entry?', 'Remove', true).then(function(ok) {
+            if (!ok) return;
+            api('DELETE', '/admin/waitlist/' + entryId).then(function() {
+                loadWaitlist(1);
+                loadStats();
+            });
         });
     }
 
@@ -387,11 +466,11 @@
             document.getElementById('addRobotForm').style.display = 'none';
             document.getElementById('robotSerial').value = '';
             loadRobots(1);
-        }).catch(function(e) { alert('Failed to create robot'); });
+        }).catch(function() { showModal('Error', 'Failed to create robot.', 'OK', false); });
     }
 
     function loadRobots(page) {
-        api('GET', '/admin/robots?page=' + page + '&limit=20').then(function(data) {
+        api('GET', '/admin/robots?page=' + page + '&limit=' + PAGE_SIZE).then(function(data) {
             var tbody = document.getElementById('robotsBody');
             if (!data.items.length) { tbody.innerHTML = '<tr><td colspan="7" class="empty">No robots</td></tr>'; return; }
             tbody.innerHTML = data.items.map(function(r) {
@@ -426,39 +505,23 @@
     }
 
     function generateApiKey(robotId) {
-        try {
-            fetch(API_BASE + '/admin/robots/' + robotId + '/api-key', {
-                method: 'POST',
-                headers: { 'Authorization': 'Bearer ' + token }
-            }).then(function(resp) {
-                return resp.json().then(function(data) {
-                    if (resp.ok) {
-                        alert('API Key (copy it now, it won\'t be shown again):\n\n' + data.api_key);
-                        loadRobots(1);
-                    } else {
-                        alert(data.detail || 'Failed to generate key');
-                    }
-                });
-            }).catch(function() { alert('Network error'); });
-        } catch (e) { alert('Network error'); }
+        api('POST', '/admin/robots/' + robotId + '/api-key').then(function(data) {
+            showCopyModal('Robot API Key', data.api_key);
+            loadRobots(1);
+        }).catch(function(e) {
+            showModal('Error', 'Failed to generate key.', 'OK', false);
+        });
     }
 
     function revokeApiKey(robotId) {
-        if (!confirm('Revoke this API key? The robot will stop sending telemetry until a new key is generated.')) return;
-        try {
-            fetch(API_BASE + '/admin/robots/' + robotId + '/api-key', {
-                method: 'DELETE',
-                headers: { 'Authorization': 'Bearer ' + token }
-            }).then(function(resp) {
-                if (resp.ok) {
-                    loadRobots(1);
-                } else {
-                    resp.json().then(function(data) {
-                        alert(data.detail || 'Failed to revoke key');
-                    });
-                }
-            }).catch(function() { alert('Network error'); });
-        } catch (e) { alert('Network error'); }
+        showModal('Revoke API Key', 'Revoke this API key? The robot will stop sending telemetry until a new key is generated.', 'Revoke', true).then(function(ok) {
+            if (!ok) return;
+            api('DELETE', '/admin/robots/' + robotId + '/api-key').then(function() {
+                loadRobots(1);
+            }).catch(function() {
+                showModal('Error', 'Failed to revoke key.', 'OK', false);
+            });
+        });
     }
 
     function showAssignModal(robotId) {
@@ -486,11 +549,11 @@
             if (modal) modal.remove();
             loadRobots(1);
             loadAssignments(1);
-        }).catch(function(e) { alert('Assignment failed'); });
+        }).catch(function() { showModal('Error', 'Assignment failed.', 'OK', false); });
     }
 
     function loadAssignments(page) {
-        api('GET', '/admin/assignments?page=' + page + '&limit=20').then(function(data) {
+        api('GET', '/admin/assignments?page=' + page + '&limit=' + PAGE_SIZE).then(function(data) {
             var tbody = document.getElementById('assignmentsBody');
             if (!data.items.length) { tbody.innerHTML = '<tr><td colspan="6" class="empty">No assignments</td></tr>'; return; }
             tbody.innerHTML = data.items.map(function(a) {
@@ -519,13 +582,19 @@
         if (!status) return;
         var body = { status: status };
         if (status === 'shipped') {
-            var tracking = prompt('Enter tracking number:');
-            if (tracking) body.tracking_number = tracking;
+            showPromptModal('Tracking Number', 'Enter the tracking number for this shipment:', 'e.g. 1Z999AA10123456784').then(function(tracking) {
+                if (tracking) body.tracking_number = tracking;
+                api('PUT', '/admin/robots/assignments/' + assignmentId, body).then(function() {
+                    loadAssignments(1);
+                    loadRobots(1);
+                });
+            });
+        } else {
+            api('PUT', '/admin/robots/assignments/' + assignmentId, body).then(function() {
+                loadAssignments(1);
+                loadRobots(1);
+            });
         }
-        api('PUT', '/admin/robots/assignments/' + assignmentId, body).then(function() {
-            loadAssignments(1);
-            loadRobots(1);
-        });
     }
 
     // Init: check auth

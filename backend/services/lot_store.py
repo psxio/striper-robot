@@ -14,7 +14,7 @@ def _now() -> str:
     return datetime.now(timezone.utc).isoformat()
 
 
-def _row_to_dict(row) -> dict:
+def _row_to_dict(row: object) -> dict:
     """Convert a DB row to a frontend-shaped dict."""
     d = dict(row)
     return {
@@ -28,11 +28,22 @@ def _row_to_dict(row) -> dict:
     }
 
 
-async def list_lots(user_id: str, page: int = 1, limit: int = 50, search: str | None = None) -> tuple[list[dict], int]:
-    """Return paginated lots for a given user."""
+async def list_lots(
+    user_id: str,
+    page: int = 1,
+    limit: int = 50,
+    search: str | None = None,
+    *,
+    organization_id: str | None = None,
+) -> tuple[list[dict], int]:
+    """Return paginated lots for a given user or active organization."""
     async for db in get_db():
-        where = "WHERE user_id = ? AND deleted_at IS NULL"
-        params: list = [user_id]
+        if organization_id:
+            where = "WHERE organization_id = ? AND deleted_at IS NULL"
+            params: list = [organization_id]
+        else:
+            where = "WHERE user_id = ? AND deleted_at IS NULL"
+            params = [user_id]
         if search:
             where += " AND name LIKE ?"
             params.append(f"%{search}%")
@@ -51,27 +62,45 @@ async def list_lots(user_id: str, page: int = 1, limit: int = 50, search: str | 
         return [_row_to_dict(r) for r in rows], total
 
 
-async def count_lots(user_id: str) -> int:
-    """Return the total number of lots for a user."""
+async def count_lots(user_id: str, *, organization_id: str | None = None) -> int:
+    """Return the total number of lots for a user or active organization."""
     async for db in get_db():
-        cursor = await db.execute(
-            "SELECT COUNT(*) FROM lots WHERE user_id = ? AND deleted_at IS NULL", (user_id,)
-        )
+        if organization_id:
+            cursor = await db.execute(
+                "SELECT COUNT(*) FROM lots WHERE organization_id = ? AND deleted_at IS NULL",
+                (organization_id,),
+            )
+        else:
+            cursor = await db.execute(
+                "SELECT COUNT(*) FROM lots WHERE user_id = ? AND deleted_at IS NULL", (user_id,)
+            )
         return (await cursor.fetchone())[0]
 
 
-async def create_lot_atomic(user_id: str, data: LotCreate, max_lots: int) -> Optional[dict]:
+async def create_lot_atomic(
+    user_id: str,
+    data: LotCreate,
+    max_lots: int,
+    *,
+    organization_id: str | None = None,
+) -> Optional[dict]:
     """Create a lot atomically with plan limit check. Returns None if over limit."""
     lot_id = str(uuid.uuid4())
     now = _now()
     features_json = json.dumps(data.features)
-    organization_id = await organization_store.get_default_organization_id(user_id)
+    organization_id = organization_id or await organization_store.get_default_organization_id(user_id)
     async for db in get_db():
         await db.execute("BEGIN IMMEDIATE")
         try:
-            cursor = await db.execute(
-                "SELECT COUNT(*) FROM lots WHERE user_id = ? AND deleted_at IS NULL", (user_id,)
-            )
+            if organization_id:
+                cursor = await db.execute(
+                    "SELECT COUNT(*) FROM lots WHERE organization_id = ? AND deleted_at IS NULL",
+                    (organization_id,),
+                )
+            else:
+                cursor = await db.execute(
+                    "SELECT COUNT(*) FROM lots WHERE user_id = ? AND deleted_at IS NULL", (user_id,)
+                )
             count = (await cursor.fetchone())[0]
             if count >= max_lots:
                 await db.execute("ROLLBACK")
@@ -116,20 +145,32 @@ async def create_lot(user_id: str, data: LotCreate) -> dict:
     return lot
 
 
-async def get_lot(user_id: str, lot_id: str) -> Optional[dict]:
-    """Get a single lot, scoped to the given user."""
+async def get_lot(user_id: str, lot_id: str, *, organization_id: str | None = None) -> Optional[dict]:
+    """Get a single lot, scoped to the given user or organization."""
     async for db in get_db():
-        cursor = await db.execute(
-            "SELECT * FROM lots WHERE id = ? AND user_id = ? AND deleted_at IS NULL",
-            (lot_id, user_id),
-        )
+        if organization_id:
+            cursor = await db.execute(
+                "SELECT * FROM lots WHERE id = ? AND organization_id = ? AND deleted_at IS NULL",
+                (lot_id, organization_id),
+            )
+        else:
+            cursor = await db.execute(
+                "SELECT * FROM lots WHERE id = ? AND user_id = ? AND deleted_at IS NULL",
+                (lot_id, user_id),
+            )
         row = await cursor.fetchone()
         return _row_to_dict(row) if row else None
 
 
-async def update_lot(user_id: str, lot_id: str, data: LotUpdate) -> Optional[dict]:
+async def update_lot(
+    user_id: str,
+    lot_id: str,
+    data: LotUpdate,
+    *,
+    organization_id: str | None = None,
+) -> Optional[dict]:
     """Update non-None fields of a lot. Returns None if not found."""
-    existing = await get_lot(user_id, lot_id)
+    existing = await get_lot(user_id, lot_id, organization_id=organization_id)
     if not existing:
         return None
 
@@ -157,36 +198,49 @@ async def update_lot(user_id: str, lot_id: str, data: LotUpdate) -> Optional[dic
     fields.append("updated_at = ?")
     values.append(_now())
     values.append(lot_id)
-    values.append(user_id)
+    values.append(organization_id or user_id)
 
     async for db in get_db():
         await db.execute(
-            f"UPDATE lots SET {', '.join(fields)} WHERE id = ? AND user_id = ?",
+            f"UPDATE lots SET {', '.join(fields)} WHERE id = ? AND {'organization_id' if organization_id else 'user_id'} = ?",
             tuple(values),
         )
         await db.commit()
 
-    return await get_lot(user_id, lot_id)
+    return await get_lot(user_id, lot_id, organization_id=organization_id)
 
 
-async def delete_lot(user_id: str, lot_id: str) -> bool:
+async def delete_lot(user_id: str, lot_id: str, *, organization_id: str | None = None) -> bool:
     """Soft-delete a lot and cascade-delete its jobs. Returns True if it existed."""
     now = _now()
     site = await site_store.get_site_by_lot(lot_id)
     async for db in get_db():
-        cursor = await db.execute(
-            "UPDATE lots SET deleted_at = ? WHERE id = ? AND user_id = ? AND deleted_at IS NULL",
-            (now, lot_id, user_id),
-        )
+        if organization_id:
+            cursor = await db.execute(
+                "UPDATE lots SET deleted_at = ? WHERE id = ? AND organization_id = ? AND deleted_at IS NULL",
+                (now, lot_id, organization_id),
+            )
+        else:
+            cursor = await db.execute(
+                "UPDATE lots SET deleted_at = ? WHERE id = ? AND user_id = ? AND deleted_at IS NULL",
+                (now, lot_id, user_id),
+            )
         if cursor.rowcount == 0:
             return False
         # Hard-delete jobs for this lot (lot is soft-deleted, jobs have no value)
-        await db.execute("DELETE FROM jobs WHERE lot_id = ? AND user_id = ?", (lot_id, user_id))
+        if organization_id:
+            await db.execute("DELETE FROM jobs WHERE lot_id = ? AND organization_id = ?", (lot_id, organization_id))
+            await db.execute(
+                "UPDATE recurring_schedules SET active = 0, updated_at = ? WHERE lot_id = ? AND organization_id = ? AND active = 1",
+                (now, lot_id, organization_id),
+            )
+        else:
+            await db.execute("DELETE FROM jobs WHERE lot_id = ? AND user_id = ?", (lot_id, user_id))
+            await db.execute(
+                "UPDATE recurring_schedules SET active = 0, updated_at = ? WHERE lot_id = ? AND user_id = ? AND active = 1",
+                (now, lot_id, user_id),
+            )
         # Deactivate recurring schedules so the scheduler cannot recreate jobs for a deleted lot.
-        await db.execute(
-            "UPDATE recurring_schedules SET active = 0, updated_at = ? WHERE lot_id = ? AND user_id = ? AND active = 1",
-            (now, lot_id, user_id),
-        )
         # Clear active_lot_id if it pointed to this lot
         await db.execute(
             "UPDATE users SET active_lot_id = NULL WHERE id = ? AND active_lot_id = ?",
@@ -198,9 +252,9 @@ async def delete_lot(user_id: str, lot_id: str) -> bool:
         return True
 
 
-async def duplicate_lot(user_id: str, lot_id: str) -> Optional[dict]:
+async def duplicate_lot(user_id: str, lot_id: str, *, organization_id: str | None = None) -> Optional[dict]:
     """Duplicate a lot with ' (Copy)' appended to the name."""
-    original = await get_lot(user_id, lot_id)
+    original = await get_lot(user_id, lot_id, organization_id=organization_id)
     if not original:
         return None
 
@@ -208,7 +262,7 @@ async def duplicate_lot(user_id: str, lot_id: str) -> Optional[dict]:
     now = _now()
     features_json = json.dumps(original["features"])
     new_name = original["name"] + " (Copy)"
-    organization_id = await organization_store.get_default_organization_id(user_id)
+    organization_id = organization_id or await organization_store.get_default_organization_id(user_id)
 
     async for db in get_db():
         await db.execute(
