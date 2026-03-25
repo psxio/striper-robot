@@ -4,6 +4,7 @@ from fastapi import APIRouter, Depends, HTTPException
 
 from ..auth import get_admin_user, require_active_billing
 from ..config import settings
+from ..services import email_service
 from ..models.commercial_schemas import (
     RobotClaimCommissionRequest,
     RobotClaimCreateRequest,
@@ -85,4 +86,14 @@ async def claim_robot(
             "commissioning_status": claim["commissioning_status"],
         },
     )
+
+    # Send claim confirmation email
+    import asyncio
+    robot = claim.get("robot") or {}
+    asyncio.create_task(email_service.send_claim_confirmation_email(
+        user["email"],
+        robot.get("serial_number") or claim.get("robot_id", ""),
+        body.friendly_name,
+    ))
+
     return claim

@@ -9,7 +9,7 @@ from ..auth import get_current_user
 from ..config import settings
 from ..database import get_db
 from ..models.schemas import ChangePlanRequest
-from ..services import billing_store, user_store
+from ..services import billing_store, email_service, user_store
 
 router = APIRouter(prefix="/api/billing", tags=["billing"])
 logger = logging.getLogger("strype.billing")
@@ -202,10 +202,16 @@ async def stripe_webhook(request: Request):
 
     elif event_type == "customer.subscription.deleted":
         subscription = event["data"]["object"]
+        sub_record = await billing_store.get_subscription_by_stripe_id(subscription["id"])
         await billing_store.update_subscription_status(
             stripe_subscription_id=subscription["id"],
             status="cancelled",
         )
+        if sub_record:
+            user = await user_store.get_user_by_id(sub_record["user_id"])
+            if user:
+                import asyncio
+                asyncio.create_task(email_service.send_subscription_cancelled_email(user["email"], sub_record["plan"]))
 
     elif event_type == "customer.subscription.updated":
         subscription = event["data"]["object"]
@@ -228,11 +234,17 @@ async def stripe_webhook(request: Request):
         invoice = event["data"]["object"]
         sub_id = invoice.get("subscription")
         if sub_id:
+            sub_record = await billing_store.get_subscription_by_stripe_id(sub_id)
             await billing_store.update_subscription_status(
                 stripe_subscription_id=sub_id,
                 status="past_due",
             )
             logger.warning("Payment failed for subscription %s", sub_id)
+            if sub_record:
+                user = await user_store.get_user_by_id(sub_record["user_id"])
+                if user:
+                    import asyncio
+                    asyncio.create_task(email_service.send_payment_failed_email(user["email"], sub_record["plan"]))
 
     elif event_type == "invoice.paid":
         invoice = event["data"]["object"]
@@ -244,6 +256,13 @@ async def stripe_webhook(request: Request):
                 status="active",
                 plan=plan,
             )
+            sub_record = await billing_store.get_subscription_by_stripe_id(sub_id)
+            if sub_record:
+                user = await user_store.get_user_by_id(sub_record["user_id"])
+                if user:
+                    import asyncio
+                    amount = str(invoice.get("amount_paid", 0) / 100) if invoice.get("amount_paid") else "0"
+                    asyncio.create_task(email_service.send_invoice_email(user["email"], amount, plan or "pro"))
 
     # Mark event as processed
     if event_id:

@@ -3503,10 +3503,16 @@ document.getElementById('helpOverlay').addEventListener('click', function(e) {
   if (e.target === this) hideHelp();
 });
 
-// Auto-show on first visit
+// Auto-show on first visit — also re-show if user has no lots yet
 if (!localStorage.getItem('strype_onboarded')) {
   setTimeout(showHelp, 800);
   localStorage.setItem('strype_onboarded', '1');
+} else if (typeof lots !== 'undefined' && lots.length === 0 && !localStorage.getItem('strype_onboarded_v2')) {
+  // Returning user with no lots — nudge them to create their first lot
+  setTimeout(function() {
+    showToast('Click + New to create your first parking lot', 'info');
+  }, 1200);
+  localStorage.setItem('strype_onboarded_v2', '1');
 }
 
 /* ═══════════════════════════════════════════════════════════════════
