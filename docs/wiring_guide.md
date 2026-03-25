@@ -51,7 +51,9 @@ A builder should be able to wire the entire robot from this document.
      |                                           |
      | SERIAL3 ────── UM982 GPS port 1 (UART)    |
      |                                           |
-     | SERIAL4 ────── UM982 GPS port 2 (heading) |
+    | SERIAL4 ────── Optional rangefinder bridge |
+    |                                           |
+    | SERIAL5 ────── UM982 GPS port 2 (heading) |
      |                                           |
      | SERIAL1/2 ──── Hoverboard UART (TX/RX/GND)|
      |                                           |
@@ -210,7 +212,8 @@ SERIAL2_BAUD = 115200
 The UM982 breakout board communicates with the Pixhawk over UART. The
 UM982 provides dual-antenna heading, which requires **two serial ports**
 on the Pixhawk: one for position (SERIAL3 / GPS1) and one for the
-moving-baseline heading solution (SERIAL4 / GPS2).
+moving-baseline heading solution (SERIAL5 in the current `striper.param`
+configuration). `SERIAL4` is left free for the optional rangefinder bridge.
 
 **Port 1 — Position (SERIAL3 / GPS1):**
 
@@ -221,7 +224,7 @@ moving-baseline heading solution (SERIAL4 / GPS2).
 | Pin 3 | RX (in) | UM982 Port 1 TX |
 | Pin 6 | GND | UM982 GND |
 
-**Port 2 — Heading (SERIAL4 / GPS2):**
+**Port 2 — Heading (secondary GNSS UART / SERIAL5 in `striper.param`):**
 
 | Pixhawk GPS2 Port Pin | Function | Connects To |
 |------------------------|----------|-------------|
@@ -245,9 +248,12 @@ plane discs (100mm diameter) under each antenna for multipath rejection.
 ```
 SERIAL3_PROTOCOL = 5       (GPS)
 SERIAL3_BAUD = 115         (115200 baud — ArduPilot uses shorthand)
-SERIAL4_PROTOCOL = 5       (GPS — second port for UM982 heading)
+SERIAL4_PROTOCOL = 28      (optional rangefinder bridge / scripting)
 SERIAL4_BAUD = 115         (115200 baud)
+SERIAL5_PROTOCOL = 5       (GPS — second port for UM982 heading)
+SERIAL5_BAUD = 115         (115200 baud)
 GPS_TYPE = 25              (UnicoreMovingBaselineNMEA — UM982 dual-antenna)
+GPS_TYPE2 = 25             (second UM982 data stream for moving baseline)
 GPS_RATE_MS = 200          (5 Hz update, or 100 for 10 Hz)
 EK3_SRC1_YAW = 2           (GPS heading — UM982 dual-antenna)
 COMPASS_ENABLE = 0         (disable compass — hub motor magnets cause
@@ -275,8 +281,8 @@ base station or NTRIP service. Options:
 1. **Mission Planner NTRIP:** Configure Mission Planner to connect to an
    NTRIP caster (e.g., RTK2Go, free) and relay corrections to the
    Pixhawk over the telemetry link.
-2. **Own base station:** A second UM980 or LC29H module at a known
-   location, transmitting corrections via a telemetry radio.
+2. **Own base station:** A second RTK-capable receiver at a known
+  location, transmitting RTCM3 corrections via a telemetry radio.
 3. **PointPerfect / Polaris:** Commercial correction services ($50/month).
 
 ---
@@ -359,7 +365,7 @@ will clog the nozzle in under 2 minutes.
 
 **Flush system:** The 3-way T-valve switches between paint and water.
 Before any pause longer than 30 seconds, flush the system with water to
-prevent paint drying in the nozzle. The `paint_control.lua` script can
+prevent paint drying in the nozzle. The `paint_unified.lua` script can
 trigger an automatic flush cycle.
 
 **Flyback diodes:** Install a **1N4007 diode** across each inductive load
@@ -567,8 +573,9 @@ Follow this order. Do not proceed until the current step is verified.
 - [ ] **11.** Connect the Pixhawk to your laptop via USB-C. Open Mission
        Planner. Flash ArduRover firmware. Set `FRAME_TYPE = 2`
        (differential drive / skid steering).
-- [ ] **12.** Wire the UM982 GPS to Pixhawk SERIAL3 (GPS1 port, position)
-       and SERIAL4 (GPS2 port, heading). Connect both GNSS antennas.
+- [ ] **12.** Wire the UM982 GPS to Pixhawk SERIAL3 (position) and the
+  secondary GNSS UART mapped as SERIAL5 in `striper.param` (heading).
+  Connect both GNSS antennas.
        Take the robot outdoors. In Mission Planner, verify GPS fix
        (3D fix, then RTK float/fixed when corrections are available).
 
@@ -614,8 +621,10 @@ Follow this order. Do not proceed until the current step is verified.
        - Test e-stop under AUTO mode. Press it mid-mission. Motors must
          stop immediately.
        - Verify GPS accuracy (walk the painted line with a tape measure).
-       - If using ultrasonics: mount HC-SR04 sensors at the front, wire
-         to spare Pixhawk GPIO or an Arduino, and verify obstacle stop.
+       - If using the prototype rangefinder bridge: mount the HC-SR04
+         sensors at the front, wire them through the dedicated bridge,
+         and verify they behave as a supplemental stop aid rather than the
+         primary safety layer.
 
 ---
 
@@ -627,7 +636,7 @@ Follow this order. Do not proceed until the current step is verified.
 | TELEM1 (SERIAL1) | JST-GH 6-pin | Hoverboard UART (or telemetry radio) |
 | TELEM2 (SERIAL2) | JST-GH 6-pin | Hoverboard UART (alt) or telemetry |
 | GPS1 (SERIAL3) | JST-GH 6-pin | UM982 GPS UART (position) |
-| GPS2 (SERIAL4) | JST-GH 6-pin | UM982 GPS UART (heading) |
+| GPS2 / secondary GNSS UART | JST-GH 6-pin | UM982 GPS UART (heading; mapped as `SERIAL5` in `striper.param`) |
 | RC IN | JST-GH 3-pin | FlySky SBUS receiver |
 | MAIN OUT 1-8 | JST-GH (servo rail) | AUX5 (pin 54): solenoid relay, AUX6 (pin 55): pump relay |
 | USB-C | USB-C | Laptop (Mission Planner) |

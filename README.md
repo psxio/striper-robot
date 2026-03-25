@@ -58,7 +58,7 @@ python scripts/sitl_test.py --connection tcp:127.0.0.1:5760
 
 ## Deployment
 
-See [docs/deployment.md](docs/deployment.md) for Railway production deployment (primary) and AWS ECS deployment (secondary option).
+See [docs/deployment.md](docs/deployment.md) for deployment guidance for Railway and AWS ECS.
 
 ## License
 

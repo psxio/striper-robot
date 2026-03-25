@@ -5,7 +5,7 @@ from datetime import datetime, timezone, timedelta
 
 from fastapi import APIRouter, Depends, HTTPException, Query, Request
 
-from ..auth import get_current_user, get_admin_user
+from ..auth import get_current_user
 from ..database import get_db
 from ..models.schemas import TelemetryHeartbeat, TelemetryResponse
 from ..rate_limit import limiter
@@ -70,8 +70,8 @@ async def _check_robot_access(robot_id: str, user: dict) -> None:
     """Verify the user has access to the given robot. Admins can access any robot."""
     if user.get("is_admin"):
         return
-    assignment = await robot_store.get_user_robot(user["id"])
-    if not assignment or assignment["robot_id"] != robot_id:
+    allowed = await robot_store.user_can_access_robot(user["id"], robot_id)
+    if not allowed:
         raise HTTPException(status_code=403, detail="Not authorized for this robot")
 
 

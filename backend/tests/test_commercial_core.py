@@ -155,35 +155,37 @@ async def test_media_and_fleet_operations_flow(auth_client):
     )
     assert robot_create.status_code == 403
 
-    from backend.services.robot_store import create_robot
+    from backend.services.robot_store import create_robot, create_robot_claim, claim_robot_for_organization
 
     robot = await create_robot("STR-001", firmware_version="2026.3.1")
+    claim, code = await create_robot_claim(robot["id"], me["id"])
+    await claim_robot_for_organization(code, org_id, me["id"], friendly_name="Commercial core robot")
 
     lot_resp = await auth_client.post("/api/lots", json=LOT_DATA)
     assert lot_resp.status_code == 201
     site = (await auth_client.get("/api/sites", headers=headers)).json()["items"][0]
 
-    work_order = (
-        await auth_client.post(
-            "/api/work-orders",
-            headers=headers,
-            json={
-                "site_id": site["id"],
-                "title": "WO-2001",
-                "date": "2026-04-20",
-                "status": "scheduled",
-                "assigned_user_id": me["id"],
-                "assigned_robot_id": robot["id"],
-            },
-        )
-    ).json()
-    run = (
-        await auth_client.post(
-            f"/api/work-orders/{work_order['id']}/runs",
-            headers=headers,
-            json={"job_id": work_order["id"], "robot_id": robot["id"], "technician_user_id": me["id"]},
-        )
-    ).json()
+    work_order_resp = await auth_client.post(
+        "/api/work-orders",
+        headers=headers,
+        json={
+            "site_id": site["id"],
+            "title": "WO-2001",
+            "date": "2026-04-20",
+            "status": "scheduled",
+            "assigned_user_id": me["id"],
+            "assigned_robot_id": robot["id"],
+        },
+    )
+    assert work_order_resp.status_code == 201
+    work_order = work_order_resp.json()
+    run_resp = await auth_client.post(
+        f"/api/work-orders/{work_order['id']}/runs",
+        headers=headers,
+        json={"job_id": work_order["id"], "robot_id": robot["id"], "technician_user_id": me["id"]},
+    )
+    assert run_resp.status_code == 201
+    run = run_resp.json()
 
     upload_resp = await auth_client.post(
         "/api/media-assets",

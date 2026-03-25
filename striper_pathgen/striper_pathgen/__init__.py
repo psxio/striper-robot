@@ -23,6 +23,11 @@ from .template_generator import (
 from .ros_converter import msg_to_paint_path, paint_job_to_msgs, paint_path_to_msg
 from .job_exporter import export_csv, export_geojson, export_kml
 from .mission_planner import export_waypoints, save_waypoints
+from .ardurover_param_validator import (
+    ValidationResult,
+    validate_ardurover_params,
+    validate_ardurover_params_file,
+)
 
 __all__ = [
     # Models
@@ -57,4 +62,8 @@ __all__ = [
     # Mission Planner / ArduPilot
     "export_waypoints",
     "save_waypoints",
+    # ArduRover param validation
+    "ValidationResult",
+    "validate_ardurover_params",
+    "validate_ardurover_params_file",
 ]

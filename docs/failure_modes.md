@@ -5,8 +5,10 @@ by subsystem. For each failure: what the operator sees, what the robot does
 automatically, and what the operator should do.
 
 Hardware reference: Pixhawk 6C Mini, Unicore UM982 GPS (dual-antenna heading),
-hoverboard hub motors (350W x2) with FOC firmware, 36V 18Ah e-bike battery, 12V diaphragm pump +
-solenoid valve + TeeJet TP8004EVS nozzle, FlySky FS-i6X RC, 2x HC-SR04 ultrasonics.
+hoverboard hub motors (350W x2) with FOC firmware, 36V 18Ah e-bike battery,
+12V diaphragm pump + solenoid valve + TeeJet TP8004EVS nozzle, FlySky
+FS-i6X RC, optional obstacle-stop layer (prototype HC-SR04 bridge or a more
+robust outdoor-rated sensor/bumper).
 
 ---
 
@@ -126,7 +128,7 @@ solenoid valve + TeeJet TP8004EVS nozzle, FlySky FS-i6X RC, 2x HC-SR04 ultrasoni
 |------|--------|
 | **Cause** | Relay welded closed (overcurrent), solenoid coil energized due to wiring short, or relay module failure |
 | **What operator sees** | Paint continues flowing after the mission commands paint off. Paint sprays during transit segments between paint lines. Cannot stop paint flow via RC toggle |
-| **Automatic action** | paint_control.lua monitors mode -- paint should stop when leaving AUTO mode. fence_check.lua kills paint on geofence breach. But if the relay is welded closed, software cannot override |
+| **Automatic action** | paint_unified.lua monitors mode -- paint should stop when leaving AUTO mode. fence_check.lua kills paint on geofence breach. But if the relay is welded closed, software cannot override |
 | **Operator action** | 1. Hit E-stop (cuts all power including 12V rail, stopping pump and closing solenoid). 2. If paint continues dripping (gravity-fed from elevated reservoir), physically pinch the tubing. 3. Inspect the relay module: swap channels to test if the relay is welded. 4. Replace the relay module if a channel is welded ($5 part). 5. Add a 5A fuse on the 12V solenoid circuit to prevent relay welding from overcurrent |
 | **Prevention** | Use a fused relay module or add a 5A inline fuse on the solenoid circuit. Use an opto-isolated relay module. Always add a 1N4007 flyback diode across the solenoid to reduce back-EMF that can weld relay contacts |
 
@@ -134,10 +136,10 @@ solenoid valve + TeeJet TP8004EVS nozzle, FlySky FS-i6X RC, 2x HC-SR04 ultrasoni
 
 | Item | Detail |
 |------|--------|
-| **Cause** | Relay module signal wire disconnected, relay coil dead, 5V supply to relay module lost, or paint_control.lua script crashed |
+| **Cause** | Relay module signal wire disconnected, relay coil dead, 5V supply to relay module lost, or paint_unified.lua crashed |
 | **What operator sees** | No paint flows during mission segments where it should be painting. Pump may be running (fluid circulating through relief valve) but solenoid is not opening. No relay click sound |
 | **Automatic action** | None |
-| **Operator action** | 1. Check relay module: verify 5V at VCC pin, GND connected, and signal wire from Pixhawk AUX5 (pin 54) is connected. 2. In Mission Planner, manually toggle Relay 1 and listen for relay click. 3. Check `RELAY1_PIN=54` in parameters. 4. Check paint_control.lua is running: look for "paint_control.lua loaded" in GCS messages after reboot. 5. Test the relay by jumpering the signal pin to 5V directly (bypasses Pixhawk). 6. Replace relay module if coil is dead |
+| **Operator action** | 1. Check relay module: verify 5V at VCC pin, GND connected, and signal wire from Pixhawk AUX5 (pin 54) is connected. 2. In Mission Planner, manually toggle Relay 1 and listen for relay click. 3. Check `RELAY1_PIN=54` in parameters. 4. Check paint_unified.lua is running: look for "paint_unified.lua loaded" in GCS messages after reboot. 5. Test the relay by jumpering the signal pin to 5V directly (bypasses Pixhawk). 6. Replace relay module if coil is dead |
 | **Prevention** | Test relay operation before every job. Carry a spare relay module. Verify Lua scripts load on every Pixhawk boot by watching GCS messages |
 
 ### 3.5 Paint Tank Empty
@@ -233,10 +235,10 @@ solenoid valve + TeeJet TP8004EVS nozzle, FlySky FS-i6X RC, 2x HC-SR04 ultrasoni
 | Item | Detail |
 |------|--------|
 | **Cause** | Runtime error in a Lua script (nil value access, division by zero), out-of-memory (heap exceeded), or SD card read error |
-| **What operator sees** | Depends on which script crashed. motor_bridge.lua crash: motors stop (FOC UART timeout). paint_control.lua crash: paint may stay in its last state (stuck on or off). GCS message shows "Lua: script <name> error" or "Lua: out of memory" |
+| **What operator sees** | Depends on which script crashed. motor_bridge.lua crash: motors stop (FOC UART timeout). paint_unified.lua crash: paint may stay in its last state (stuck on or off). GCS message shows "Lua: script <name> error" or "Lua: out of memory" |
 | **Automatic action** | ArduRover Lua engine may restart the failed script automatically (depends on error type). If motor_bridge.lua crashes, the FOC firmware UART timeout (1 second) stops the motors |
-| **Operator action** | 1. Switch to HOLD (motors stop regardless of Lua state). 2. Check GCS messages for the error text. 3. Reboot Pixhawk (power cycle or use Mission Planner reboot command). Scripts reload from SD card on boot. 4. If the error repeats, check the SD card: pull it and verify /APM/scripts/ contains all four .lua files, and none are 0 bytes. 5. For "out of memory": increase `SCR_HEAP_SIZE` from 102400 to 153600 (150KB) |
-| **Prevention** | Test all Lua scripts in SITL before deploying to hardware. Use `SCR_DEBUG_LVL=1` to catch warnings. Keep scripts simple -- the current four scripts total under 300 lines, well within Lua engine limits |
+| **Operator action** | 1. Switch to HOLD (motors stop regardless of Lua state). 2. Check GCS messages for the error text. 3. Reboot Pixhawk (power cycle or use Mission Planner reboot command). Scripts reload from SD card on boot. 4. If the error repeats, check the SD card: pull it and verify /APM/scripts/ contains the required baseline scripts (`motor_bridge.lua`, `paint_unified.lua`, `fence_check.lua`), and none are 0 bytes. If the prototype rangefinder bridge is installed, also verify `rangefinder_bridge.lua`. 5. For "out of memory": increase `SCR_HEAP_SIZE` from 102400 to 153600 (150KB) |
+| **Prevention** | Test all Lua scripts in SITL before deploying to hardware. Use `SCR_DEBUG_LVL=1` to catch warnings. Keep the baseline script set small and only add the optional rangefinder bridge after bench validation |
 
 ---
 
@@ -306,15 +308,15 @@ solenoid valve + TeeJet TP8004EVS nozzle, FlySky FS-i6X RC, 2x HC-SR04 ultrasoni
 | **Operator action** | 1. Let the robot complete RTL (it will stop at the launch point). 2. Check the fence boundary in Mission Planner -- is it correctly drawn around the entire work area? 3. Check `FENCE_MARGIN` (1.0m) -- the robot must stay 1m inside the polygon. 4. If the fence is too small: redraw and re-upload in Mission Planner. 5. If the breach was due to GPS drift: check RTK status, wait for better fix. 6. To disable the fence temporarily: `FENCE_ENABLE=0` (use with caution) |
 | **Prevention** | Draw fence boundaries at least 2 meters beyond the outermost waypoint in every direction. Include `FENCE_MARGIN=1.0m`. Validate that all mission waypoints are inside the fence polygon before starting. Set `FENCE_RADIUS=50` as a circular backup |
 
-### 7.3 Obstacle Detected (HC-SR04 Ultrasonics)
+### 7.3 Optional Obstacle-Stop Layer Triggered
 
 | Item | Detail |
 |------|--------|
-| **Cause** | Person, vehicle, bollard, shopping cart, or other object in the robot's path. HC-SR04 sensors detect objects at 2-400cm range |
-| **What operator sees** | Robot stops unexpectedly. If wired to ArduRover's object avoidance, Mission Planner shows obstacle detection |
-| **Automatic action** | Depends on integration method. If wired through ArduRover's avoidance system (`AVOID_ENABLE`): robot stops and waits. If handled by a separate Arduino/script: behavior depends on implementation. In the default param file, `AVOID_ENABLE=0` (disabled) |
-| **Operator action** | 1. Clear the obstacle. 2. If the robot stopped, switch to MANUAL, reposition if needed, then resume AUTO. 3. If using ultrasonic sensors with `AVOID_ENABLE=0`: the sensors are logging-only (no auto-stop). The operator must watch and use E-stop or RC manual override to stop the robot for obstacles |
-| **Prevention** | Clear the lot of movable obstacles before starting. Set up cones or caution tape around the work area. Monitor the robot throughout the mission. Consider enabling `AVOID_ENABLE=1` once ultrasonic integration is tested |
+| **Cause** | Person, vehicle, bollard, shopping cart, or other object in the robot's path. On prototype builds this may come from an HC-SR04 bridge; on upgraded builds it may come from an outdoor-rated sensor or contact bumper |
+| **What operator sees** | Robot stops unexpectedly. Mission Planner may show obstacle or rangefinder activity if the stop layer is integrated into ArduRover |
+| **Automatic action** | Depends on integration method. In the current default parameter set, the optional obstacle layer is not the primary safety mechanism and `AVOID_ENABLE=0` remains common. If a separate bridge or controller is installed, behavior depends on that implementation |
+| **Operator action** | 1. Clear the obstacle or verify the trigger was false. 2. Switch to MANUAL, reposition if needed, then resume AUTO. 3. If running the prototype HC-SR04 bridge, treat it as a supplemental aid only and keep an operator ready on RC or hardware e-stop |
+| **Prevention** | Clear the lot of movable obstacles before starting. Set up cones or caution tape around the work area. Monitor the robot throughout the mission. For field builds, prefer an outdoor-rated stop layer or physical bumper over relying on HC-SR04 alone |
 
 ---
 

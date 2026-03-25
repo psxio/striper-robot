@@ -1,14 +1,15 @@
 # Striper Robot -- Quick Start Guide
 
 Step-by-step guide from a box of parts to a robot painting its first parking
-lot. This guide uses the validated BOM v3 (~$1,011 components, ~$1,200-$1,500 all-in).
-See `docs/validated_bom_v3.md` for the full parts list.
+lot. This guide uses the validated BOM v3 (~$1,027 components, ~$1,200-$1,500 all-in).
+See [buying_guide.md](buying_guide.md) for the shopping list and
+[validated_bom_v3.md](validated_bom_v3.md) for the engineering rationale.
 
 Total estimated time: 2 weekends (20-25 hours of hands-on work).
 
-> **Prefer a ready-to-run robot?** The assembled Strype robot ships
-> pre-built, pre-flashed, pre-calibrated, and ready to paint in 30 minutes.
-> See `docs/business-plan.md` for details on the assembled product vs. DIY.
+> **Prefer a ready-to-run robot?** The public repo focuses on the DIY and
+> engineering workflow. Commercial packaging, pricing, and sales collateral
+> are maintained outside the public repository.
 
 **Tools required**: soldering iron, multimeter, hex key set (M3, M5), drill
 with bits, wire strippers, crimping tool, screwdrivers (Phillips, flat),
@@ -24,7 +25,7 @@ hoverboard-firmware-hack-FOC source code and build toolchain
 
 ### Step 1: Unbox and Inventory Check (30 minutes)
 
-Verify every item from the Tier 2 BOM (see `docs/bom.md`). Lay everything
+Verify every item from the current buy-now list (see [buying_guide.md](buying_guide.md)). Lay everything
 out on a workbench and check off:
 
 | # | Item | Check |
@@ -38,14 +39,14 @@ out on a workbench and check off:
 | 7 | Shurflo 8000 diaphragm pump (12V, 60 PSI, 1.8 GPM) | [ ] |
 | 8 | 12V solenoid valve (N.C., 3/8" NPT, brass, direct-acting) | [ ] |
 | 9 | TeeJet TP8004EVS even-fan nozzle + 60-mesh strainer + adapters + 3 ft 3/8" tubing | [ ] |
-| 10 | 36V 18Ah e-bike battery with charger | [ ] |
-| 11 | DC-DC converter 36V to 12V (5A minimum, XL4015) | [ ] |
+| 10 | 36V 18Ah battery pack with charger from a disclosed-cell vendor | [ ] |
+| 11 | Separate DC-DC rails: sealed 12V pump converter plus separate control/avionics rail | [ ] |
 | 12 | Holybro PM06 V2 power module (5V/3A + battery monitoring) | [ ] |
 | 13 | E-stop button (22mm mushroom, twist-release, N.C.) + 40A DC contactor | [ ] |
-| 14 | 2x HC-SR04 ultrasonic sensors | [ ] |
+| 14 | Outdoor-rated obstacle sensor or physical bumper stop | [ ] |
 | 15 | FlySky FS-i6X transmitter + FS-iA6B receiver | [ ] |
 | 16 | 2-channel 5V relay module (opto-isolated) | [ ] |
-| 17 | Wiring kit: 14/18/22 AWG wire, XT60 connectors, 30A fuse + holder, JST-GH cables, M3 standoffs, zip ties, heat shrink | [ ] |
+| 17 | Wiring kit: 12 AWG main power, 18 AWG control/power rail, 22 AWG signal wire, XT60 connectors, 30A fuse + holder, JST-GH cables, M3 standoffs, zip ties, heat shrink | [ ] |
 | 18 | 2x front casters (swivel, 3") | [ ] |
 | 19 | 1N4007 diodes (2x, for flyback protection) | [ ] |
 
@@ -192,8 +193,9 @@ Wire the power distribution system. Refer to `docs/wiring_guide.md` Section
    - **SERIAL3 (GPS1)** — position: Pixhawk TX (pin 2) to UM982 Port 1 RX,
      Pixhawk RX (pin 3) to UM982 Port 1 TX, GND (pin 6) to GND,
      VCC (pin 1, 5V) to UM982 VCC
-   - **SERIAL4 (GPS2)** — heading: Pixhawk TX (pin 2) to UM982 Port 2 RX,
-     Pixhawk RX (pin 3) to UM982 Port 2 TX, GND (pin 6) to GND
+    - **Secondary GNSS UART (`SERIAL5` in `striper.param`)** — heading:
+       Pixhawk TX (pin 2) to UM982 Port 2 RX, Pixhawk RX (pin 3) to UM982
+       Port 2 TX, GND (pin 6) to GND
 6. Mount **both** GNSS antennas on the highest point of the robot, separated
    by at least 20cm (larger baseline = better heading accuracy). Clear
    360-degree sky view for both
@@ -225,6 +227,7 @@ Wire the power distribution system. Refer to `docs/wiring_guide.md` Section
    - `FRAME_TYPE` = 2 (skid steer)
    - `SERIAL2_PROTOCOL` = 28 (Scripting)
    - `GPS_TYPE` = 25 (UnicoreMovingBaselineNMEA / UM982)
+   - `GPS_TYPE2` = 25 (second UM982 data stream)
    - `SCR_ENABLE` = 1
 7. Update `WHL_TRACK` to match your measured track width (default 0.40m)
 
@@ -234,18 +237,19 @@ Wire the power distribution system. Refer to `docs/wiring_guide.md` Section
 2. Remove the microSD card from the Pixhawk
 3. Insert it into your laptop
 4. Create the folder `/APM/scripts/` if it does not exist
-5. Copy these four files from `ardurover/lua/` in this repository:
+5. Copy these required files from `ardurover/lua/` in this repository:
    - `motor_bridge.lua`
-   - `paint_control.lua`
-   - `paint_speed_sync.lua`
+   - `paint_unified.lua`
    - `fence_check.lua`
+   - Optional: `rangefinder_bridge.lua` if you are using the prototype
+     obstacle bridge
 6. Eject the SD card and re-insert it into the Pixhawk
 7. Power on the Pixhawk and connect in Mission Planner
-8. In the Messages tab, verify all four scripts loaded:
+8. In the Messages tab, verify the required scripts loaded:
    - "motor_bridge.lua loaded - hoverboard FOC UART bridge"
-   - "paint_control.lua loaded"
-   - "paint_speed_sync.lua loaded"
+   - "paint_unified.lua loaded - relay-based paint control"
    - "fence_check.lua loaded"
+   - Optional: "rangefinder_bridge.lua loaded" if installed
 
 ### Step 11: Wire and Bind RC Transmitter (30 minutes)
 
@@ -457,7 +461,7 @@ Now add paint commands to the mission (still using water).
    - Water sprays between WP1 and WP2 only
    - No spraying during transit segments
    - Clean start and stop of spray at waypoints
-   - paint_control.lua lead/lag compensation produces clean line ends
+   - paint_unified.lua lead/lag compensation produces clean line ends
 5. Measure the water line on the ground:
    - Width should be approximately 4" (from TeeJet TP8004EVS)
    - Line should be straight (no S-curves or wobble)

@@ -71,3 +71,8 @@ variable "frontend_url" {
 variable "cors_origins" {
   type = string
 }
+
+variable "alarm_topic_arn" {
+  type    = string
+  default = ""
+}

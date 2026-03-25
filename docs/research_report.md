@@ -95,7 +95,7 @@ A used hoverboard ($20-50) from eBay/Facebook Marketplace gives you:
 
 ---
 
-## Positioning: UM980 Replaces ZED-F9P (Saves $125-175)
+## Positioning: Historical UM980 Research, Current Recommendation UM982
 
 ### RTK GPS Module Comparison
 
@@ -108,17 +108,19 @@ A used hoverboard ($20-50) from eBay/Facebook Marketplace gives you:
 | **u-blox ZED-F9R** | ~$250-350 | 1-2cm RTK | L1/L2 | Built-in IMU + dead reckoning |
 | **u-blox ZED-X20P** | TBD (new) | 1-2cm RTK | All-band | Eliminates base station via PointPerfect Live |
 
-### Recommendation: UM980
+### Current Recommendation: UM982
 
-The **Unicore UM980** at ~$120-150 gives **8mm RTK accuracy** — better than the ZED-F9P at half the price. It is well-validated in the precision agriculture community (AgOpenGPS). ArduPilot has native support.
+This research originally favored **UM980** on price and raw RTK accuracy. That recommendation is now superseded.
 
-**Skip the BNO085 IMU.** In an open parking lot with 10-20 Hz RTK, you do not need an IMU. Use heading-from-motion. If you need standstill heading, drive forward 20cm to establish GPS heading, or add a $10 LSM6DSV later.
+Use **UM982** for the current rover because dual-antenna heading solves the low-speed heading problem that breaks UM980-at-paint-speed deployments. UM980 remains historically interesting on price/performance, but it is not the current purchase recommendation for this robot.
+
+**Skip the BNO085 IMU as a heading crutch.** The current path is UM982 dual-antenna heading rather than relying on heading-from-motion at paint speed.
 
 ### RTK Correction Sources
 
 | Source | Cost | Coverage | Best For |
 |--------|------|----------|----------|
-| **Own base station** (2nd UM980/LC29H) | $60-150 one-time | Where you put it | Reliability, no subscription |
+| **Own base station** (2nd RTK-capable receiver) | $60-150 one-time | Where you put it | Reliability, no subscription |
 | **RTK2Go** | Free | 800+ stations, variable | Testing, demos |
 | **Point One Polaris** | $50/month | USA, Canada, EU, Australia | Business with multiple job sites |
 | **PointPerfect Live** (u-blox) | Usage-based | USA, EU | If using ZED-X20P |
@@ -215,11 +217,14 @@ return update, 1000
 | Wiring, connectors, fuses | Amazon | $13 |
 | **TOTAL** | | **~$409** |
 
-### Tier 2: $631 "Best Value" (Recommended)
+### Tier 2: $631 Historical "Best Value" Estimate
 
 > **NOTE:** This was the original estimate. After deep hardware research,
-> the Tier 2 BOM has been revised to **~$780**. See `docs/bom.md` for
-> the corrected BOM with Shurflo pump, PM06 V2, DC contactor, etc.
+> the early Tier 2 BOM was revised substantially. Historical progression: ~$631 early estimate,
+> then ~$780 after first hardening pass, and currently ~$1,027 in the research-backed BOM.
+> See [approved_sku_sheet.md](approved_sku_sheet.md), [validated_bom_v3.md](validated_bom_v3.md),
+> and [buying_guide.md](buying_guide.md) for the current purchase path.
+> Do not shop from the historical tables below.
 
 | Component | Source | Cost |
 |-----------|--------|------|
@@ -236,7 +241,7 @@ return update, 1000
 | Wiring/misc | Amazon | $30 |
 | **TOTAL** | | **~$631** |
 
-### Tier 3: $850 "Production Prototype"
+### Tier 3: $850 Historical "Production Prototype"
 
 | Component | Source | Cost |
 |-----------|--------|------|
@@ -265,7 +270,7 @@ return update, 1000
 |-----------|-------------|-----|
 | **ArduRover + AC_Sprayer** | Replaces entire ROS2 stack | Battle-tested, 30 lines of Lua vs 16 nodes |
 | **Hoverboard FOC firmware** | Replaces custom motor driver | Proven in dozens of robots, $30 total |
-| **UM980 RTK module** | Better GPS at half the price | 8mm accuracy, triple-band, ArduPilot native |
+| **UM982 RTK module** | Current rover default | 8mm RTK-class position plus dual-antenna heading |
 | **Mission Planner / QGC** | Replaces custom dashboard | Free, mature, mobile-ready |
 | **Foxglove Studio** | Dev-time monitoring/debugging | Better than RViz for field work |
 
@@ -309,11 +314,6 @@ All competitors use the same approach we planned: **low-pressure diaphragm pump 
 ---
 
 ## Business Model Notes
-
-> **Full business strategy:** See `docs/business-plan.md` for the comprehensive
-> internal business plan covering moat analysis, 5 revenue streams, pricing
-> strategy, unit economics, go-to-market phases, competitive landscape, growth
-> flywheel, and 3-year financial projections.
 
 - **Parking lot striping market is wide open** — almost zero commercial autonomous solutions
 - **Sports field market is crowded** — 6+ well-funded competitors (Turf Tank, TinyMobileRobots, SWOZI, FJD, Fleet, CivDot)
@@ -368,7 +368,7 @@ All competitors use the same approach we planned: **low-pressure diaphragm pump 
 ```
 
 **Total custom code: ~30 lines Lua + pathgen library (already written).**
-**Total BOM: $631-905 vs $1,100-1,350 original.**
+**Current research-backed BOM: $1,027. Historical estimate range in this document: $631-905.**
 **Time to field-ready: days, not months.**
 
 ---
@@ -389,7 +389,7 @@ All competitors use the same approach we planned: **low-pressure diaphragm pump 
 | `striper_ws/src/striper_simulation/` | **KILL** | Use SITL (ArduPilot's built-in simulator) |
 | `dashboard/` | **KILL** | Mission Planner / QGC replaces this |
 | `scripts/pathgen_cli.py` | **KEEP** | CLI for job generation |
-| `docs/bom.md` | **UPDATE** | New BOM |
+| [docs/validated_bom_v3.md](../docs/validated_bom_v3.md) | **UPDATE** | Current validated BOM |
 | `docs/wiring_guide.md` | **UPDATE** | Simplified wiring |
 | `docs/topic_map.md` | **KILL** | No ROS2 topics |
 
@@ -429,7 +429,7 @@ All competitors use the same approach we planned: **low-pressure diaphragm pump 
 
 ### Why Parking Lots Are Underserved
 
-1. **GPS multipath near buildings** — satellite signals bounce off walls, reducing accuracy. Sports fields are open sky. Parking lots have buildings, light poles, trees nearby. RTK still works but needs better antennas/receivers (UM980's triple-band helps here).
+1. **GPS multipath near buildings** — satellite signals bounce off walls, reducing accuracy. Sports fields are open sky. Parking lots have buildings, light poles, trees nearby. RTK still works but needs better antennas/receivers (the current UM982 triband baseline helps here).
 
 2. **More obstacles** — parked cars, curbs, speed bumps, pedestrians, light poles. Sports fields are flat open grass.
 
@@ -443,7 +443,7 @@ All competitors use the same approach we planned: **low-pressure diaphragm pump 
 
 | Advantage | Detail |
 |-----------|--------|
-| **Price** | Sub-$1K robot vs $19K-61K commercial products |
+| **Price** | Roughly $1K-class robot ($1,027 research-backed BOM) vs $19K-61K commercial products |
 | **No subscription** | One-time build cost vs $6K-16K/year fees |
 | **Open architecture** | ArduPilot is open source, hackable, community-supported |
 | **Parking lot focus** | Purpose-built for asphalt, not retrofitted from sports |
@@ -462,7 +462,7 @@ All competitors use the same approach we planned: **low-pressure diaphragm pump 
 ### Revenue Model
 
 - **Per-job pricing:** $500-2K per parking lot (matching manual pricing but faster)
-- **Robot pays for itself in 2-3 jobs** at a $631 build cost
+- **Robot pays for itself in a few jobs** even at the current $1,027 research-backed BOM
 - **RaaS potential:** $2K-5K/month recurring revenue per robot deployed
 - **Consumables:** ~$60-100 in paint per 50-space lot ($15-25/gallon, 4-5 gallons needed)
 

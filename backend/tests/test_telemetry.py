@@ -3,7 +3,13 @@
 import pytest
 
 from backend.database import get_db
-from backend.services.robot_store import create_robot, assign_robot, _hash_api_key
+from backend.services.robot_store import (
+    create_robot,
+    assign_robot,
+    create_robot_claim,
+    claim_robot_for_organization,
+    _hash_api_key,
+)
 
 
 HEARTBEAT_URL = "/api/telemetry/heartbeat"
@@ -165,6 +171,31 @@ async def test_admin_can_see_any_robot_telemetry(admin_client, client):
     assert resp.status_code == 200
     data = resp.json()
     assert data["battery_pct"] == 85
+
+
+@pytest.mark.asyncio
+async def test_org_member_can_see_claimed_robot_telemetry(client):
+    """A user can access telemetry for a robot claimed into their active organization."""
+    robot = await _create_robot_with_key(serial="TEL-ORG")
+    owner_id, owner_token = await _register_user(client, email="owner-org@example.com")
+
+    client.headers["Authorization"] = f"Bearer {owner_token}"
+    me = (await client.get("/api/auth/me")).json()
+    claim, code = await create_robot_claim(robot["id"], owner_id)
+    await claim_robot_for_organization(code, me["active_organization_id"], owner_id)
+
+    await client.post(
+        HEARTBEAT_URL,
+        json=VALID_HEARTBEAT,
+        headers={"X-Robot-Key": API_KEY},
+    )
+
+    resp = await client.get(
+        f"/api/telemetry/robot/{robot['id']}/latest",
+        headers={"Authorization": f"Bearer {owner_token}"},
+    )
+    assert resp.status_code == 200
+    assert resp.json()["battery_pct"] == 85
 
 
 # ---- 7. Get latest returns 404 when no telemetry exists ----

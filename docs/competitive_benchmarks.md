@@ -2,6 +2,9 @@
 
 *Compiled March 2026 from manufacturer specs, forum reports, and academic papers.*
 
+> For actual purchases, use [approved_sku_sheet.md](approved_sku_sheet.md) or [buying_guide.md](buying_guide.md).
+> This document is a benchmarking and risk-analysis reference, not the canonical shopping list.
+
 ---
 
 ## 1. Industry Accuracy Standard Summary
@@ -17,7 +20,7 @@
 | **Tyker Robot Plotter** | "pinpoint" (not quantified) | RTK-GNSS or Total Station | 12-16x faster than manual crew | Road pre-marking; Netherlands |
 | **HP SitePrint** | +/- 2 mm | Total Station (not GNSS) | Indoor only | Floor layout printing; $$$; not outdoor |
 | **Husqvarna EPOS** | 2 cm (local base) / 1-6 cm (cloud) | RTK-GNSS | Mowing speed | Consumer robot mower reference |
-| **Striper (ours)** | Target: 2 cm | Unicore UM980 triband RTK L1/L2/L5 | TBD | 8 mm RTK position accuracy from UM980 |
+| **Striper (ours)** | Target: 2 cm | Holybro H-RTK UM982 dual-antenna GNSS | 0.5-1.0 m/s target | 8 mm RTK-class position with dual-antenna heading at standstill |
 
 ### Key Takeaway
 **The industry consensus for GNSS-based outdoor line marking is +/- 1-2 cm accuracy.** This is the bar. No commercial system claims better than 1 cm outdoors with GNSS alone. Systems achieving mm-level use total stations or laser kits (not pure GNSS).
@@ -110,7 +113,7 @@
 
 ### 3.4 General RTK Field Accuracy (Multiple Sources)
 - **Theoretical RTK position accuracy**: 8 mm + 1 ppm horizontal, 15 mm + 1 ppm vertical
-- **Unicore UM980 spec**: 8 mm horizontal, 15 mm vertical (RTK fixed)
+- **UM982 / UM980 RTK class spec**: 8 mm horizontal, 15 mm vertical (RTK fixed)
 - **Practical outdoor**: 1-2 cm in open sky, degrading near buildings
 - **The gap**: Position accuracy != path following accuracy. The controller, steering, speed, terrain all add error on top of GPS error.
 
@@ -148,10 +151,10 @@ This is the critical distinction. RTK gives you 1-2 cm **position knowledge**, b
 ### 4.4 Realistic Expectations for Our Robot
 
 Given:
-- UM980 position accuracy: ~8 mm RTK fixed
+- UM982 position accuracy: ~8 mm RTK fixed
 - Hoverboard differential drive: responsive steering, no mechanical slop in turns
 - Target speed: 0.5-1.0 m/s (typical for paint robots)
-- GPS update rate: 20 Hz (UM980 supports this)
+- GPS update rate: 10 Hz in the checked-in baseline; higher rates are available if later tuning justifies them
 - Open parking lot: good sky view, minimal multipath
 
 **Realistic cross-track error: 2-5 cm** in the middle of a parking lot, degrading to **5-10 cm** near buildings due to multipath. This is competitive with commercial systems claiming 1-2 cm (which is position accuracy, not necessarily path-following accuracy).
@@ -179,7 +182,7 @@ Parking lots are surrounded by buildings, light poles, cars, and walls. GPS sign
 
 ### 5.3 Mitigation Strategies
 
-1. **Triband receiver (L1/L2/L5)**: UM980's L5 band is more resistant to multipath than L1/L2
+1. **Triband receiver (L1/L2/L5)**: the current UM982 baseline retains the triband advantage and better heading behavior than the old single-antenna path
 2. **Ground plane**: 10+ cm metal ground plane under antenna reduces ground-bounce multipath
 3. **Antenna placement**: Mount as high as practical; clear of metal obstructions
 4. **NTRIP over base station**: Eliminates base station multipath as a variable
@@ -201,7 +204,7 @@ Motor vibration does **not** significantly degrade RTK position accuracy for gro
 ### 6.2 Indirect Effects (Real Concerns)
 
 - **Antenna cable fatigue**: Vibration can loosen SMA connectors over time, causing intermittent signal loss
-- **Compass interference**: Hub motor magnets create magnetic fields that overwhelm the compass (we already disable compass and use GSF heading)
+- **Compass interference**: Hub motor magnets create magnetic fields that overwhelm the compass (we disable the compass and use UM982 dual-antenna GPS heading)
 - **IMU noise**: High-frequency vibration feeds into accelerometer/gyro, degrading EKF state estimation
 - **Structural flex**: If antenna is on a flexible mount, it moves relative to the robot body, adding position noise
 
@@ -228,13 +231,13 @@ Motor vibration does **not** significantly degrade RTK position accuracy for gro
 ## 8. Conclusions for Striper Project
 
 ### We Are Competitive
-- Our UM980 GPS (8 mm RTK) matches or exceeds what competitors use
+- Our UM982 GNSS stack matches or exceeds what competitors use on raw RTK position while improving low-speed heading behavior
 - Our target accuracy (2-5 cm path following) is within the same range as commercial sports field robots
 - Parking lots have more forgiving accuracy requirements than sports fields (no FIFA certification needed)
 
 ### Our Advantages vs. 10Lines
 - Open-source ArduRover firmware vs proprietary (faster iteration, community support)
-- $780 BOM vs likely $5K+ for their hardware
+- $1,027 research-backed BOM vs likely $5K+ for their hardware
 - NTRIP eliminates base station (same as TinyMobileRobots' advantage)
 - US-based development (they're expanding from Estonia)
 

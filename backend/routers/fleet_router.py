@@ -32,6 +32,13 @@ class FleetRobotUpdateRequest(BaseModel):
     notes: Optional[str] = Field(default=None, max_length=1000)
 
 
+async def _get_org_robot_or_404(organization_id: str, robot_id: str) -> dict:
+    robot = await robot_store.get_robot_for_organization(organization_id, robot_id)
+    if not robot:
+        raise HTTPException(status_code=404, detail="Robot not found in organization fleet")
+    return robot
+
+
 @router.get("/robots")
 async def list_robots(
     page: int = Query(default=1, ge=1),
@@ -39,8 +46,19 @@ async def list_robots(
     status: Optional[str] = Query(default=None),
     context: dict = Depends(get_organization_context),
 ):
-    items, total = await robot_store.list_robots(page=page, limit=limit, status=status)
+    items, total = await robot_store.list_robots(
+        page=page,
+        limit=limit,
+        status=status,
+        organization_id=context["organization"]["id"],
+    )
     return {"items": items, "total": total, "page": page, "limit": limit}
+
+
+@router.get("/claimed-robots")
+async def list_claimed_robots(context: dict = Depends(get_organization_context)):
+    items = await robot_store.list_claimed_robots(context["organization"]["id"])
+    return {"items": items, "total": len(items)}
 
 
 @router.patch("/robots/{robot_id}")
@@ -49,6 +67,7 @@ async def update_robot(
     body: FleetRobotUpdateRequest,
     context: dict = Depends(require_organization_role("dispatcher")),
 ):
+    await _get_org_robot_or_404(context["organization"]["id"], robot_id)
     robot = await robot_store.update_robot(
         robot_id,
         status=body.status,
@@ -83,7 +102,12 @@ async def list_maintenance_events(
     robot_id: Optional[str] = Query(default=None),
     context: dict = Depends(get_organization_context),
 ):
-    items = await fleet_store.list_maintenance_events(robot_id=robot_id)
+    if robot_id:
+        await _get_org_robot_or_404(context["organization"]["id"], robot_id)
+    items = await fleet_store.list_maintenance_events(
+        organization_id=context["organization"]["id"],
+        robot_id=robot_id,
+    )
     return {"items": [MaintenanceEventResponse(**item) for item in items], "total": len(items)}
 
 
@@ -92,6 +116,7 @@ async def create_maintenance_event(
     body: MaintenanceEventCreateRequest,
     context: dict = Depends(require_organization_role("dispatcher")),
 ):
+    await _get_org_robot_or_404(context["organization"]["id"], body.robot_id)
     item = await fleet_store.create_maintenance_event(
         body.robot_id,
         context["organization"]["id"],
@@ -117,7 +142,12 @@ async def list_service_checklists(
     robot_id: Optional[str] = Query(default=None),
     context: dict = Depends(get_organization_context),
 ):
-    items = await fleet_store.list_service_checklists(robot_id=robot_id)
+    if robot_id:
+        await _get_org_robot_or_404(context["organization"]["id"], robot_id)
+    items = await fleet_store.list_service_checklists(
+        organization_id=context["organization"]["id"],
+        robot_id=robot_id,
+    )
     return {"items": [ServiceChecklistResponse(**item) for item in items], "total": len(items)}
 
 
@@ -126,6 +156,7 @@ async def create_service_checklist(
     body: ServiceChecklistCreateRequest,
     context: dict = Depends(require_organization_role("dispatcher")),
 ):
+    await _get_org_robot_or_404(context["organization"]["id"], body.robot_id)
     item = await fleet_store.create_service_checklist(
         body.robot_id,
         context["organization"]["id"],

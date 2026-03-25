@@ -6,7 +6,7 @@
 # GPS: Unicore UM982 dual-antenna RTK (8mm position, 0.2° heading)
 # Motors: Hoverboard BLDC via FOC firmware over UART
 # Paint: Shurflo 8000 pump + 3/8" direct-acting solenoid + TP8004EVS nozzle
-# Battery: 36V 18Ah e-bike pack (648Wh), Holybro PM06 V2 (5V), XL4015 (12V 5A)
+# Battery: 36V 18Ah e-bike pack (648Wh), Holybro PM06 V2 (5V), sealed 36V→12V converter (10A+)
 # RC: FlySky FS-i6X receiver (iBus or PPM)
 # Weight: ~22kg dry, ~45kg with full paint tank (5 gal / ~19L paint)
 # Wheels: 6.5" (0.165m diameter) hoverboard wheels
@@ -59,7 +59,9 @@ SERIAL2_BAUD,115
 SERIAL3_PROTOCOL,5
 SERIAL3_BAUD,115
 
-# Serial4 = Arduino Nano rangefinder bridge (HC-SR04 ultrasonic sensors)
+# Serial4 = optional Arduino Nano rangefinder bridge (HC-SR04 ultrasonic sensors)
+# This serial port may remain configured and physically unused on the default
+# field baseline where the prototype bridge is not installed.
 # Protocol 28 = Scripting (Lua reads distance bytes from Arduino Nano)
 # Arduino Nano sends distance data at 115200 baud
 # See obstacle_avoid.lua for the serial protocol specification
@@ -428,7 +430,7 @@ RC10_OPTION,0
 # -----------------------------------------------------------------------------
 # Arming checks bitmask:
 # Bit 0=All, 1=Baro, 2=Compass, 3=GPS, 4=INS, 5=Params, 6=RC, 7=Voltage
-# 120 = GPS + INS + params + RC + voltage (skip barometer AND compass for ground robot)
+# 120 = GPS + INS + params + RC (skip barometer, compass, and voltage)
 ARMING_CHECK,120
 
 # Require arming method: 1 = require rudder stick or GCS arm command
@@ -593,14 +595,12 @@ SIMPLE,0
 # -----------------------------------------------------------------------------
 # RANGEFINDER CONFIGURATION (HC-SR04 Ultrasonic via Arduino Nano Bridge)
 # -----------------------------------------------------------------------------
-# Two HC-SR04 sensors connected via Arduino Nano bridge on Serial4.
-# The Lua script obstacle_avoid.lua reads the rangefinder data and
-# implements stop/resume logic with hysteresis.
-
-# NOTE: Requires rangefinder_bridge.lua script to parse Arduino Nano serial data. Without this script, obstacle avoidance is non-functional.
+# Optional prototype obstacle bridge.
+# Leave disabled in the default field baseline. Re-enable only if the
+# HC-SR04 + Arduino Nano bridge is actually installed and validated.
 
 # Rangefinder 1: Front-Left HC-SR04
-RNGFND1_TYPE,36
+RNGFND1_TYPE,0
 RNGFND1_MIN_CM,2
 RNGFND1_MAX_CM,400
 RNGFND1_ORIENT,0
@@ -608,7 +608,7 @@ RNGFND1_POS_X,0.30
 RNGFND1_POS_Y,0.08
 
 # Rangefinder 2: Front-Right HC-SR04
-RNGFND2_TYPE,36
+RNGFND2_TYPE,0
 RNGFND2_MIN_CM,2
 RNGFND2_MAX_CM,400
 RNGFND2_ORIENT,0
@@ -618,15 +618,16 @@ RNGFND2_POS_Y,-0.08
 # -----------------------------------------------------------------------------
 # PROXIMITY SENSOR (aggregates rangefinders for avoidance)
 # -----------------------------------------------------------------------------
-# PRX_TYPE=4 = Rangefinder-based proximity
-PRX_TYPE,4
+# PRX_TYPE=0 = disabled by default
+PRX_TYPE,0
 PRX_IGN_GND,1
 
 # -----------------------------------------------------------------------------
 # OBJECT AVOIDANCE
 # -----------------------------------------------------------------------------
-# AVOID_ENABLE bitmask: 1=fence, 2=proximity, 4=bench_markers → 7=all
-AVOID_ENABLE,7
+# AVOID_ENABLE bitmask: 1=fence, 2=proximity, 4=bench_markers
+# Default baseline keeps fence enabled and leaves proximity disabled.
+AVOID_ENABLE,1
 # AVOID_BEHAVE: 1=stop (safest for paint robot)
 AVOID_BEHAVE,1
 # AVOID_MARGIN: 0.8m safety margin (stop before reaching obstacle)
@@ -652,8 +653,9 @@ RALLY_TOTAL,0
 # 8. Test paint solenoid with water before loading paint
 # 9. Perform initial PID tuning on flat pavement
 # 10. Verify GPS achieves RTK Fixed before starting paint missions
-# 11. Verify ultrasonic sensors read reasonable distances (2cm-400cm)
-# 12. Test obstacle stop: place object at 1m, verify robot holds
-# 13. Test obstacle clear: remove object, verify robot resumes AUTO
-# 14. Verify Arduino Nano bridge sending data on Serial4
+# 11. Optional: if the HC-SR04 bridge is installed, verify sensors read
+#     reasonable distances (2cm-400cm)
+# 12. Optional: test obstacle stop with the prototype bridge enabled
+# 13. Optional: remove the obstacle and verify expected recovery behavior
+# 14. Optional: verify the Arduino Nano bridge is sending data on Serial4
 # =============================================================================

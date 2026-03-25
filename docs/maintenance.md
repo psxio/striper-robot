@@ -4,9 +4,10 @@ Complete maintenance checklists for the autonomous parking lot line striper.
 Following these procedures will prevent most field failures and extend the
 life of all components.
 
-Hardware reference: Pixhawk 6C Mini, Unicore UM980 GPS, hoverboard hub motors
-(350W x2) with FOC firmware, 36V 10Ah e-bike battery, 12V diaphragm pump +
-solenoid valve + TeeJet TP8004EVS nozzle, FlySky FS-i6X RC.
+Hardware reference: Pixhawk 6C Mini, Unicore UM982 dual-antenna GPS,
+hoverboard hub motors (350W x2) with FOC firmware, 36V 18Ah e-bike battery,
+12V diaphragm pump + solenoid valve + TeeJet TP8004EVS nozzle, FlySky
+FS-i6X RC.
 
 ---
 
@@ -35,11 +36,12 @@ minutes.
 - [ ] RC stick inputs visible in Mission Planner Radio Calibration page
 - [ ] Flight mode switch (CH5) toggles between MANUAL / HOLD / AUTO
 - [ ] SD card inserted in Pixhawk (Lua scripts will not load without it)
-- [ ] GCS messages show all four Lua scripts loaded:
+- [ ] GCS messages show the required Lua scripts loaded:
   - `motor_bridge.lua loaded`
-  - `paint_control.lua loaded`
-  - `paint_speed_sync.lua loaded`
+      - `paint_unified.lua loaded`
   - `fence_check.lua loaded`
+      - Optional: `rangefinder_bridge.lua loaded` if the prototype obstacle
+                  bridge is installed
 
 ### 1.3 Motors
 
@@ -213,15 +215,16 @@ time: 1-2 hours.
 - [ ] Inspect the TeeJet nozzle tip under magnification -- replace if the
       orifice is worn or chipped (replace every 3-6 months with regular use)
 
-### 4.3 Compass Recalibration
+### 4.3 GNSS Heading Verification
 
-- [ ] Perform a full compass calibration outdoors, away from vehicles and
-      metal structures
-- [ ] Rotate the robot through all orientations (figure-8 in three axes)
-- [ ] Verify compass heading matches a known reference (smartphone compass
-      or physical landmark)
-- [ ] Run compass motor compensation: `COMPASS_MOT_TYPE=2`, follow Mission
-      Planner compass-mot wizard
+- [ ] Verify `COMPASS_ENABLE=0` and `EK3_SRC1_YAW=2` remain unchanged in the
+      parameter set
+- [ ] Power the robot outdoors and wait for Mission Planner to report
+      "EKF yaw alignment complete"
+- [ ] Confirm the Mission Planner heading matches the robot's actual facing
+      direction while stationary
+- [ ] Inspect both UM982 antenna mounts, SMA connectors, and baseline spacing
+      for looseness or damage
 
 ### 4.4 Accelerometer Calibration
 
@@ -242,8 +245,8 @@ time: 1-2 hours.
 - [ ] Fully charge the battery, then measure resting voltage of each cell
       group if possible (balanced = all cells within 0.05V)
 - [ ] Note the total charge capacity accepted vs rated capacity -- if less
-      than 70% of rated (e.g., less than 7Ah for a 10Ah pack), the battery
-      is nearing end of life
+      than 70% of rated (e.g., less than 12.6Ah for an 18Ah pack), the
+      battery is nearing end of life
 - [ ] Inspect battery pack for swelling, unusual warmth, or damaged
       wrapping
 - [ ] Clean battery contacts (XT60 connector pins) with contact cleaner
@@ -302,7 +305,8 @@ project phases).
 2. Reinstall SD card in Pixhawk
 3. Connect battery, verify Pixhawk boots and all Lua scripts load
 4. Verify GPS lock
-5. Recalibrate compass (magnetization can shift during storage)
+5. Verify UM982 heading alignment and confirm Mission Planner heading matches
+      the robot while stationary
 6. Perform RC calibration
 7. Test motors in MANUAL mode
 8. Flush the paint system with clean water and test spray pattern
@@ -312,7 +316,7 @@ project phases).
 
 ## 6. Battery Care (36V Li-ion)
 
-The 36V 10Ah e-bike battery is a 10S lithium-ion pack with an integrated BMS
+The 36V 18Ah e-bike battery is a 10S lithium-ion pack with an integrated BMS
 (Battery Management System). Proper care extends its life from 300 to 800+
 charge cycles.
 
@@ -320,9 +324,9 @@ charge cycles.
 
 | Parameter | Value |
 |-----------|-------|
-| Charger type | 42V 2A lithium-ion charger (10S) |
+| Charger type | 42V 2A-3A lithium-ion charger (10S) |
 | Full charge voltage | 42.0V (4.2V per cell) |
-| Charge time (empty to full) | 3-5 hours at 2A |
+| Charge time (empty to full) | 6-10 hours, depending on charger output |
 | Charge temperature range | 32-113 degrees F (0-45 degrees C) |
 
 - Always use the charger supplied with the battery or one rated for 10S
@@ -504,9 +508,9 @@ Hoverboard tires are solid rubber (no flats possible) but they do wear:
 - Mount on the highest point of the robot
 - Use an aluminum ground plane disc (100mm diameter, 1-2mm thick) under the
   antenna for better multipath rejection
-- Keep the antenna at least 10cm from the Pixhawk compass to avoid magnetic
-  interference with GPS signals (the GPS signals are not affected, but the
-  compass is affected by the antenna's ground plane if too close)
+- Keep the antenna and ground plane at least 10cm from the Pixhawk body and
+      high-current wiring so the enclosure, cable routing, and service loops stay
+      accessible
 
 ### 9.3 Cable
 
@@ -586,9 +590,10 @@ and updates are infrequent.
 4. Navigate to `/APM/scripts/`
 5. Replace or update the .lua files:
    - `motor_bridge.lua`
-   - `paint_control.lua`
-   - `paint_speed_sync.lua`
+      - `paint_unified.lua`
    - `fence_check.lua`
+      - Optional: `rangefinder_bridge.lua` if your robot uses the prototype
+        obstacle bridge
 6. Verify file sizes are non-zero and files are not corrupted (open each
    in a text editor)
 7. Re-insert the SD card in the Pixhawk
@@ -609,7 +614,7 @@ and updates are infrequent.
 | Frame bolt check | Weekly | 10 min |
 | GPS antenna inspection | Weekly | 5 min |
 | Deep clean and paint system overhaul | Monthly | 60-90 min |
-| Compass recalibration | Monthly | 15 min |
+| GNSS heading verification | Monthly | 15 min |
 | Battery health check | Monthly | 15 min |
 | RC transmitter battery replacement | Monthly | 5 min |
 | Nozzle tip replacement | Every 3-6 months | 5 min |
@@ -653,4 +658,4 @@ Optional but recommended:
 | Spare hoverboard mainboard (pre-flashed) | 1 | $30 |
 | Spare 12V diaphragm pump | 1 | $30 |
 | Spare solenoid valve | 1 | $15 |
-| Second 36V 10Ah battery | 1 | $100 |
+| Second 36V 18Ah battery | 1 | $160-$250 |

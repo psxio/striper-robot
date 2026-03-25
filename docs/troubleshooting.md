@@ -3,9 +3,10 @@
 Problem, diagnosis, and fix format for the 10 most common issues.
 Each entry includes: symptoms, diagnostic steps, fix, and prevention.
 
-Hardware reference: Pixhawk 6C Mini running ArduRover 4.5+, Unicore UM980 GPS,
-hoverboard hub motors (350W x2) with FOC firmware on SERIAL2, 36V 10Ah e-bike
-battery, 12V diaphragm pump + solenoid valve, FlySky FS-i6X RC.
+Hardware reference: Pixhawk 6C Mini running ArduRover 4.5+, Unicore UM982
+dual-antenna GPS, hoverboard hub motors (350W x2) with FOC firmware on
+SERIAL2, 36V 18Ah e-bike battery, 12V diaphragm pump + solenoid valve,
+FlySky FS-i6X RC.
 
 ---
 
@@ -28,13 +29,13 @@ is wrong.
 
 | # | PreArm Message | Cause | Fix |
 |---|----------------|-------|-----|
-| 1 | "PreArm: Compass not calibrated" | Compass calibration not done or failed | Perform compass calibration: Setup > Mandatory Hardware > Compass > Start. Rotate robot through all axes outdoors, away from metal |
-| 2 | "PreArm: GPS hdop too high" or "PreArm: Need 3D Fix" | GPS does not have a good enough fix. Satellite count too low or accuracy too poor | Move outdoors with clear sky view. Wait 30-60 seconds for fix. Check antenna SMA connector. Check `SERIAL3_PROTOCOL=5`, `GPS_TYPE=24` |
+| 1 | "PreArm: Compass not calibrated" | Legacy compass settings were re-enabled on a build that should use UM982 GPS heading | Restore `COMPASS_ENABLE=0` and `EK3_SRC1_YAW=2`, reboot, and verify Mission Planner reports "EKF yaw alignment complete" before arming |
+| 2 | "PreArm: GPS hdop too high" or "PreArm: Need 3D Fix" | GPS does not have a good enough fix. Satellite count too low, heading antenna unavailable, or accuracy too poor | Move outdoors with clear sky view. Wait 30-60 seconds for fix. Check both SMA connectors. Check `SERIAL3_PROTOCOL=5`, `SERIAL5_PROTOCOL=5`, `GPS_TYPE=25`, and `GPS_TYPE2=25` |
 | 3 | "PreArm: Battery below minimum" or "PreArm: Battery voltage X below minimum Y" | Battery voltage below `BATT_ARM_VOLT` (35V) | Charge the battery. Minimum arming voltage is 35V (3.5V/cell). If battery is charged but reading is wrong, recalibrate `BATT_VOLT_MULT` with a multimeter |
 | 4 | "PreArm: RC not calibrated" | RC transmitter has not been calibrated in Mission Planner | Go to Setup > Mandatory Hardware > Radio Calibration. Move all sticks to full extents and click Calibrate |
 | 5 | "PreArm: Throttle not zero" or "PreArm: Throttle too high" | Throttle stick is not at the bottom position | Pull throttle stick (CH3) fully down. Check `RC3_TRIM` matches the actual minimum PWM value |
 | 6 | "PreArm: Check AHRS" or "PreArm: EKF not healthy" | EKF has not converged yet (common immediately after power-on) or IMU calibration is bad | Wait 30-60 seconds after boot for the EKF to converge. If it persists, redo accelerometer calibration: Setup > Mandatory Hardware > Accel Calibration |
-| 7 | "PreArm: Compass offsets too high" | Compass calibration was done near a magnetic source, or Pixhawk is mounted too close to hub motors | Redo compass calibration at least 10m from vehicles and metal structures. Move Pixhawk farther from the hub motors (at least 15cm) |
+| 7 | "PreArm: Compass offsets too high" | A legacy compass path is still enabled or stale compass calibration data was restored | Disable the compass again (`COMPASS_ENABLE=0`) and rely on UM982 dual-antenna heading. Do not run compass calibration on the default hoverboard build |
 | 8 | "PreArm: Param check failed" or "PreArm: SERVO_FUNCTION invalid" | A parameter value is out of range or conflicting | In Mission Planner, go to Config > Full Parameter List. Check for parameter errors highlighted in red. Reload from `striper.param` if needed |
 | 9 | "PreArm: No scripting serial" or Lua script error | `SERIAL2_PROTOCOL` is not set to 28, or motor_bridge.lua failed to load | Check `SERIAL2_PROTOCOL=28`. Check SD card has `/APM/scripts/motor_bridge.lua`. Check GCS messages for Lua errors |
 | 10 | "PreArm: Hardware safety switch" | Safety switch is engaged (Pixhawk default) | Hold the safety button on the Pixhawk for 5 seconds. Or set `BRD_SAFETY_DEFLT=0` to disable (our param file already does this since we use a hardware E-stop instead) |
@@ -44,8 +45,9 @@ is wrong.
 1. Connect to Mission Planner and read the HUD message bar -- the pre-arm
    message tells you exactly which check is failing
 2. If no message is visible, go to the Messages tab for the full error text
-3. Check which arming checks are enabled: `ARMING_CHECK=124` enables
-   compass, GPS, INS, params, RC, and voltage checks (skips barometer)
+3. Check which arming checks are enabled: the checked-in `striper.param`
+   uses `ARMING_CHECK=120`, which enables GPS, INS, params, and RC checks
+   while skipping barometer and compass on this ground robot
 4. For quick testing only: you can temporarily set `ARMING_CHECK=0` to
    bypass all checks. **Never do this for a real paint mission.**
 
@@ -67,44 +69,43 @@ toward the first waypoint. In MANUAL mode, it drives normally.
 
 - In AUTO mode, robot spins in circles or spirals
 - In Mission Planner, the heading indicator does not match the robot's actual
-  facing direction
-- The compass heading may be off by 90, 180, or random degrees
-- MANUAL mode works correctly (because MANUAL uses raw RC input, no compass)
+   facing direction while the robot is stationary
+- Heading may jump, freeze, or point 90/180 degrees away from reality
+- MANUAL mode works correctly (because MANUAL uses raw RC input, no
+   navigation heading)
 
 ### Diagnostic Steps
 
-1. Place the robot on the ground, pointed north (use a phone compass as
-   reference)
-2. In Mission Planner, check the heading display. If it shows south (180
-   degree error), east (90 degree error), or spinning randomly, the
-   compass is the problem
-3. In Mission Planner, go to Status tab and watch the `magfield` values
-   while rotating the robot. Erratic values = magnetic interference
-4. Check `COMPASS_ORIENT` -- if the Pixhawk is rotated on the frame, this
-   value must match:
-   - 0 = Pixhawk arrow points forward (standard)
-   - 4 = Pixhawk arrow points backward (yaw 180)
-   - 6 = Pixhawk arrow points right (yaw 270)
-5. Check physical distance between Pixhawk and hub motors. The permanent
-   magnets in the hub motors produce strong magnetic fields
+1. Place the robot on the ground, pointed in a known direction
+2. In Mission Planner, verify the status text reports "EKF yaw alignment
+   complete" before starting AUTO
+3. Check the heading display. If it points 90 or 180 degrees away from the
+   robot's actual orientation, or drifts while stationary, the UM982 heading
+   solution is not healthy
+4. Verify both GNSS antennas have clear sky view, both SMA connectors are
+   tight, and the antenna baseline has not shifted on the mast
+5. Check the current parameter set: `COMPASS_ENABLE=0`, `EK3_SRC1_YAW=2`,
+   `GPS_TYPE=25`, and `GPS_TYPE2=25`
+6. Confirm the second UM982 UART is alive. In the current `striper.param`,
+   the heading link is on `SERIAL5`, while `SERIAL4` is reserved for the
+   optional rangefinder bridge
 
 ### Fix
 
 | Cause | Fix |
 |-------|-----|
-| Compass not calibrated | Redo calibration outdoors, 10m+ from metal |
-| `COMPASS_ORIENT` wrong | Set to match Pixhawk physical orientation on frame |
-| Motor magnetic interference | Move Pixhawk farther from motors (15cm+). Re-calibrate. Set `COMPASS_MOT_TYPE=2` and run compass-mot wizard |
-| Compass completely unreliable | Disable compass and use GPS-based heading: set `COMPASS_USE=0`, `EK3_SRC1_YAW=1`. Robot must be moving for heading (no heading at standstill) |
+| UM982 heading not converged | Wait in an open area until Mission Planner reports "EKF yaw alignment complete" |
+| One GNSS antenna disconnected or damaged | Re-seat both SMA connectors, inspect antenna cables, and replace the failed antenna or cable |
+| Secondary UM982 UART not configured | Restore `SERIAL5_PROTOCOL=5`, `GPS_TYPE=25`, and `GPS_TYPE2=25` from `striper.param` |
+| Legacy compass settings re-enabled | Set `COMPASS_ENABLE=0`, reboot, and do not perform compass calibration on this build |
 
 ### Prevention
 
-- Mount Pixhawk at maximum distance from hub motors
-- Always calibrate compass at the job site, not at home
-- Run `COMPASS_MOT_TYPE=2` (throttle-based motor compensation) once during
-  initial setup
-- Consider disabling the compass entirely for this robot (hub motors are very
-  strong magnets) and relying on GPS course heading
+- Verify heading in Mission Planner before every AUTO mission while the robot
+   is stationary
+- Keep both UM982 antennas rigid, separated, and clear of overhead blockage
+- Leave the compass disabled on the hoverboard build; heading comes from the
+   UM982 moving-baseline solution
 
 ---
 
@@ -144,7 +145,7 @@ of being straight.
 | PID tuning too loose | Increase `ATC_STR_RAT_P` by 20%. Decrease `NAVL1_PERIOD` from 5 to 4 |
 | Robot speed too fast for controller | Reduce `WP_SPEED` from 0.50 to 0.30 m/s |
 | GPS antenna vibration | Secure antenna mounting. Ensure the antenna is rigid on the mast, not wobbling |
-| `GPS_DELAY_MS` too high | Reduce from 200 to 100ms. The UM980 is fast and 200ms may over-compensate |
+| `GPS_DELAY_MS` too high | Reduce from 120 to 100ms. The UM982 update path is fast and extra delay can over-compensate |
 
 ### Prevention
 
@@ -191,8 +192,8 @@ paint and looks bad. Too thin leaves gaps in coverage.
 | Lines too thin (<3") | Pump pressure too low | Check 12V rail voltage (should be 12.0V). Check pump for wear. Verify pump is getting 12V, not 10V from a sagging converter |
 | Lines too thin (<3") | Clogged nozzle | Remove and clean nozzle tip. See maintenance guide Section 7 |
 | Width varies along line | Robot speed varies | Check PID tuning for speed control. Set `SPRAY_SPEED_MIN=0.10` to cut paint at very low speeds |
-| Drips/runs at line starts | Solenoid opens before robot moves | Increase `SPRAY_SPEED_MIN` from 0.10 to 0.20 m/s. Adjust lead time in paint_control.lua (`LEAD_TIME_MS`) |
-| Thin at line ends | Solenoid closes too early | Increase `LAG_TIME_MS` in paint_control.lua from 30 to 50-80ms |
+| Drips/runs at line starts | Solenoid opens before robot moves | Increase `SPRAY_SPEED_MIN` from 0.10 to 0.20 m/s. Adjust lead time in `paint_unified.lua` (`LEAD_TIME_MS`) |
+| Thin at line ends | Solenoid closes too early | Increase `LAG_TIME_MS` in `paint_unified.lua` from 30 to 50-80ms |
 
 ### Prevention
 
@@ -275,19 +276,22 @@ navigate or arm.
 ### Diagnostic Steps
 
 1. **Is the GPS module detected?** In Mission Planner, go to Setup >
-   Optional Hardware > GPS. It should show the UM980 (or "AutoDetect").
+   Optional Hardware > GPS. It should show the UM982 moving-baseline setup
+   (or "AutoDetect").
    If nothing is detected:
    - Check SERIAL3 wiring (TX/RX crossover, GND, 5V)
    - Check `SERIAL3_PROTOCOL=5` and `SERIAL3_BAUD=115`
-   - Check `GPS_TYPE=24` (UnicoreNMEA / UM980)
-2. **Is the antenna connected?** Check the SMA connector at the UM980
-   breakout. It must be hand-tight. A disconnected antenna = 0 satellites
+   - Check `GPS_TYPE=25` and `GPS_TYPE2=25`
+   - Check the second UM982 UART is configured on `SERIAL5_PROTOCOL=5`
+2. **Is the antenna connected?** Check both SMA connectors at the UM982
+   breakout. The primary antenna drives position; the second antenna drives
+   heading. A disconnected primary antenna = 0 satellites
 3. **Is there sky view?** The antenna needs an unobstructed view of the sky.
    Test outdoors, away from buildings and tree canopy. GPS does not work
    indoors
 4. **How many satellites?** Mission Planner shows sat count. For 3D Fix:
    need 6+ satellites. For RTK: typically need 10+ satellites
-5. **Is the antenna on the correct frequency?** The UM980 is L1/L2/L5
+5. **Is the antenna on the correct frequency?** The UM982 is L1/L2/L5
    triple-band. The antenna must support at least L1/L2. A single-band
    L1-only antenna will work but with reduced accuracy and slower convergence
 6. **Cold start vs warm start**: first fix after a long power-off can take
@@ -298,12 +302,12 @@ navigate or arm.
 
 | Cause | Fix |
 |-------|-----|
-| SERIAL3 wiring wrong | Verify TX-to-RX crossover: Pixhawk TX (pin 2) to UM980 RX, Pixhawk RX (pin 3) to UM980 TX. Verify GND connected |
-| `GPS_TYPE` wrong | Set `GPS_TYPE=24` for UM980. Use `GPS_TYPE=1` (Auto) if unsure |
+| SERIAL3 wiring wrong | Verify TX-to-RX crossover: Pixhawk TX (pin 2) to UM982 Port 1 RX, Pixhawk RX (pin 3) to UM982 Port 1 TX. Verify GND connected |
+| GPS configuration wrong | Set `GPS_TYPE=25`, `GPS_TYPE2=25`, `SERIAL3_PROTOCOL=5`, and `SERIAL5_PROTOCOL=5` for the UM982 moving-baseline setup |
 | Antenna disconnected | Hand-tighten SMA connector |
 | No sky view | Move outdoors. The antenna needs 360-degree sky view |
 | Antenna cable damaged | Replace the SMA cable. Check for kinks or cuts |
-| UM980 module dead | Measure 5V at the UM980 VCC pin. If power is present but no response, the module may be faulty. Try `GPS_TYPE=1` (Auto) to re-detect |
+| UM982 module dead | Measure 5V at the UM982 VCC pin. If power is present but no response, the module may be faulty. Try `GPS_TYPE=1` only as a temporary autodetect step, then restore the moving-baseline settings |
 | Wrong antenna type | Verify the antenna is multiband (L1/L2). A Bluetooth or WiFi antenna on an SMA connector will not work |
 
 ### Prevention
@@ -458,7 +462,7 @@ should be off.
    Measure continuity between the 12V supply and the solenoid -- there
    should be no continuity with the relay removed. If there is, a wire is
    shorting around the relay
-4. **Check paint_control.lua**: in GCS messages, look for "PAINT: OFF"
+4. **Check paint_unified.lua**: in GCS messages, look for "PAINT: OFF"
    messages when switching out of AUTO mode. If these messages are absent,
    the script may have crashed
 
@@ -468,7 +472,7 @@ should be off.
 |-------|-----|
 | Relay welded closed | Replace the relay module ($5). The relay contacts have fused from overcurrent or missing flyback diode |
 | Relay signal wire shorted to 5V | Find and fix the short. The signal wire from AUX5 should only go to the relay IN pin |
-| paint_control.lua crashed | Reboot Pixhawk. Script will reload. Check for Lua errors in GCS messages |
+| paint_unified.lua crashed | Reboot Pixhawk. Script will reload. Check for Lua errors in GCS messages |
 | `RELAY1_PIN` wrong | Verify `RELAY1_PIN=54` in parameters |
 | Solenoid wired bypassing relay | Trace the solenoid wiring. Both terminals must go through the relay N.O. contact, not direct to 12V |
 
@@ -498,11 +502,13 @@ One or more Lua scripts fail to load or crash during operation.
 
 - GCS messages show "Lua: <script_name> error" with an error description
 - GCS shows "Lua: out of memory"
-- One or more of the four expected "loaded" messages is missing after boot:
+- One or more of the required "loaded" messages is missing after boot:
   - `motor_bridge.lua loaded` -- MISSING means motors will not respond
-  - `paint_control.lua loaded` -- MISSING means paint relay control is manual only
-  - `paint_speed_sync.lua loaded` -- MISSING means no speed-based paint safety
+   - `paint_unified.lua loaded` -- MISSING means mission paint relay control
+      and speed-based paint gating are unavailable
   - `fence_check.lua loaded` -- MISSING means no automatic paint cutoff on fence breach
+   - Optional: `rangefinder_bridge.lua loaded` -- MISSING means the prototype
+      obstacle bridge will not report distances
 - No "loaded" messages at all = scripting engine is not enabled
 
 ### Diagnostic Steps
@@ -512,7 +518,10 @@ One or more Lua scripts fail to load or crash during operation.
 2. **Check the SD card**:
    - Power off the Pixhawk. Remove the SD card
    - Insert into your laptop. Navigate to `/APM/scripts/`
-   - Verify all four .lua files are present
+    - Verify the required .lua files are present: `motor_bridge.lua`,
+       `paint_unified.lua`, and `fence_check.lua`
+    - If the prototype obstacle bridge is installed, also verify
+       `rangefinder_bridge.lua`
    - Verify file sizes are non-zero (open each in a text editor to confirm
      they contain valid Lua code and are not corrupted)
    - Check the SD card for filesystem errors (right-click > Properties >
@@ -522,11 +531,12 @@ One or more Lua scripts fail to load or crash during operation.
    - `attempt to index a nil value` = the script is calling an API that
      does not exist. This can happen if the ArduRover firmware is too old
      for the script
-   - `out of memory` = the Lua heap is too small for all four scripts
+   - `out of memory` = the Lua heap is too small for the loaded scripts
    - `file not found` = the script path is wrong (must be `/APM/scripts/`)
    - `syntax error` = the .lua file is corrupted or was edited incorrectly
-4. **Check `SCR_HEAP_SIZE`**: default is 102400 (100KB). All four scripts
-   should fit comfortably. If getting out-of-memory, increase to 153600
+4. **Check `SCR_HEAP_SIZE`**: default is 102400 (100KB). The baseline
+   script set should fit comfortably. If the optional rangefinder bridge is
+   installed or you see out-of-memory errors, increase to 153600
    (150KB)
 5. **Check `SCR_VM_I_COUNT`**: default is 25000. If scripts are timing
    out (taking too many instructions per tick), increase to 50000
@@ -536,7 +546,7 @@ One or more Lua scripts fail to load or crash during operation.
 | Cause | Fix |
 |-------|-----|
 | `SCR_ENABLE=0` | Set `SCR_ENABLE=1`. Reboot Pixhawk |
-| Script files missing from SD card | Copy all four .lua files from `ardurover/lua/` to the SD card at `/APM/scripts/` |
+| Script files missing from SD card | Copy the baseline .lua files from `ardurover/lua/` to the SD card at `/APM/scripts/`: `motor_bridge.lua`, `paint_unified.lua`, and `fence_check.lua` |
 | Script files corrupted | Re-download from the repository and copy fresh files to the SD card |
 | SD card not inserted | Insert the SD card into the Pixhawk. It is a microSD slot on the side |
 | SD card filesystem error | Back up the card contents, format as FAT32, restore files |
@@ -552,14 +562,15 @@ If you do not have time to debug a Lua script issue:
 1. **motor_bridge.lua failed**: the robot cannot move autonomously. You
    must fix this script before proceeding. The most common field fix is to
    reboot the Pixhawk (power cycle)
-2. **paint_control.lua failed**: you can still control paint manually via
+2. **paint_unified.lua failed**: you can still control paint manually via
    RC toggles (CH7 for solenoid, CH8 for pump). Mission DO_SET_RELAY
    commands will still work for basic on/off
-3. **paint_speed_sync.lua failed**: non-critical. Paint control still works
-   through paint_control.lua. You lose the speed-based paint pause feature
-4. **fence_check.lua failed**: non-critical. ArduRover's built-in
+3. **fence_check.lua failed**: non-critical. ArduRover's built-in
    `FENCE_ACTION` still works. You lose the automatic paint-off on fence
    breach feature
+4. **rangefinder_bridge.lua failed**: only relevant if the prototype
+   obstacle bridge is installed. The robot will continue using manual
+   operator observation and the hardware e-stop as its primary safety layer
 
 ### Prevention
 
@@ -624,7 +635,9 @@ during troubleshooting. All values reference the default `striper.param` file.
 | `SERIAL2_PROTOCOL` | 28 | Motor UART scripting | Motors do not respond |
 | `SERIAL2_BAUD` | 115 | Motor UART baud rate | Motors do not respond |
 | `SERIAL3_PROTOCOL` | 5 | GPS UART | GPS not detected |
-| `GPS_TYPE` | 24 | UM980 (UnicoreNMEA) | GPS not detected |
+| `SERIAL5_PROTOCOL` | 5 | Secondary GPS UART / UM982 heading | Heading not detected |
+| `GPS_TYPE` | 25 | UM982 moving-baseline primary | GPS not detected |
+| `GPS_TYPE2` | 25 | UM982 moving-baseline secondary | Heading not detected |
 | `SCR_ENABLE` | 1 | Lua scripting on/off | Scripts not loading |
 | `SCR_HEAP_SIZE` | 102400 | Lua memory (bytes) | Out of memory errors |
 | `COMPASS_ENABLE` | 0 | Compass disabled (hub motor interference) | Heading wrong |
@@ -639,7 +652,7 @@ during troubleshooting. All values reference the default `striper.param` file.
 | `RELAY1_PIN` | 54 | Solenoid relay pin | Paint relay not working |
 | `RELAY2_PIN` | 55 | Pump relay pin | Pump relay not working |
 | `FENCE_ENABLE` | 1 | Geofence on/off | False fence breaches |
-| `ARMING_CHECK` | 124 | Arming checks bitmask | Cannot arm (diagnosis) |
+| `ARMING_CHECK` | 120 | Arming checks bitmask | Cannot arm (diagnosis) |
 | `FS_THR_ENABLE` | 1 | RC failsafe | Robot stops (RC loss) |
 | `FS_GCS_ENABLE` | 1 | Telemetry failsafe | Robot stops (GCS loss) |
 | `SPRAY_SPEED_MIN` | 0.10 | Min speed for paint (m/s) | Paint pooling at stops |

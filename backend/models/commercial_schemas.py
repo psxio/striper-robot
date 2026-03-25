@@ -110,6 +110,54 @@ class SiteResponse(BaseModel):
     zoom: Optional[int] = None
 
 
+class SiteScanCreateRequest(BaseModel):
+    site_id: str
+    scan_type: Literal["satellite_import", "manual_trace", "drone_capture", "dxf_import", "telemetry_replay"] = "manual_trace"
+    notes: str = Field(default="", max_length=2000)
+    source_media_asset_id: Optional[str] = None
+
+
+class SiteScanResponse(BaseModel):
+    id: str
+    organization_id: str
+    site_id: str
+    lot_id: Optional[str] = None
+    source_media_asset_id: Optional[str] = None
+    scan_type: str
+    notes: str
+    summary: dict[str, Any] = Field(default_factory=dict)
+    geometry_snapshot: list[Any] = Field(default_factory=list)
+    captured_at: str
+    created_at: str
+    updated_at: str
+
+
+class SiteSimulationCreateRequest(BaseModel):
+    site_id: str
+    scan_id: Optional[str] = None
+    work_order_id: Optional[str] = None
+    robot_id: Optional[str] = None
+    mode: Literal["preview", "dispatch_readiness", "mission_rehearsal"] = "preview"
+    speed_mph: float = Field(default=2.0, gt=0, le=8.0)
+    notes: str = Field(default="", max_length=2000)
+
+
+class SiteSimulationResponse(BaseModel):
+    id: str
+    organization_id: str
+    site_id: str
+    scan_id: Optional[str] = None
+    work_order_id: Optional[str] = None
+    robot_id: Optional[str] = None
+    status: str
+    mode: str
+    notes: str
+    config: dict[str, Any] = Field(default_factory=dict)
+    result: dict[str, Any] = Field(default_factory=dict)
+    created_at: str
+    updated_at: str
+
+
 class QuoteCreateRequest(BaseModel):
     site_id: str
     title: str = Field(min_length=1, max_length=200)
@@ -309,3 +357,34 @@ class ConsumableUsageResponse(BaseModel):
     job_run_id: Optional[str] = None
     notes: str
     created_at: str
+
+
+class RobotClaimCreateRequest(BaseModel):
+    robot_id: str
+
+
+class RobotClaimCommissionRequest(BaseModel):
+    friendly_name: str = Field(default="", max_length=200)
+    deployment_notes: str = Field(default="", max_length=2000)
+
+
+class RobotClaimResponse(BaseModel):
+    id: str
+    robot_id: str
+    organization_id: Optional[str] = None
+    status: str
+    commissioning_status: str
+    friendly_name: str = ""
+    deployment_notes: str = ""
+    created_by_user_id: Optional[str] = None
+    claimed_by_user_id: Optional[str] = None
+    claimed_at: Optional[str] = None
+    commissioned_at: Optional[str] = None
+    created_at: str
+    updated_at: str
+    serial_number: Optional[str] = None
+    firmware_version: Optional[str] = None
+    maintenance_status: Optional[str] = None
+    issue_state: Optional[str] = None
+    last_seen_at: Optional[str] = None
+    claim_code: Optional[str] = None

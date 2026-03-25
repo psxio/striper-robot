@@ -36,15 +36,22 @@ async def create_maintenance_event(
         return dict(row) if row else {}
 
 
-async def list_maintenance_events(robot_id: Optional[str] = None) -> list[dict]:
+async def list_maintenance_events(
+    organization_id: Optional[str] = None,
+    robot_id: Optional[str] = None,
+) -> list[dict]:
     async for db in get_db():
-        where = ""
+        where = []
         params: list[object] = []
+        if organization_id:
+            where.append("organization_id = ?")
+            params.append(organization_id)
         if robot_id:
-            where = "WHERE robot_id = ?"
+            where.append("robot_id = ?")
             params.append(robot_id)
+        where_sql = f"WHERE {' AND '.join(where)}" if where else ""
         cursor = await db.execute(
-            f"SELECT * FROM maintenance_events {where} ORDER BY created_at DESC",
+            f"SELECT * FROM maintenance_events {where_sql} ORDER BY created_at DESC",
             tuple(params),
         )
         rows = await cursor.fetchall()
@@ -76,15 +83,22 @@ async def create_service_checklist(
         return data
 
 
-async def list_service_checklists(robot_id: Optional[str] = None) -> list[dict]:
+async def list_service_checklists(
+    organization_id: Optional[str] = None,
+    robot_id: Optional[str] = None,
+) -> list[dict]:
     async for db in get_db():
-        where = ""
+        where = []
         params: list[object] = []
+        if organization_id:
+            where.append("organization_id = ?")
+            params.append(organization_id)
         if robot_id:
-            where = "WHERE robot_id = ?"
+            where.append("robot_id = ?")
             params.append(robot_id)
+        where_sql = f"WHERE {' AND '.join(where)}" if where else ""
         cursor = await db.execute(
-            f"SELECT * FROM service_checklists {where} ORDER BY created_at DESC",
+            f"SELECT * FROM service_checklists {where_sql} ORDER BY created_at DESC",
             tuple(params),
         )
         rows = await cursor.fetchall()

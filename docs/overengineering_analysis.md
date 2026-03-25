@@ -128,7 +128,7 @@ If the built-in sprayer is not flexible enough, ArduRover supports Lua scripts t
 A Lua script for paint control would be approximately **30-50 lines**:
 
 ```lua
--- paint_control.lua
+-- paint_unified.lua
 function update()
     if ardu:get_mode() == 10 then  -- AUTO mode
         local wp = mission:get_current_nav_index()

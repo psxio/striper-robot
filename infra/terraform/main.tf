@@ -2,6 +2,7 @@ data "aws_availability_zones" "available" {}
 
 locals {
   name_prefix = "${var.project_name}-${var.environment}"
+  is_production = var.environment == "production"
   secret_arns = compact([
     var.database_url_secret_arn,
     var.secret_key_secret_arn,
@@ -177,6 +178,26 @@ resource "aws_s3_bucket_versioning" "private" {
   }
 }
 
+resource "aws_s3_bucket_server_side_encryption_configuration" "private" {
+  bucket = aws_s3_bucket.private.id
+  rule {
+    apply_server_side_encryption_by_default {
+      sse_algorithm = "AES256"
+    }
+  }
+}
+
+resource "aws_s3_bucket_lifecycle_configuration" "private" {
+  bucket = aws_s3_bucket.private.id
+  rule {
+    id     = "retain-versions"
+    status = "Enabled"
+    noncurrent_version_expiration {
+      noncurrent_days = local.is_production ? 90 : 30
+    }
+  }
+}
+
 resource "aws_s3_bucket_public_access_block" "private" {
   bucket                  = aws_s3_bucket.private.id
   block_public_acls       = true
@@ -194,6 +215,26 @@ resource "aws_s3_bucket_versioning" "reports" {
   bucket = aws_s3_bucket.reports.id
   versioning_configuration {
     status = "Enabled"
+  }
+}
+
+resource "aws_s3_bucket_server_side_encryption_configuration" "reports" {
+  bucket = aws_s3_bucket.reports.id
+  rule {
+    apply_server_side_encryption_by_default {
+      sse_algorithm = "AES256"
+    }
+  }
+}
+
+resource "aws_s3_bucket_lifecycle_configuration" "reports" {
+  bucket = aws_s3_bucket.reports.id
+  rule {
+    id     = "retain-report-versions"
+    status = "Enabled"
+    noncurrent_version_expiration {
+      noncurrent_days = local.is_production ? 180 : 45
+    }
   }
 }
 
@@ -215,22 +256,23 @@ resource "aws_db_instance" "postgres" {
   identifier              = "${local.name_prefix}-postgres"
   engine                  = "postgres"
   engine_version          = "16.4"
-  instance_class          = "db.t4g.micro"
-  allocated_storage       = 50
-  max_allocated_storage   = 200
+  instance_class          = local.is_production ? "db.t4g.small" : "db.t4g.micro"
+  allocated_storage       = local.is_production ? 100 : 50
+  max_allocated_storage   = local.is_production ? 400 : 200
   db_name                 = var.database_name
   username                = var.database_username
   password                = var.database_password
   db_subnet_group_name    = aws_db_subnet_group.main.name
   vpc_security_group_ids  = [aws_security_group.db.id]
-  backup_retention_period = 7
+  backup_retention_period = local.is_production ? 14 : 7
   backup_window           = "04:00-05:00"
   maintenance_window      = "sun:05:00-sun:06:00"
   deletion_protection     = true
   skip_final_snapshot     = false
   publicly_accessible     = false
   storage_encrypted       = true
-  multi_az                = false
+  multi_az                = local.is_production
+  auto_minor_version_upgrade = true
   tags                    = local.tags
 }
 
@@ -243,7 +285,7 @@ resource "aws_ecr_repository" "app" {
 
 resource "aws_cloudwatch_log_group" "app" {
   name              = "/ecs/${local.name_prefix}"
-  retention_in_days = 30
+  retention_in_days = local.is_production ? 30 : 14
   tags              = local.tags
 }
 
@@ -351,8 +393,16 @@ resource "aws_lb_listener" "http" {
   protocol          = "HTTP"
 
   default_action {
-    type             = "forward"
-    target_group_arn = aws_lb_target_group.app.arn
+    type = var.certificate_arn != "" ? "redirect" : "forward"
+    target_group_arn = var.certificate_arn == "" ? aws_lb_target_group.app.arn : null
+    dynamic "redirect" {
+      for_each = var.certificate_arn != "" ? [1] : []
+      content {
+        port        = "443"
+        protocol    = "HTTPS"
+        status_code = "HTTP_301"
+      }
+    }
   }
 }
 
@@ -390,14 +440,14 @@ resource "aws_ecs_task_definition" "app" {
         protocol      = "tcp"
       }]
       environment = [
-        { name = "ENV", value = "production" },
+        { name = "ENV", value = var.environment },
         { name = "FRONTEND_URL", value = var.frontend_url },
         { name = "CORS_ORIGINS", value = var.cors_origins },
         { name = "AWS_REGION", value = var.aws_region },
         { name = "OBJECT_STORAGE_BACKEND", value = "s3" },
         { name = "S3_PRIVATE_BUCKET", value = aws_s3_bucket.private.bucket },
         { name = "S3_REPORTS_BUCKET", value = aws_s3_bucket.reports.bucket },
-        { name = "ACCESS_TOKEN_EXPIRE_MINUTES", value = "60" }
+        { name = "ACCESS_TOKEN_EXPIRE_MINUTES", value = "30" }
       ]
       secrets = local.container_secrets
       logConfiguration = {
@@ -417,8 +467,12 @@ resource "aws_ecs_service" "app" {
   name            = local.name_prefix
   cluster         = aws_ecs_cluster.main.id
   task_definition = aws_ecs_task_definition.app.arn
-  desired_count   = 1
+  desired_count   = local.is_production ? 2 : 1
   launch_type     = "FARGATE"
+  health_check_grace_period_seconds = 120
+  deployment_minimum_healthy_percent = 100
+  deployment_maximum_percent         = 200
+  enable_execute_command             = true
 
   deployment_circuit_breaker {
     enable   = true
@@ -455,6 +509,7 @@ resource "aws_cloudwatch_metric_alarm" "alb_5xx" {
     TargetGroup  = aws_lb_target_group.app.arn_suffix
   }
   treat_missing_data = "notBreaching"
+  alarm_actions      = var.alarm_topic_arn != "" ? [var.alarm_topic_arn] : []
   tags               = local.tags
 }
 
@@ -472,5 +527,6 @@ resource "aws_cloudwatch_metric_alarm" "alb_latency" {
     TargetGroup  = aws_lb_target_group.app.arn_suffix
   }
   treat_missing_data = "notBreaching"
+  alarm_actions      = var.alarm_topic_arn != "" ? [var.alarm_topic_arn] : []
   tags               = local.tags
 }

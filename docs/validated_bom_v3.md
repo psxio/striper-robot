@@ -4,6 +4,26 @@
 > **Method**: Cross-referenced against ArduPilot docs, datasheets, competitor teardowns,
 > research papers, and manufacturer specifications. Every change from v2 is justified below.
 
+> If you are actively buying parts, start with [approved_sku_sheet.md](approved_sku_sheet.md)
+> and [buying_guide.md](buying_guide.md).
+> This file is the engineering rationale and validated baseline. The buying guide is the short
+> answer for what to purchase now.
+
+> This BOM is research-backed against datasheets, ArduPilot constraints, and competitor benchmarks.
+> It is not a claim that the full robot has already been field-validated end-to-end.
+
+> For a production-focused audit of which parts are merely cost-efficient versus genuinely
+> best-in-class, see [parts_audit_best_possible.md](parts_audit_best_possible.md).
+
+---
+
+## Purchasing Note
+
+- Buy from [approved_sku_sheet.md](approved_sku_sheet.md) and [buying_guide.md](buying_guide.md), not from [bom.md](bom.md).
+- Use this file when you want the engineering justification behind those choices.
+- Treat hoverboard drive, HC-SR04, and open buck modules as prototype-era compromises, not final commercial hardware.
+- Keep UM982, Shurflo, TeeJet TP8004EVS, and the contactor-based e-stop architecture.
+
 ---
 
 ## CRITICAL CHANGE: UM980 → UM982 (Heading Problem)
@@ -39,7 +59,7 @@ or unavailable during painting.
 | Battery | Not published | 640 Wh (5 hr spray) | 640 Wh |
 | Paint capacity | 5.5 gal | 10 L (2.6 gal) | 5 gal |
 | Line width | Adjustable | 5-10 cm (2-4") | 4" (10 cm) |
-| Price | ~$6,000/yr lease | ~$5,000/yr lease | $1,011 BOM / $299/yr RaaS |
+| Price | ~$6,000/yr lease | ~$5,000/yr lease | $1,027 BOM / $299/yr RaaS |
 
 **Sources:**
 - [Turf Tank One Specs](https://turftank.com/us/turftankone/)
@@ -123,19 +143,31 @@ or unavailable during painting.
   - Range with 150-250W average: 2.6-4.3 hours
   - Conservative for budgeting: 90-120 minutes of active painting (accounts for terrain, wind, paint viscosity overhead)
 - **Requires**: Same form factor (Hailong case, XT60 connector, 10S BMS with cell balancing)
+- **Buying rule**: Do not buy the cheapest generic 18Ah listing. Buy from a vendor that discloses
+  cell brand, BMS rating, continuous current rating, and connector type.
 - **BATT_LOW_VOLT=33V** (3.3V/cell), **BATT_CRT_VOLT=31V** (3.1V/cell)
 
-### 9. Power Distribution — $49 (CHANGED from $37)
-- **Change**: Added second buck converter for pump (+$12)
-- **Why**: Shurflo pump draws 6.4A at 12V. XL4015 is rated 5A. Pump alone exceeds rating.
-  Sharing one converter causes brownouts on Pixhawk/GPS during pump operation.
-- XL4015 #1 (36V→12V, 5A): Pixhawk, GPS, solenoid, RC receiver (~2A total)
-- XL4015 #2 (36V→12V, 5A): Pump only (6.4A peak, but demand-cycle reduces average)
-  - Note: 6.4A exceeds 5A rating but pump duty-cycles (runs ~50% of time via demand switch)
-  - Alternative: Use a 10A buck converter ($15) instead of two XL4015s
+### 9. Power Distribution — $65 (UPDATED default shopping recommendation)
+- **Change**: The default purchase recommendation is now separate sealed DC-DC rails rather than
+  open XL4015 modules.
+- **Why**: The engineering analysis already proved the pump needs its own rail. The remaining problem
+  is durability. Open hobby buck modules are acceptable on the bench, but not the cleanest purchase
+  choice for an outdoor production-minded build.
+- Buy now:
+  - sealed 36V→12V pump converter with at least 10A continuous rating
+  - separate control/avionics rail so pump startup cannot brown out Pixhawk, GNSS, or RC
+  - Holybro PM06 V2 as the default regulated Pixhawk power module
+- **Selection rule until exact SKUs are frozen**: choose sealed converters with 8-60V input,
+  12V fixed output, documented continuous current rating, and outdoor/automotive mounting suitability.
+  Do not use open bench buck modules as the final installed power hardware.
 - Holybro PM06 V2 power module (current/voltage sensing) — $25
 - **Wire gauge**: 12 AWG main power (handles 20A continuous, fused at 30A)
 - 30A blade fuse on battery output
+
+### 9a. Obstacle Sensing — Prototype Only Unless Upgraded
+- **Prototype option**: HC-SR04 is acceptable for bench testing and very early field trials.
+- **Buying rule**: Do not treat HC-SR04 as the final field safety layer. If you want a safer outdoor
+  build, buy an outdoor-rated distance sensor or physical bumper stop before relying on autonomous stop behavior.
 
 ### 10. E-Stop System — $25 (UNCHANGED)
 - 22mm mushroom button → 40A DC contactor
@@ -177,13 +209,13 @@ or unavailable during painting.
 | Solenoid | $20 | $20 | — |
 | TeeJet nozzle | $15 | $15 | — |
 | Battery (10Ah→18Ah) | $100 | $160 | +$60 |
-| Power distribution | $37 | $49 | +$12 (separate pump converter) |
+| Power distribution | $37 | $65 | +$28 (separate sealed rails + pump surge margin) |
 | E-stop + contactor | $25 | $25 | — |
 | RC transmitter | $50 | $50 | — |
 | Frame + hardware | $80 | $80 | — |
 | Paint tank + plumbing | — | $30 | NEW |
 | Wiring, fuses, misc | $53 | $106 | +$53 (see additional parts below) |
-| **TOTAL** | **$780** | **$1,011** | **+$231** |
+| **TOTAL** | **$780** | **$1,027** | **+$247** |
 
 ### Additional Parts Not in Line Items
 
@@ -205,7 +237,7 @@ Included in the "Wiring, fuses, misc" line ($106):
 **Cost increase justified by:**
 - UM982 eliminates the #1 technical risk (heading at paint speed)
 - 18Ah battery matches proven competitor capacity (640Wh)
-- Separate pump converter prevents electronics brownouts
+- Separate sealed power rails reduce brownouts and improve durability
 - Paint tank/plumbing was always needed but wasn't specified
 - Pixhawk actual price is lower than originally estimated
 
@@ -339,7 +371,7 @@ Parking lot line tolerance is ±5-7 cm ("looks straight"), so this is adequate.
 
 ## PRE-BUILD VALIDATION CHECKLIST
 
-Before spending $1,011, validate these on the bench:
+Before spending $1,027, validate these on the bench:
 
 - [ ] **UM982 heading test**: Order eval board, verify GPS_TYPE=25 heading at standstill
 - [ ] **Hoverboard UART test**: Flash FOC firmware, verify motor_bridge.lua protocol works

@@ -12,7 +12,15 @@ from ..models.commercial_schemas import (
 )
 from ..models.schemas import ScheduleCreate, ScheduleUpdate
 from ..orgs import get_organization_context, require_organization_role
-from ..services import job_store, organization_audit_store, quote_store, report_store, schedule_store, site_store
+from ..services import (
+    job_store,
+    organization_audit_store,
+    quote_store,
+    report_store,
+    robot_store,
+    schedule_store,
+    site_store,
+)
 
 router = APIRouter(tags=["operations"])
 
@@ -27,6 +35,61 @@ async def _validate_assignee_membership(organization_id: str, user_id: str | Non
         )
         return await cursor.fetchone() is not None
     return False
+
+
+async def _validate_robot_dispatch(
+    organization_id: str,
+    robot_id: str | None,
+    *,
+    date: str,
+    scheduled_start_at: str | None = None,
+    scheduled_end_at: str | None = None,
+    exclude_job_id: str | None = None,
+) -> bool:
+    if not robot_id:
+        return True
+    robot = await robot_store.get_robot_for_organization(organization_id, robot_id)
+    if not robot:
+        raise HTTPException(status_code=404, detail="Assigned robot not found")
+    if robot.get("status") == "retired":
+        raise HTTPException(status_code=400, detail="Assigned robot is retired")
+    if robot.get("maintenance_status") not in (None, "", "ready"):
+        raise HTTPException(
+            status_code=400,
+            detail=f"Assigned robot is not dispatch-ready: {robot.get('maintenance_status')}",
+        )
+    if robot.get("issue_state"):
+        raise HTTPException(status_code=400, detail=f"Assigned robot has active issue: {robot['issue_state']}")
+
+    async for db in get_db():
+        params: list[object] = [organization_id, robot_id, date]
+        where = """
+            organization_id = ? AND robot_id = ? AND date = ?
+            AND status NOT IN ('cancelled', 'completed', 'verified')
+        """
+        if exclude_job_id:
+            where += " AND id != ?"
+            params.append(exclude_job_id)
+        cursor = await db.execute(
+            f"""SELECT id, scheduled_start_at, scheduled_end_at
+                FROM jobs
+                WHERE {where}
+                LIMIT 1""",
+            tuple(params),
+        )
+        existing = await cursor.fetchone()
+        if not existing:
+            return True
+        if not scheduled_start_at or not scheduled_end_at:
+            raise HTTPException(status_code=409, detail="Assigned robot already has work scheduled for that date")
+        existing_start = existing["scheduled_start_at"]
+        existing_end = existing["scheduled_end_at"]
+        if not existing_start or not existing_end:
+            raise HTTPException(status_code=409, detail="Assigned robot already has work scheduled for that date")
+        if scheduled_start_at < existing_end and scheduled_end_at > existing_start:
+            raise HTTPException(status_code=409, detail="Assigned robot is already booked in that time window")
+        return True
+    return True
 
 
 @router.get("/api/work-orders")
@@ -61,6 +124,13 @@ async def create_work_order(
             raise HTTPException(status_code=404, detail="Quote not found")
     if not await _validate_assignee_membership(context["organization"]["id"], body.assigned_user_id):
         raise HTTPException(status_code=404, detail="Assigned technician not found in organization")
+    await _validate_robot_dispatch(
+        context["organization"]["id"],
+        body.assigned_robot_id,
+        date=body.date,
+        scheduled_start_at=body.scheduled_start_at,
+        scheduled_end_at=body.scheduled_end_at,
+    )
     work_order = await job_store.create_work_order(
         context["organization"]["id"],
         context["user"]["id"],
@@ -112,6 +182,14 @@ async def update_work_order(
     existing = await job_store.get_job_by_org(context["organization"]["id"], job_id)
     if not existing:
         raise HTTPException(status_code=404, detail="Work order not found")
+    await _validate_robot_dispatch(
+        context["organization"]["id"],
+        body.assigned_robot_id or existing.get("robot_id"),
+        date=existing["date"],
+        scheduled_start_at=body.scheduled_start_at or existing.get("scheduled_start_at"),
+        scheduled_end_at=body.scheduled_end_at or existing.get("scheduled_end_at"),
+        exclude_job_id=job_id,
+    )
     if body.status == "verified":
         report = await report_store.get_latest_job_report(context["organization"]["id"], job_id)
         issues = report_store.report_readiness_issues(report)
@@ -171,11 +249,17 @@ async def create_job_run(
         raise HTTPException(status_code=400, detail="Job run payload does not match route job ID")
     if not await _validate_assignee_membership(context["organization"]["id"], body.technician_user_id):
         raise HTTPException(status_code=404, detail="Assigned technician not found in organization")
+    run_robot_id = work_order.get("robot_id")
+    if body.robot_id:
+        robot = await robot_store.get_robot_for_organization(context["organization"]["id"], body.robot_id)
+        if not robot:
+            raise HTTPException(status_code=404, detail="Assigned robot not found")
+        run_robot_id = robot["id"]
     run = await job_store.create_job_run(
         context["organization"]["id"],
         job_id,
         work_order.get("site_id"),
-        body.robot_id or work_order.get("robot_id"),
+        run_robot_id,
         body.technician_user_id or context["user"]["id"],
         notes=body.notes,
     )
@@ -232,6 +316,8 @@ async def create_org_schedule(
         body.day_of_week,
         body.day_of_month,
         body.time_preference,
+        organization_id=context["organization"]["id"],
+        site_id=site["id"],
     )
     return schedule
 

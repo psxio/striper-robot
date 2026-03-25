@@ -20,6 +20,17 @@ Use ardurover/sitl/sim_striper.sh to launch SITL.
 import argparse
 import sys
 import time
+from pathlib import Path
+
+
+PROJECT_ROOT = Path(__file__).resolve().parents[1]
+PACKAGE_ROOT = PROJECT_ROOT / "striper_pathgen"
+for candidate in (PROJECT_ROOT, PACKAGE_ROOT):
+    candidate_str = str(candidate)
+    if candidate_str not in sys.path:
+        sys.path.insert(0, candidate_str)
+
+from striper_pathgen.ardurover_param_validator import validate_ardurover_params_file
 
 try:
     from pymavlink import mavutil, mavwp
@@ -42,6 +53,7 @@ CONNECT_TIMEOUT = 30    # seconds
 ARM_TIMEOUT = 30        # seconds
 MISSION_TIMEOUT = 180   # seconds for entire mission
 HEARTBEAT_TIMEOUT = 5   # seconds between heartbeats
+DEFAULT_PARAM_FILE = PROJECT_ROOT / "ardurover" / "params" / "striper.param"
 
 
 # ── Helpers ────────────────────────────────────────────────────────────────
@@ -146,6 +158,30 @@ def _relay_cmd(seq, relay, state):
         x=0, y=0, z=0,
         mission_type=0,
     )
+
+
+def validate_param_file(param_file: Path) -> bool:
+    """Validate the checked-in ArduRover baseline before running SITL."""
+    try:
+        result = validate_ardurover_params_file(param_file)
+    except FileNotFoundError:
+        print(f"ERROR: Parameter file not found: {param_file}")
+        return False
+
+    print(f"Validating parameter baseline: {param_file}")
+    for warning in result.warnings:
+        print(f"WARNING: {warning}")
+
+    if not result.ok:
+        for error in result.errors:
+            print(f"ERROR: {error}")
+        return False
+
+    print(
+        "Parameter baseline validation passed "
+        f"({result.stats['parsed_parameters']} parameters checked)."
+    )
+    return True
 
 
 # ── Main Test Flow ─────────────────────────────────────────────────────────
@@ -367,11 +403,26 @@ def main():
         "--height", type=float, default=RECT_HEIGHT_M,
         help=f"Rectangle height in meters (default: {RECT_HEIGHT_M})",
     )
+    parser.add_argument(
+        "--param-file",
+        type=Path,
+        default=DEFAULT_PARAM_FILE,
+        help=f"Path to ArduRover parameter file (default: {DEFAULT_PARAM_FILE})",
+    )
+    parser.add_argument(
+        "--skip-param-validation",
+        action="store_true",
+        help="Skip local striper.param validation before connecting to SITL",
+    )
     args = parser.parse_args()
 
     test = SITLTest(args.connection)
 
     try:
+        if not args.skip_param_validation and not validate_param_file(args.param_file):
+            print("ABORT: Parameter baseline validation failed")
+            sys.exit(2)
+
         test.connect()
 
         # Build and upload mission

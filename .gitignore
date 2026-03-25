@@ -2,6 +2,17 @@
 .env
 .env.*
 !.env.example
+*.pem
+*.key
+*.p12
+*.pfx
+*.crt
+*.cer
+*.jks
+*.ovpn
+secrets/
+docs/internal/
+docs/business-plan.md
 
 # Python
 __pycache__/

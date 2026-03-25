@@ -21,3 +21,15 @@ jobs:
           scan-type: fs
           scan-ref: .
           format: table
+      - uses: hashicorp/setup-terraform@v3
+      - name: Terraform validate
+        working-directory: infra/terraform
+        run: |
+          terraform init -backend=false
+          terraform validate
+      - name: Build local image for scan
+        run: docker build -t strype-security-scan -f backend/Dockerfile .
+      - uses: aquasecurity/trivy-action@0.28.0
+        with:
+          image-ref: strype-security-scan
+          format: table

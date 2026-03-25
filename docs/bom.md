@@ -1,6 +1,19 @@
 # Striper Robot -- Bill of Materials (BOM)
 
-**NOTE: This BOM is superseded by docs/validated_bom_v3.md which has research-validated pricing and specs.**
+**NOTE: Do not shop from this file.**
+
+This BOM is historical context only. For current purchasing:
+
+- Use [buying_guide.md](buying_guide.md) for the short shopping list
+- Use [validated_bom_v3.md](validated_bom_v3.md) for the validated engineering BOM
+- Use [parts_audit_best_possible.md](parts_audit_best_possible.md) for production-grade upgrade choices
+
+If you only need the current answer:
+
+- Current research-backed prototype BOM: about $1,027
+- Current GNSS choice: UM982, not UM980
+- Current battery baseline: 36V 18Ah, not 10Ah
+- HC-SR04 is not the current production obstacle-stop recommendation
 
 Bill of materials for the autonomous parking-lot line-striping robot,
 redesigned around **ArduRover on a Pixhawk flight controller** with
@@ -9,10 +22,9 @@ redesigned around **ArduRover on a Pixhawk flight controller** with
 Three tiers let you start cheap and upgrade as needed. Prices are
 approximate USD as of early 2026 and exclude shipping/tax.
 
-> **Business context:** The Tier 2 BOM ($780) is the COGS basis for the
-> assembled Strype robot ($2,495 retail, 69% gross margin). See
-> `docs/business-plan.md` for full pricing strategy, unit economics, and
-> revenue model.
+> **Business context:** The $780 Tier 2 number below is historical only.
+> Current research-backed prototype BOM guidance lives in
+> [validated_bom_v3.md](validated_bom_v3.md).
 
 ---
 
@@ -45,13 +57,17 @@ enough to prove the concept in a parking lot.
 
 ---
 
-## Tier 2: $780 "Best Value" (RECOMMENDED)
+## Tier 2: $780 Historical "Best Value" Estimate (Superseded)
 
 The sweet spot. A real Pixhawk running ArduRover gives you autopilot,
 Mission Planner, RC manual override, geofencing, and the built-in
-AC_Sprayer library. The UM980 GPS is cheaper and more accurate than the
-ZED-F9P. A separate e-bike battery gives 45-70 minutes of runtime
+AC_Sprayer library. This original estimate used UM980 and a 10Ah battery.
+Current docs have superseded that with UM982 and an 18Ah battery. A separate e-bike battery gives 45-70 minutes of runtime
 (realistic, accounting for average motor + paint system draw).
+
+> **Superseded hardware warning:** Do not buy this tier verbatim.
+> For current purchases, use UM982 instead of UM980, 36V 18Ah instead of 10Ah,
+> and do not rely on HC-SR04 as the final production obstacle-stop layer.
 
 > **Important: Hoverboard compatibility.** The mainboard **must** have an
 > **STM32F103RCT6** or **GD32F103RCT6** chip. Boards with **AT32** chips
@@ -66,25 +82,29 @@ ZED-F9P. A separate e-bike battery gives 45-70 minutes of runtime
 | 2 | ST-Link V2 programmer | Same as Tier 1. | 1 | $6 | [Amazon](https://www.amazon.com/s?k=ST-Link+V2) |
 | 3 | 2020 aluminum extrusion frame + plywood deck | 500mm lengths of 20x20mm V-slot extrusion, corner brackets, T-nuts, M5 screws. 3/4" plywood deck as stressed skin. Harvest original hub motor brackets from the hoverboard shell for mounting. | 1 | $50 | [Amazon](https://www.amazon.com/s?k=2020+aluminum+extrusion+500mm) / Home Depot |
 | 4 | Pixhawk 6C Mini | Holybro Pixhawk 6C Mini. Runs ArduRover firmware. STM32H743, triple IMU, barometer, microSD. Part: Holybro 6C Mini Set. | 1 | $120 | [Holybro](https://holybro.com/products/pixhawk-6c-mini) |
-| 5 | Unicore UM980 breakout + triband antenna | ArduSimple simpleRTK3B Budget (recommended). UM980 RTK GNSS module. L1/L2/L5 triple-band, 8mm RTK accuracy. ArduPilot native support (`GPS_TYPE=24`). Includes JST-GH cable for Pixhawk GPS port. Pair with a triband L1/L2/L5 antenna for full benefit. | 1 | $180 | [ArduSimple](https://www.ardusimple.com/product/simplertk3b-budget/) |
+| 5 | Historical UM980 breakout + triband antenna (superseded) | Original estimate used ArduSimple simpleRTK3B Budget with UM980. Current validated build uses UM982 dual-antenna heading instead. | 1 | $180 | [ArduSimple](https://www.ardusimple.com/product/simplertk3b-budget/) |
 | 6 | Shurflo 8000 diaphragm pump | **Shurflo 8000-543-236** (or 8000-543-238). 12V, 60 PSI, 1.0 GPM. Self-priming. Handles traffic paint viscosity (thin 10-15% with water). Cheap Amazon pumps will clog or fail with real traffic paint. | 1 | $90 | [Amazon](https://www.amazon.com/s?k=Shurflo+8000+diaphragm+pump+12V) |
 | 7 | 12V solenoid valve (N.C., direct-acting) | **3/8" NPT, brass, direct-acting** (NOT pilot-operated). Direct-acting valves work at zero pressure differential. Pilot-operated valves require minimum flow pressure to seal and will drip at low pump speeds. | 1 | $20 | [Amazon](https://www.amazon.com/s?k=3%2F8+12V+solenoid+valve+brass+normally+closed+direct+acting) |
 | 8 | TeeJet TP8004EVS nozzle + fittings | **TeeJet TP8004EVS** (Even Spray variant). The standard 8004 has tapered edges producing uneven line width. The EVS variant delivers uniform distribution across the full fan. At 60mm nozzle height = ~100mm (4") line width. Include 60-mesh inline strainer, barb-to-NPT adapters, and 3ft of 3/8" vinyl tubing. | 1 | $15 | [Amazon](https://www.amazon.com/s?k=TeeJet+TP8004EVS) / [SpraySmarter](https://www.spraysmarter.com/) |
 | 9 | Paint flush system + mounting hardware | 500ml water reservoir + 3-way T-valve for automatic nozzle flush (prevents clogging during pauses >30 seconds). Nozzle bracket, paint reservoir holder, tube routing clips. Use normal-dry traffic paint only (fast-dry clogs nozzle in <2 min). | 1 | $25 | Amazon / hardware store |
-| 10 | 36V 10Ah e-bike battery | 36V lithium-ion, 10S or equivalent. 360Wh. Includes 30A BMS. XT60 or Anderson connector. **Realistic runtime: 45-70 minutes** (not 2-3 hours — motors draw 200-400W average, pump draws 36W). | 1 | $100 | [Amazon](https://www.amazon.com/s?k=36V+10Ah+ebike+battery) |
+| 10 | Historical 36V 10Ah e-bike battery (superseded) | Original estimate used 36V lithium-ion, 10S, 360Wh. Current validated build uses 36V 18Ah for materially better runtime and margin assumptions. | 1 | $100 | [Amazon](https://www.amazon.com/s?k=36V+10Ah+ebike+battery) |
 | 11 | 36V→12V DC-DC converter (5A) | **5A minimum, 10A preferred** (XL4015 or LM2596HV). The Shurflo pump has 15-24A inrush on startup; a 3A converter will brownout. 5A handles steady-state; 10A handles inrush with margin. | 1 | $12 | [Amazon](https://www.amazon.com/s?k=36V+to+12V+DC+DC+converter+5A) |
 | 12 | Holybro PM06 V2 power module | Replaces generic 5V BEC. Provides regulated 5.2V/3A to Pixhawk with **built-in battery voltage and current monitoring** (INA226 sensor). Plugs directly into Pixhawk POWER port via JST-GH. Input range: 7-42V. | 1 | $25 | [Holybro](https://holybro.com/products/pm06-v2) |
 | 13 | E-stop button + DC contactor | 22mm mushroom-head twist-release button (N.C. contacts). **Route through a 40A DC contactor** (e.g., Hella 4RA relay or EV200 style). The 22mm button's contacts energize the contactor coil; the contactor breaks the 36V/40A main power. A bare e-stop button cannot reliably break 40A DC. | 1 | $25 | Amazon |
-| 14 | HC-SR04 ultrasonic sensors | 2-400 cm range, 5V. Front-left and front-right obstacle detection. Connected via Arduino Nano bridge to Pixhawk SERIAL4. | 2 | $5 | Amazon |
+| 14 | HC-SR04 ultrasonic sensors (historical prototype choice) | 2-400 cm range, 5V. Prototype-only obstacle sensing option. Current docs do not recommend HC-SR04 as the final production stop layer. | 2 | $5 | Amazon |
 | 15 | RC transmitter + receiver (FlySky FS-i6X) | 6-channel, 2.4 GHz, IBUS/SBUS receiver. Manual override + mode switching. Part: FlySky FS-i6X with FS-iA6B receiver. | 1 | $30 | [Amazon](https://www.amazon.com/s?k=FlySky+FS-i6X) |
 | 16 | Wiring, connectors, fuses, mounting | **12 AWG** silicone wire (main power, not 14 AWG), 18 AWG (12V rail), 22 AWG (signals). XT60 connectors, 30A blade fuse + holder, JST-GH cables for Pixhawk, M3 standoffs, zip ties, heat shrink. **Include 2x 1N4007 flyback diodes** for solenoid and pump. | 1 lot | $30 | Amazon |
 | 17 | Relay module (2-channel, 5V) | For Pixhawk AUX OUT to control solenoid and pump. Opto-isolated preferred. | 1 | $5 | Amazon |
 | 18 | 60-mesh inline paint strainer | Prevents nozzle clogs from paint solids. Install between pump outlet and solenoid inlet. | 1 | $5 | Amazon |
 | 19 | 1N4007 flyback diodes (2x) | Suppress voltage spikes when relay opens solenoid/pump. Cathode to positive, anode to negative terminal. | 2 | $2 | Amazon |
 
-**Tier 2 Total: ~$780**
+**Historical Tier 2 Total: ~$780**
 
-> **What changed from original $631 estimate:** Pump upgraded from $30
+> **What changed from original $631 estimate:** This section describes the historical path to the
+> ~$780 estimate. Current purchasing guidance has moved beyond this to the
+> research-backed BOM in [validated_bom_v3.md](validated_bom_v3.md).
+>
+> Historical deltas included: Pump upgraded from $30
 > generic to $90 Shurflo (traffic paint needs it). BEC upgraded from $5
 > generic to $25 Holybro PM06 V2 (battery monitoring). E-stop needs $20
 > contactor (button alone can't break 40A). 12V converter needs 5A ($12
@@ -95,11 +115,14 @@ ZED-F9P. A separate e-bike battery gives 45-70 minutes of runtime
 
 ---
 
-## Tier 3: $1,050 "Production Prototype"
+## Tier 3: $1,050 Historical "Production Prototype"
 
 Built to run all day on real job sites. Better GPS antenna for multipath
 rejection near buildings, bigger battery, weatherproof enclosure,
 proper spray tip with filter, and a full-size Pixhawk for expansion.
+
+> **Superseded hardware warning:** This historical tier still shows UM980 and HC-SR04.
+> Use the current validated BOM and buying guide for present-day purchasing decisions.
 
 | # | Component | Specs / Notes | Qty | Cost | Source |
 |---|-----------|---------------|-----|------|--------|
@@ -107,13 +130,13 @@ proper spray tip with filter, and a full-size Pixhawk for expansion.
 | 2 | ST-Link V2 programmer | Same. | 1 | $6 | Amazon |
 | 3 | Aluminum frame + proper casters + paint tray mount | Welded or bolted aluminum tube/extrusion frame. 4" swivel casters (locking). Integrated paint reservoir tray. | 1 | $80 | Amazon / local metal shop |
 | 4 | Pixhawk 6C (full size) | Holybro Pixhawk 6C. Full-size with all ports. More serial ports, CAN bus, dual redundant power. Part: Holybro Pixhawk 6C Standard Set. | 1 | $180 | [Holybro](https://holybro.com/products/pixhawk-6c) |
-| 5 | Unicore UM980 breakout | Same module as Tier 2. | 1 | $120 | ArduSimple / SparkFun |
+| 5 | Historical UM980 breakout (superseded) | Same module as historical Tier 2. Current validated build uses UM982 instead. | 1 | $120 | ArduSimple / SparkFun |
 | 6 | Quality multiband GNSS antenna | Survey-grade L1/L2/L5 antenna with ground plane. Better multipath rejection for parking lots near buildings. (e.g., u-blox ANN-MB-00 or Beitian BT-800D). | 1 | $65 | [SparkFun](https://www.sparkfun.com/) / [DigiKey](https://www.digikey.com/) |
 | 7 | Graco-style spray tip + filter + fittings | Graco RAC 5 LL5319 reversible tip, inline filter (60-mesh), tip guard. Professional-grade line quality. | 1 | $100 | Amazon / [Graco](https://www.graco.com/) / paint supply |
 | 8 | 36V 15Ah e-bike battery + charger | 36V lithium-ion, 15Ah (540Wh). Includes BMS. Bundled 42V 2A charger. **Realistic runtime: 90-120 min** (1.5x Tier 2). | 1 | $140 | [Amazon](https://www.amazon.com/s?k=36V+15Ah+ebike+battery+charger) |
 | 9 | DC-DC converter (36V→12V, 10A) + Holybro PM06 V2 | 36V to 12V (10A, XL4015) for pump/solenoid. Holybro PM06 V2 for 5V with battery monitoring. ATC fuse panel (4-way). | 1 | $45 | Amazon / Holybro |
 | 10 | E-stop button + DC contactor | Same as Tier 2. 22mm button drives 40A DC contactor coil. | 1 | $25 | Amazon |
-| 11 | HC-SR04 ultrasonic sensors | Same as Tier 2. | 2 | $5 | Amazon |
+| 11 | HC-SR04 ultrasonic sensors (historical prototype choice) | Same as historical Tier 2. Not the current production safety recommendation. | 2 | $5 | Amazon |
 | 12 | FlySky FS-i6X (full 10-channel) | 10-channel transmitter. Extra channels for spray on/off toggle, speed dial, mode switch. Part: FlySky FS-i6X + FS-iA10B receiver. | 1 | $50 | [Amazon](https://www.amazon.com/s?k=FlySky+FS-i6X+10+channel) |
 | 13 | Weatherproof enclosure | IP65, ~300x200x120mm. Houses Pixhawk, DC-DC converters, relay module, fuse panel. | 1 | $20 | [Amazon](https://www.amazon.com/s?k=IP65+enclosure+300x200) |
 | 14 | Shurflo 8000 diaphragm pump | Same as Tier 2. Shurflo 8000-543-236, 12V, 60 PSI. Handles traffic paint. | 1 | $90 | Amazon |
@@ -127,17 +150,17 @@ proper spray tip with filter, and a full-size Pixhawk for expansion.
 
 ## Tier Comparison
 
-| Feature | Tier 1 ($409) | Tier 2 ($780) | Tier 3 ($1,050) |
+| Feature | Tier 1 ($409) | Tier 2 historical ($780) | Tier 3 historical ($1,050) |
 |---------|---------------|---------------|---------------|
 | Autopilot | ESP32 (custom FW) | Pixhawk 6C Mini (ArduRover) | Pixhawk 6C Full (ArduRover) |
-| GPS module | ZED-F9P (1-2 cm) | UM980 (8 mm) | UM980 (8 mm) + survey antenna |
-| Runtime | 20-40 min (hoverboard battery) | 45-70 min (36V 10Ah) | 90-120 min (36V 15Ah) |
+| GPS module | ZED-F9P (1-2 cm) | UM980 (historical; current build uses UM982) | UM980 (historical; current build uses UM982) + survey antenna |
+| Runtime | 20-40 min (hoverboard battery) | 45-70 min (historical 36V 10Ah) | 90-120 min (historical 36V 15Ah) |
 | Pump | Generic diaphragm | Shurflo 8000 (traffic paint) | Shurflo 8000 (traffic paint) |
 | Nozzle | Basic flat fan | TeeJet TP8004EVS (even spray) | Graco RAC 5 reversible tip |
 | RC override | No | Yes (FlySky 6ch) | Yes (FlySky 10ch) |
 | Mission Planner | No | Yes | Yes |
 | Geofencing | No | Yes (ArduRover) | Yes (ArduRover) |
-| Obstacle detection | No | 2x ultrasonic | 2x ultrasonic |
+| Obstacle detection | No | 2x ultrasonic (historical prototype) | 2x ultrasonic (historical prototype) |
 | Weatherproofing | None | None | IP65 enclosure |
 | Frame | Plywood | Aluminum extrusion + plywood | Aluminum + proper casters |
 | E-stop | Button + relay | Button + DC contactor | Button + DC contactor |

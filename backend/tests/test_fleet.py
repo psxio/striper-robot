@@ -16,8 +16,10 @@ async def _setup_org_and_robot(auth_client):
     me = (await auth_client.get("/api/auth/me")).json()
     org_id = me["active_organization_id"]
     headers = {"X-Organization-ID": org_id}
-    from backend.services.robot_store import create_robot
+    from backend.services.robot_store import create_robot, create_robot_claim, claim_robot_for_organization
     robot = await create_robot("FLT-001", firmware_version="2026.1.0")
+    claim, code = await create_robot_claim(robot["id"], me["id"])
+    await claim_robot_for_organization(code, org_id, me["id"], friendly_name="Fleet test robot")
     return headers, robot["id"]
 
 
