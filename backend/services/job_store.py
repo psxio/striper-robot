@@ -38,6 +38,15 @@ def _row_to_dict(row: object) -> dict:
         job["lot_name"] = data["lot_name"]
     if data.get("site_name") is not None:
         job["site_name"] = data["site_name"]
+    # Job estimate fields (from LEFT JOIN job_estimates)
+    if data.get("estimated_cost") is not None:
+        job["estimated_cost"] = data["estimated_cost"]
+    if data.get("estimated_runtime_min") is not None:
+        job["estimated_runtime_min"] = data["estimated_runtime_min"]
+    if data.get("paint_gallons") is not None:
+        job["paint_gallons"] = data["paint_gallons"]
+    if data.get("total_line_length_ft") is not None:
+        job["total_line_length_ft"] = data["total_line_length_ft"]
     return job
 
 
@@ -50,10 +59,12 @@ def _job_run_to_dict(row: object) -> dict:
 async def get_job(user_id: str, job_id: str) -> Optional[dict]:
     async for db in get_db():
         cursor = await db.execute(
-            """SELECT j.*, l.name AS lot_name, s.name AS site_name
+            """SELECT j.*, l.name AS lot_name, s.name AS site_name,
+                      je.estimated_cost, je.estimated_runtime_min, je.paint_gallons, je.total_line_length_ft
                FROM jobs j
                LEFT JOIN lots l ON l.id = j.lot_id
                LEFT JOIN sites s ON s.id = j.site_id
+               LEFT JOIN job_estimates je ON je.job_id = j.id
                WHERE j.id = ? AND j.user_id = ?""",
             (job_id, user_id),
         )
@@ -64,10 +75,12 @@ async def get_job(user_id: str, job_id: str) -> Optional[dict]:
 async def get_job_by_org(organization_id: str, job_id: str) -> Optional[dict]:
     async for db in get_db():
         cursor = await db.execute(
-            """SELECT j.*, l.name AS lot_name, s.name AS site_name
+            """SELECT j.*, l.name AS lot_name, s.name AS site_name,
+                      je.estimated_cost, je.estimated_runtime_min, je.paint_gallons, je.total_line_length_ft
                FROM jobs j
                LEFT JOIN lots l ON l.id = j.lot_id
                LEFT JOIN sites s ON s.id = j.site_id
+               LEFT JOIN job_estimates je ON je.job_id = j.id
                WHERE j.id = ? AND j.organization_id = ?""",
             (job_id, organization_id),
         )
@@ -98,10 +111,12 @@ async def list_jobs(
         total = (await cursor.fetchone())[0]
         offset = (page - 1) * limit
         cursor = await db.execute(
-            f"""SELECT j.*, l.name AS lot_name, s.name AS site_name
+            f"""SELECT j.*, l.name AS lot_name, s.name AS site_name,
+                       je.estimated_cost, je.estimated_runtime_min, je.paint_gallons, je.total_line_length_ft
                 FROM jobs j
                 LEFT JOIN lots l ON l.id = j.lot_id
                 LEFT JOIN sites s ON s.id = j.site_id
+                LEFT JOIN job_estimates je ON je.job_id = j.id
                 {where}
                 ORDER BY j.updated_at DESC
                 LIMIT ? OFFSET ?""",
@@ -131,10 +146,12 @@ async def list_work_orders(
         total = (await cursor.fetchone())[0]
         offset = (page - 1) * limit
         cursor = await db.execute(
-            f"""SELECT j.*, l.name AS lot_name, s.name AS site_name
+            f"""SELECT j.*, l.name AS lot_name, s.name AS site_name,
+                       je.estimated_cost, je.estimated_runtime_min, je.paint_gallons, je.total_line_length_ft
                 FROM jobs j
                 LEFT JOIN lots l ON l.id = j.lot_id
                 LEFT JOIN sites s ON s.id = j.site_id
+                LEFT JOIN job_estimates je ON je.job_id = j.id
                 {where}
                 ORDER BY COALESCE(j.scheduled_start_at, j.date) DESC
                 LIMIT ? OFFSET ?""",
@@ -151,10 +168,12 @@ async def find_work_order_for_schedule(
 ) -> Optional[dict]:
     async for db in get_db():
         cursor = await db.execute(
-            """SELECT j.*, l.name AS lot_name, s.name AS site_name
+            """SELECT j.*, l.name AS lot_name, s.name AS site_name,
+                      je.estimated_cost, je.estimated_runtime_min, je.paint_gallons, je.total_line_length_ft
                FROM jobs j
                LEFT JOIN lots l ON l.id = j.lot_id
                LEFT JOIN sites s ON s.id = j.site_id
+               LEFT JOIN job_estimates je ON je.job_id = j.id
                WHERE j.organization_id = ? AND j.recurring_schedule_id = ? AND j.date = ?
                LIMIT 1""",
             (organization_id, recurring_schedule_id, date),
@@ -173,10 +192,12 @@ async def get_priority_job(user_id: str) -> Optional[dict]:
     async for db in get_db():
         cursor = await db.execute(
             """
-            SELECT j.*, l.name AS lot_name, s.name AS site_name
+            SELECT j.*, l.name AS lot_name, s.name AS site_name,
+                   je.estimated_cost, je.estimated_runtime_min, je.paint_gallons, je.total_line_length_ft
             FROM jobs j
             LEFT JOIN lots l ON l.id = j.lot_id AND l.user_id = j.user_id
             LEFT JOIN sites s ON s.id = j.site_id
+            LEFT JOIN job_estimates je ON je.job_id = j.id
             WHERE j.user_id = ? AND j.status IN ('in_progress', 'assigned', 'scheduled', 'pending')
             ORDER BY
                 CASE j.status

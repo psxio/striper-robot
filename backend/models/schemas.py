@@ -170,6 +170,13 @@ class JobResponse(BaseModel):
     started_at: Optional[str] = None
     completed_at: Optional[str] = None
     robot_id: Optional[str] = None
+    lot_name: Optional[str] = None
+    site_name: Optional[str] = None
+    notes: Optional[str] = ""
+    estimated_cost: Optional[float] = None
+    estimated_runtime_min: Optional[int] = None
+    paint_gallons: Optional[float] = None
+    total_line_length_ft: Optional[float] = None
     created: str
     modified: str
 

@@ -585,8 +585,15 @@ select{-webkit-appearance:none;appearance:none;background-image:url("data:image/
       <!-- ═══ JOBS TAB ═══ -->
       <div class="sidebar-panel" id="panel-jobs">
         <div class="panel-section" style="flex:1">
-          <div class="panel-header">
+          <div class="panel-header" style="display:flex;justify-content:space-between;align-items:center">
             <span class="panel-title">Scheduled Jobs</span>
+            <select id="jobStatusFilter" style="font-size:.75rem;padding:2px 6px;background:var(--card-bg);color:var(--text-2);border:1px solid var(--border);border-radius:4px">
+              <option value="">All statuses</option>
+              <option value="pending">Pending</option>
+              <option value="in_progress">In Progress</option>
+              <option value="completed">Completed</option>
+              <option value="cancelled">Cancelled</option>
+            </select>
           </div>
           <div id="jobsList"></div>
           <div class="add-job-form">
@@ -2594,12 +2601,14 @@ function updateJobLotSelect() {
 
 function renderJobsList() {
   var container = document.getElementById('jobsList');
-  if (!jobs.length) {
+  var filterStatus = document.getElementById('jobStatusFilter')?.value || '';
+  var filteredJobs = filterStatus ? jobs.filter(function(j) { return j.status === filterStatus; }) : jobs;
+  if (!filteredJobs.length) {
     container.innerHTML = '<div class="empty-state" style="padding:16px">No scheduled jobs yet.</div>';
     return;
   }
 
-  container.innerHTML = jobs.map(function(job) {
+  container.innerHTML = filteredJobs.map(function(job) {
     var lot = lots.find(function(l) { return l.id === job.lotId; });
     var lotName = lot ? escapeHtml(lot.name) : 'Deleted Lot';
     var dateStr = new Date(job.date + 'T00:00:00').toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric', year: 'numeric' });
@@ -2611,9 +2620,12 @@ function renderJobsList() {
       completed: ' — Completed'
     };
     var statusLabel = statusLabels[job.status] || '';
+    var estimateStr = '';
+    if (job.estimated_cost) estimateStr += ' $' + Number(job.estimated_cost).toFixed(0);
+    if (job.estimated_runtime_min) estimateStr += (estimateStr ? ' | ' : ' ') + job.estimated_runtime_min + ' min';
     return '<div class="job-item">' +
       '<div class="job-status ' + job.status + '"></div>' +
-      '<div class="job-info"><div class="job-lot-name">' + lotName + statusLabel + '</div><div class="job-date">' + dateStr + timePref + (isPast && job.status === 'pending' ? ' (overdue)' : '') + '</div></div>' +
+      '<div class="job-info"><div class="job-lot-name">' + lotName + statusLabel + '</div><div class="job-date">' + dateStr + timePref + (isPast && job.status === 'pending' ? ' (overdue)' : '') + (estimateStr ? ' —' + estimateStr : '') + '</div></div>' +
       '<div class="job-actions">' +
         '<button class="job-action-btn" data-export-job="' + job.id + '" title="Export mission"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg></button>' +
         (job.status === 'pending' ?
@@ -2732,6 +2744,8 @@ document.getElementById('jobsList').addEventListener('click', async function(e) 
     });
   }
 });
+
+document.getElementById('jobStatusFilter').addEventListener('change', renderJobsList);
 
 document.getElementById('addJobBtn').addEventListener('click', async function() {
   var btn = this;
