@@ -5,7 +5,7 @@ import os
 from typing import Optional
 
 from fastapi import APIRouter, Depends, File, Form, HTTPException, Query, Request, UploadFile
-from fastapi.responses import Response
+from fastapi.responses import RedirectResponse, Response
 
 from ..rate_limit import limiter
 
@@ -98,6 +98,15 @@ async def download_media_asset(asset_id: str, context: dict = Depends(get_organi
     asset, content = await media_store.read_media_asset(context["organization"]["id"], asset_id)
     if not asset or content is None:
         raise HTTPException(status_code=404, detail="Media asset not found")
+
+    # Try presigned S3 redirect first (avoids proxying bytes through backend)
+    from ..services import storage_service
+    presigned_url = await storage_service.generate_presigned_url(
+        asset["storage_key"], filename=asset["filename"],
+    )
+    if presigned_url:
+        return RedirectResponse(url=presigned_url, status_code=307)
+
     return Response(
         content=content,
         media_type=asset["content_type"],

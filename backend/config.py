@@ -78,6 +78,9 @@ class Settings:
         # Metrics
         self.METRICS_TOKEN: str = os.environ.get("METRICS_TOKEN", "")
 
+        # S3 presigned URL expiry
+        self.S3_PRESIGN_EXPIRY_SECONDS: int = int(os.environ.get("S3_PRESIGN_EXPIRY_SECONDS", "3600"))
+
         # Per-plan API rate limits (requests per minute)
         self.RATE_LIMITS: dict = {
             "free": "30/minute",

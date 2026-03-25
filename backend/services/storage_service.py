@@ -105,6 +105,52 @@ async def delete_object(storage_key: str, *, bucket: Optional[str] = None) -> No
         path.unlink()
 
 
+async def generate_presigned_url(
+    storage_key: str,
+    *,
+    bucket: Optional[str] = None,
+    expiry: Optional[int] = None,
+    filename: Optional[str] = None,
+) -> Optional[str]:
+    """Generate a presigned S3 download URL. Returns None for local backend.
+
+    Args:
+        storage_key: The S3 object key.
+        bucket: Override bucket (default: S3_PRIVATE_BUCKET).
+        expiry: URL expiry in seconds (default: S3_PRESIGN_EXPIRY_SECONDS from config).
+        filename: Force a download filename via Content-Disposition.
+    """
+    if settings.OBJECT_STORAGE_BACKEND != "s3":
+        return None
+
+    try:
+        import boto3
+
+        client = boto3.client(
+            "s3",
+            endpoint_url=settings.S3_ENDPOINT_URL or None,
+            aws_access_key_id=settings.S3_ACCESS_KEY_ID or None,
+            aws_secret_access_key=settings.S3_SECRET_ACCESS_KEY or None,
+            region_name=settings.S3_REGION or None,
+        )
+        params = {
+            "Bucket": bucket or settings.S3_PRIVATE_BUCKET or settings.S3_BUCKET,
+            "Key": storage_key,
+        }
+        if filename:
+            params["ResponseContentDisposition"] = f'attachment; filename="{filename}"'
+
+        expiry_seconds = expiry or getattr(settings, "S3_PRESIGN_EXPIRY_SECONDS", 3600)
+        url = client.generate_presigned_url(
+            "get_object",
+            Params=params,
+            ExpiresIn=expiry_seconds,
+        )
+        return url
+    except Exception:
+        return None
+
+
 def guess_filename(storage_key: str, original_filename: Optional[str] = None) -> str:
     if original_filename:
         return original_filename
