@@ -11,7 +11,7 @@ from ..auth import get_admin_user
 from ..models.schemas import (
     SetPlanRequest, RobotCreate, RobotUpdate, AssignRobotRequest, AssignmentUpdate,
 )
-from ..services import admin_store, user_store, waitlist_store
+from ..services import admin_store, email_service, user_store, waitlist_store
 from ..services import robot_store
 from ..services.billing_store import set_user_plan
 
@@ -212,6 +212,21 @@ async def update_assignment(
     if not assignment:
         raise HTTPException(status_code=404, detail="Assignment not found")
     await admin_store.log_audit(admin["email"], "update_assignment", assignment_id)
+
+    # Send email notifications on shipment status changes
+    if body.status in ("shipped", "active", "returning"):
+        user = await user_store.get_user_by_id(assignment["user_id"])
+        if user:
+            import asyncio
+            if body.status == "shipped":
+                tracking = assignment.get("tracking_number") or body.tracking_number or ""
+                asyncio.create_task(email_service.send_robot_shipped_email(user["email"], tracking))
+            elif body.status == "active":
+                asyncio.create_task(email_service.send_robot_delivered_email(user["email"]))
+            elif body.status == "returning":
+                label_info = assignment.get("return_tracking") or ""
+                asyncio.create_task(email_service.send_return_initiated_email(user["email"], label_info))
+
     return assignment
 
 

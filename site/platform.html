@@ -3956,7 +3956,7 @@ async function loadRobotStatus() {
     var data = await api.get('/api/robots/status');
     var el = document.getElementById('robotStatusInfo');
     if (data.status === 'no_robot') {
-      el.innerHTML = 'No robot assigned yet. Contact support.';
+      el.innerHTML = 'No robot assigned yet. <a href="/claim.html" style="color:var(--accent);font-weight:600">Claim a Robot</a> with your code, or contact support.';
     } else {
       var statusColors = { preparing: 'var(--yellow)', shipped: 'var(--blue)', active: 'var(--green)', returning: 'var(--orange)' };
       var connectivityColors = { online: 'var(--green)', offline: 'var(--red)', unknown: 'var(--text-3)' };

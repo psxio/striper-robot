@@ -1,0 +1,217 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Strype — Claim Robot</title>
+<link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+<style>
+  *{margin:0;padding:0;box-sizing:border-box}
+  :root{
+    --bg:#0d1117;--card:#161b22;--border:#30363d;
+    --text:#e6edf3;--text2:#8b949e;--green:#3fb950;
+    --blue:#58a6ff;--red:#f85149;--yellow:#d29922;
+    --radius:8px;
+  }
+  body{font-family:'DM Sans',sans-serif;background:var(--bg);color:var(--text);min-height:100vh}
+  a{color:var(--blue);text-decoration:none}
+  .topbar{display:flex;align-items:center;justify-content:space-between;padding:12px 24px;border-bottom:1px solid var(--border);background:var(--card)}
+  .topbar h1{font-size:18px;font-weight:700}
+  .topbar-links{display:flex;gap:16px;align-items:center;font-size:14px}
+  .container{max-width:520px;margin:0 auto;padding:48px 24px}
+  .section{background:var(--card);border:1px solid var(--border);border-radius:var(--radius);padding:24px;margin-bottom:20px}
+  .section-title{font-size:16px;font-weight:600;margin-bottom:6px}
+  .section-sub{font-size:13px;color:var(--text2);margin-bottom:20px}
+  .field{margin-bottom:16px}
+  label{display:block;font-size:13px;color:var(--text2);margin-bottom:6px}
+  input,textarea{width:100%;background:var(--bg);border:1px solid var(--border);color:var(--text);padding:9px 12px;border-radius:var(--radius);font-size:14px;font-family:inherit;outline:none;transition:border-color .2s}
+  textarea{min-height:70px;resize:vertical}
+  input:focus,textarea:focus{border-color:var(--blue)}
+  .btn{display:inline-flex;align-items:center;justify-content:center;padding:9px 20px;border-radius:var(--radius);font-size:14px;font-weight:600;cursor:pointer;border:none;transition:opacity .15s;font-family:inherit}
+  .btn:hover{opacity:.85}
+  .btn:disabled{opacity:.4;cursor:default}
+  .btn-primary{background:var(--green);color:#0d1117}
+  .btn-outline{background:transparent;border:1px solid var(--border);color:var(--text)}
+  .flash{display:none;padding:10px 16px;border-radius:var(--radius);font-size:14px;margin-bottom:16px}
+  .flash.show{display:block}
+  .flash-ok{background:rgba(63,185,80,.15);border:1px solid var(--green);color:var(--green)}
+  .flash-err{background:rgba(248,81,73,.15);border:1px solid var(--red);color:var(--red)}
+  .robot-preview{background:var(--bg);border:1px solid var(--border);border-radius:var(--radius);padding:16px;margin-bottom:16px}
+  .robot-preview .serial{font-family:'JetBrains Mono',monospace;font-size:18px;font-weight:600;color:var(--green)}
+  .robot-preview .detail{font-size:13px;color:var(--text2);margin-top:4px}
+  .step{display:none}
+  .step.active{display:block}
+  .success-card{text-align:center;padding:32px}
+  .success-card h2{color:var(--green);margin-bottom:8px}
+  .success-card p{color:var(--text2);margin-bottom:20px}
+</style>
+</head>
+<body>
+<div class="topbar">
+  <h1>Claim Your Robot</h1>
+  <div class="topbar-links">
+    <a href="/platform.html">Platform</a>
+    <a href="/operations.html">Operations</a>
+  </div>
+</div>
+
+<div class="container">
+  <!-- Step 1: Enter claim code -->
+  <div id="step1" class="step active">
+    <div class="section">
+      <div class="section-title">Enter Claim Code</div>
+      <div class="section-sub">Your admin or sales contact provided a claim code to activate your robot.</div>
+      <div id="flash1" class="flash"></div>
+      <form id="validateForm">
+        <div class="field">
+          <label for="claimCode">Claim code</label>
+          <input id="claimCode" type="text" placeholder="claim_xxxxxxxxxxxxxxxx" required autocomplete="off" spellcheck="false" style="font-family:'JetBrains Mono',monospace">
+        </div>
+        <button type="submit" class="btn btn-primary" id="validateBtn">Validate Code</button>
+      </form>
+    </div>
+  </div>
+
+  <!-- Step 2: Preview + confirm -->
+  <div id="step2" class="step">
+    <div class="section">
+      <div class="section-title">Robot Found</div>
+      <div class="robot-preview">
+        <div class="serial" id="robotSerial"></div>
+        <div class="detail" id="robotDetail"></div>
+      </div>
+      <div id="flash2" class="flash"></div>
+      <form id="claimForm">
+        <div class="field">
+          <label for="friendlyName">Friendly name (optional)</label>
+          <input id="friendlyName" type="text" placeholder="e.g. North lot unit" maxlength="100">
+        </div>
+        <div class="field">
+          <label for="deployNotes">Deployment notes (optional)</label>
+          <textarea id="deployNotes" placeholder="Any setup notes for your team..." maxlength="500"></textarea>
+        </div>
+        <div style="display:flex;gap:8px">
+          <button type="button" class="btn btn-outline" onclick="goBack()">Back</button>
+          <button type="submit" class="btn btn-primary" id="claimBtn">Claim Robot</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <!-- Step 3: Success -->
+  <div id="step3" class="step">
+    <div class="section success-card">
+      <h2>Robot Claimed!</h2>
+      <p>Your robot has been commissioned into your workspace.</p>
+      <div class="robot-preview" style="text-align:left">
+        <div class="serial" id="successSerial"></div>
+        <div class="detail" id="successDetail"></div>
+      </div>
+      <div id="apiKeySection" style="display:none;text-align:left;margin-bottom:16px">
+        <label style="color:var(--yellow)">Robot API Key (save this now — it won't be shown again)</label>
+        <div style="display:flex;gap:8px;margin-top:6px">
+          <input id="apiKeyDisplay" type="text" readonly style="font-family:'JetBrains Mono',monospace;color:var(--green)">
+          <button type="button" class="btn btn-outline" id="copyKeyBtn">Copy</button>
+        </div>
+      </div>
+      <a href="/platform.html" class="btn btn-primary">Go to Platform</a>
+    </div>
+  </div>
+</div>
+
+<script type="module">
+import { apiFetch, getToken, redirectToPlatform } from '/assets/app-shell.js';
+
+if (!getToken()) redirectToPlatform();
+
+let validatedClaim = null;
+let validatedCode = '';
+
+function flash(id, msg, type = 'err') {
+  const el = document.getElementById(id);
+  if (!el) return;
+  el.textContent = msg;
+  el.className = 'flash show flash-' + type;
+}
+
+function showStep(n) {
+  document.querySelectorAll('.step').forEach(s => s.classList.remove('active'));
+  document.getElementById('step' + n).classList.add('active');
+}
+
+window.goBack = function() { showStep(1); };
+
+// Step 1: Validate claim code
+document.getElementById('validateForm').addEventListener('submit', async (e) => {
+  e.preventDefault();
+  const code = document.getElementById('claimCode').value.trim();
+  if (!code) return;
+  const btn = document.getElementById('validateBtn');
+  btn.disabled = true;
+  btn.textContent = 'Validating...';
+  try {
+    const claim = await apiFetch('/api/robot-claims/' + encodeURIComponent(code));
+    if (!claim) return;
+    validatedClaim = claim;
+    validatedCode = code;
+    document.getElementById('robotSerial').textContent = claim.serial_number || claim.robot_id;
+    const parts = [];
+    if (claim.firmware_version) parts.push('Firmware ' + claim.firmware_version);
+    if (claim.status) parts.push('Status: ' + claim.status);
+    document.getElementById('robotDetail').textContent = parts.join(' | ') || 'Ready to claim';
+    showStep(2);
+  } catch (err) {
+    flash('flash1', err.message || 'Invalid claim code');
+  } finally {
+    btn.disabled = false;
+    btn.textContent = 'Validate Code';
+  }
+});
+
+// Step 2: Confirm claim
+document.getElementById('claimForm').addEventListener('submit', async (e) => {
+  e.preventDefault();
+  const btn = document.getElementById('claimBtn');
+  btn.disabled = true;
+  btn.textContent = 'Claiming...';
+  try {
+    const result = await apiFetch('/api/robot-claims/' + encodeURIComponent(validatedCode) + '/claim', {
+      method: 'POST',
+      body: JSON.stringify({
+        friendly_name: document.getElementById('friendlyName').value.trim(),
+        deployment_notes: document.getElementById('deployNotes').value.trim(),
+      }),
+    });
+    if (!result) return;
+    // Show success
+    const robot = result.robot || {};
+    document.getElementById('successSerial').textContent = robot.serial_number || validatedClaim.serial_number || '';
+    document.getElementById('successDetail').textContent =
+      (result.friendly_name ? result.friendly_name + ' — ' : '') + 'Commissioned into workspace';
+    // Show API key if one was generated
+    if (result.api_key) {
+      document.getElementById('apiKeyDisplay').value = result.api_key;
+      document.getElementById('apiKeySection').style.display = 'block';
+      document.getElementById('copyKeyBtn').addEventListener('click', () => {
+        navigator.clipboard.writeText(result.api_key).then(() => {
+          document.getElementById('copyKeyBtn').textContent = 'Copied!';
+        });
+      });
+    }
+    showStep(3);
+  } catch (err) {
+    flash('flash2', err.message || 'Failed to claim robot');
+  } finally {
+    btn.disabled = false;
+    btn.textContent = 'Claim Robot';
+  }
+});
+
+// Pre-fill from URL param (e.g., /claim.html?code=claim_xxx)
+const params = new URLSearchParams(window.location.search);
+if (params.get('code')) {
+  document.getElementById('claimCode').value = params.get('code');
+}
+</script>
+</body>
+</html>
