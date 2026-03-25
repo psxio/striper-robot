@@ -12,9 +12,10 @@ from fastapi.responses import Response
 from pydantic import BaseModel
 from typing import Literal
 
-from ..auth import get_current_user
+from ..auth import require_active_billing
 from ..config import settings
 from ..models.schemas import LotCreate, LotUpdate, LotResponse, PaginatedLotResponse
+from ..orgs import get_organization_context
 from ..services import lot_store
 
 router = APIRouter(prefix="/api/lots", tags=["lots"])
@@ -50,9 +51,15 @@ async def list_lots(
     page: int = Query(default=1, ge=1),
     limit: int = Query(default=50, ge=1, le=200),
     search: str = Query(default=None, max_length=200),
-    user: dict = Depends(get_current_user),
+    context: dict = Depends(get_organization_context),
 ):
-    items, total = await lot_store.list_lots(user["id"], page=page, limit=limit, search=search)
+    items, total = await lot_store.list_lots(
+        context["user"]["id"],
+        page=page,
+        limit=limit,
+        search=search,
+        organization_id=context["organization"]["id"],
+    )
     return PaginatedLotResponse(
         items=[_to_response(l) for l in items],
         total=total,
@@ -62,11 +69,17 @@ async def list_lots(
 
 
 @router.post("", response_model=LotResponse, status_code=201)
-async def create_lot(body: LotCreate, user: dict = Depends(get_current_user)):
+async def create_lot(body: LotCreate, _billing=Depends(require_active_billing), context: dict = Depends(get_organization_context)):
     # Atomic plan enforcement
+    user = context["user"]
     plan = user.get("plan") or "free"
     limits = settings.PLAN_LIMITS.get(plan, settings.PLAN_LIMITS["free"])
-    lot = await lot_store.create_lot_atomic(user["id"], body, limits["max_lots"])
+    lot = await lot_store.create_lot_atomic(
+        user["id"],
+        body,
+        limits["max_lots"],
+        organization_id=context["organization"]["id"],
+    )
     if not lot:
         raise HTTPException(
             status_code=403,
@@ -78,8 +91,12 @@ async def create_lot(body: LotCreate, user: dict = Depends(get_current_user)):
 
 
 @router.get("/{lot_id}", response_model=LotResponse)
-async def get_lot(lot_id: str, user: dict = Depends(get_current_user)):
-    lot = await lot_store.get_lot(user["id"], lot_id)
+async def get_lot(lot_id: str, context: dict = Depends(get_organization_context)):
+    lot = await lot_store.get_lot(
+        context["user"]["id"],
+        lot_id,
+        organization_id=context["organization"]["id"],
+    )
     if not lot:
         raise HTTPException(status_code=404, detail="Lot not found")
     return _to_response(lot)
@@ -87,35 +104,49 @@ async def get_lot(lot_id: str, user: dict = Depends(get_current_user)):
 
 @router.put("/{lot_id}", response_model=LotResponse)
 async def update_lot(
-    lot_id: str, body: LotUpdate, user: dict = Depends(get_current_user)
+    lot_id: str, body: LotUpdate, context: dict = Depends(get_organization_context)
 ):
-    lot = await lot_store.update_lot(user["id"], lot_id, body)
+    lot = await lot_store.update_lot(
+        context["user"]["id"],
+        lot_id,
+        body,
+        organization_id=context["organization"]["id"],
+    )
     if not lot:
         raise HTTPException(status_code=404, detail="Lot not found")
     return _to_response(lot)
 
 
 @router.delete("/{lot_id}")
-async def delete_lot(lot_id: str, user: dict = Depends(get_current_user)):
-    deleted = await lot_store.delete_lot(user["id"], lot_id)
+async def delete_lot(lot_id: str, context: dict = Depends(get_organization_context)):
+    deleted = await lot_store.delete_lot(
+        context["user"]["id"],
+        lot_id,
+        organization_id=context["organization"]["id"],
+    )
     if not deleted:
         raise HTTPException(status_code=404, detail="Lot not found")
     return {"ok": True}
 
 
 @router.post("/{lot_id}/duplicate", response_model=LotResponse, status_code=201)
-async def duplicate_lot(lot_id: str, user: dict = Depends(get_current_user)):
+async def duplicate_lot(lot_id: str, _billing=Depends(require_active_billing), context: dict = Depends(get_organization_context)):
     # Enforce plan lot limit (same as create_lot)
+    user = context["user"]
     plan = user.get("plan") or "free"
     limits = settings.PLAN_LIMITS.get(plan, settings.PLAN_LIMITS["free"])
-    _, total = await lot_store.list_lots(user["id"])
+    _, total = await lot_store.list_lots(user["id"], organization_id=context["organization"]["id"])
     if total >= limits["max_lots"]:
         raise HTTPException(
             status_code=403,
             detail=f"Plan limited to {limits['max_lots']} lot"
                    + ("s" if limits["max_lots"] != 1 else ""),
         )
-    lot = await lot_store.duplicate_lot(user["id"], lot_id)
+    lot = await lot_store.duplicate_lot(
+        user["id"],
+        lot_id,
+        organization_id=context["organization"]["id"],
+    )
     if not lot:
         raise HTTPException(status_code=404, detail="Lot not found")
     return _to_response(lot)
@@ -127,10 +158,14 @@ async def duplicate_lot(lot_id: str, user: dict = Depends(get_current_user)):
 async def import_file(
     lot_id: str,
     file: UploadFile = File(...),
-    user: dict = Depends(get_current_user),
+    context: dict = Depends(get_organization_context),
 ):
     """Import DXF or SVG file into a lot's features."""
-    lot = await lot_store.get_lot(user["id"], lot_id)
+    lot = await lot_store.get_lot(
+        context["user"]["id"],
+        lot_id,
+        organization_id=context["organization"]["id"],
+    )
     if not lot:
         raise HTTPException(status_code=404, detail="Lot not found")
 
@@ -212,8 +247,9 @@ async def import_file(
     # Append to existing features
     all_features = lot["features"] + new_features
     updated = await lot_store.update_lot(
-        user["id"], lot_id,
+        context["user"]["id"], lot_id,
         LotUpdate(features=all_features),
+        organization_id=context["organization"]["id"],
     )
     return _to_response(updated)
 
@@ -238,10 +274,14 @@ class ExportRequest(BaseModel):
 async def export_lot(
     lot_id: str,
     body: ExportRequest,
-    user: dict = Depends(get_current_user),
+    context: dict = Depends(get_organization_context),
 ):
     """Export lot features as waypoints, GeoJSON, or KML."""
-    lot = await lot_store.get_lot(user["id"], lot_id)
+    lot = await lot_store.get_lot(
+        context["user"]["id"],
+        lot_id,
+        organization_id=context["organization"]["id"],
+    )
     if not lot:
         raise HTTPException(status_code=404, detail="Lot not found")
 

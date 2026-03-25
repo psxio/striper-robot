@@ -113,3 +113,26 @@ async def set_user_plan(user_id: str, plan: str) -> bool:
         )
         await db.commit()
         return cursor.rowcount > 0
+
+
+async def is_billing_active(user_id: str) -> bool:
+    """Check whether a user is allowed to create resources.
+
+    - Free-tier users (no subscription row, plan='free') → always allowed
+    - Paid users → allowed only if their subscription status is 'active'
+    - Users with a cancelled/past_due/unpaid subscription → blocked
+
+    This queries the subscriptions table directly rather than relying on the
+    user's plan column, which may have a race window after cancellation.
+    """
+    async for db in get_db():
+        # Check if user has any non-free subscription
+        cursor = await db.execute(
+            "SELECT status FROM subscriptions WHERE user_id = ? ORDER BY created_at DESC LIMIT 1",
+            (user_id,),
+        )
+        row = await cursor.fetchone()
+        if not row:
+            # No subscription record — free tier, always allowed
+            return True
+        return row["status"] == "active"

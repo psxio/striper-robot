@@ -4,7 +4,7 @@ import logging
 
 from fastapi import APIRouter, Depends, HTTPException, Query
 
-from ..auth import get_current_user
+from ..auth import get_current_user, require_active_billing
 from ..config import settings
 from ..models.schemas import ScheduleCreate, ScheduleUpdate, ScheduleResponse
 from ..services import schedule_store, lot_store
@@ -44,7 +44,7 @@ async def get_schedule_by_id(
 
 
 @router.post("", response_model=ScheduleResponse, status_code=201)
-async def create_schedule(body: ScheduleCreate, user: dict = Depends(get_current_user)):
+async def create_schedule(body: ScheduleCreate, user: dict = Depends(require_active_billing)):
     # Require Pro+ plan
     plan = user.get("plan") or "free"
     if plan == "free":

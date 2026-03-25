@@ -103,6 +103,23 @@ async def get_current_user(request: Request) -> dict:
         return user_dict
 
 
+async def require_active_billing(request: Request) -> dict:
+    """FastAPI dependency that verifies the user has active billing.
+
+    Free-tier users (no subscription) are always allowed.
+    Paid-tier users must have an active subscription (not cancelled/past_due).
+    Raises 403 if billing is inactive.
+    """
+    user = await get_current_user(request)
+    from .services.billing_store import is_billing_active
+    if not await is_billing_active(user["id"]):
+        raise HTTPException(
+            status_code=403,
+            detail="Subscription inactive — please update your billing at /billing.html",
+        )
+    return user
+
+
 async def get_admin_user(request: Request) -> dict:
     """FastAPI dependency that requires an admin user. Raises 403 if not admin."""
     user = await get_current_user(request)

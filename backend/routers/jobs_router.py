@@ -5,7 +5,7 @@ import logging
 from fastapi import APIRouter, Depends, HTTPException, Query
 from typing import Literal, Optional
 
-from ..auth import get_current_user
+from ..auth import get_current_user, require_active_billing
 from ..config import settings
 from ..models.schemas import JobCreate, JobUpdate, JobResponse, PaginatedJobResponse
 from ..services import job_store, lot_store
@@ -45,7 +45,7 @@ async def get_job(job_id: str, user: dict = Depends(get_current_user)):
 
 
 @router.post("", response_model=JobResponse, status_code=201)
-async def create_job(body: JobCreate, user: dict = Depends(get_current_user)):
+async def create_job(body: JobCreate, user: dict = Depends(require_active_billing)):
     # Validate lot ownership
     lot = await lot_store.get_lot(user["id"], body.lotId)
     if not lot:
